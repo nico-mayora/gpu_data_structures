@@ -1,4 +1,0 @@
-C:\Users\Nico\scoop\shims\cmake.exe -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=C:/Users/Nico/AppData/Local/Programs/CLion/bin/ninja/win/x64/ninja.exe -G Ninja -S C:\Users\Nico\CLionProjects\gpu_data_structures\kd-tree-cuda -B C:\Users\Nico\CLionProjects\gpu_data_structures\kd-tree-cuda\cmake-build-release
--- Configuring done (0.1s)
--- Generating done (0.0s)
--- Build files have been written to: C:/Users/Nico/CLionProjects/gpu_data_structures/kd-tree-cuda/cmake-build-release
