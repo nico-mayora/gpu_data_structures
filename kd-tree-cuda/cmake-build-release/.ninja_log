@@ -1,0 +1,8 @@
+# ninja log v6
+3236	4411	7706706773104898	CMakeFiles/kd_tree_cuda.dir/cmake_device_link.obj	3b35dd22248df9b0
+13	3236	7706706740860057	CMakeFiles/kd_tree_cuda.dir/main.cu.obj	9689425ae80c73b
+4411	4545	7706706784843719	kd_tree_cuda.exe	5119a9716c33656c
+17	2394	7706706740900077	CMakeFiles/kd_tree_cuda.dir/src/builder.cu.obj	bf4a7fc9167ce828
+19	240	7706707830971071	build.ninja	d0d175c5d016357a
+19	240	7706707830931066	C:/Users/Nico/CLionProjects/gpu_data_structures/kd-tree-cuda/cmake-build-release/cmake_install.cmake	d0d175c5d016357a
+3	12423	7706818286124438	CMakeFiles/kd_tree_cuda.dir/main.cu.obj	9689425ae80c73b
