@@ -1,3 +1,0 @@
-C:/Users/Nico/CLionProjects/gpu_data_structures/kd-tree-cuda/cmake-build-debug/CMakeFiles/kd_tree_cuda.dir
-C:/Users/Nico/CLionProjects/gpu_data_structures/kd-tree-cuda/cmake-build-debug/CMakeFiles/edit_cache.dir
-C:/Users/Nico/CLionProjects/gpu_data_structures/kd-tree-cuda/cmake-build-debug/CMakeFiles/rebuild_cache.dir

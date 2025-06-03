@@ -16,10 +16,10 @@ struct Point {
     float coords[DIM];
 };
 
-struct custom_less {
-    int level;
+struct ZipCompare {
+    int dim;
 
-    __host__ __device__ bool operator()(
+    __device__ bool operator()(
         const thrust::tuple<int, Point>& a,
         const thrust::tuple<int, Point>& b) const
     {
@@ -29,7 +29,6 @@ struct custom_less {
         }
 
         // If tags are equal, sort by data
-        const int dim = level % DIM;
         return thrust::get<1>(a).coords[dim] < thrust::get<1>(b).coords[dim];
     }
 };

@@ -56,36 +56,37 @@ __global__ void updateTags(int* tags, const int l, const int N) {
     // else tag remains unchanged: node is already at its correct position.
 }
 
-static void sort_tagged_data(int* d_tags, Point* d_data, const int n, const int l) {
-    const auto zip_begin = make_zip_iterator(
-        thrust::make_tuple(d_tags, d_data)
-    );
-    const auto zip_end = zip_begin + n;
-    // Sort with custom comparator
-    auto less_op = custom_less {l};
-    sort(thrust::device, zip_begin, zip_end, less_op);
-}
-
 void __host__ buildKDTree(Point* points, const size_t N) {
     int* d_tags;
-    cudaMalloc(&d_tags, N * sizeof(int));
-    cudaMemset(d_tags, 0, N * sizeof(int));
+    const size_t tagBufferSize =  N * sizeof(int);
+    Point* d_points;
+    const size_t pointBufferSize = N * sizeof(Point);
+    // Allocate GPU buffers.
+    cudaMalloc(&d_tags, tagBufferSize);
+    cudaMalloc(&d_points, pointBufferSize);
+    // Initialise buffers.
+    cudaMemset(d_tags, 0, tagBufferSize);
+    cudaMemcpy(d_points, points, pointBufferSize, cudaMemcpyHostToDevice);
+
+    // Create Thrust iterators for sorting
+    const auto zip_begin = thrust::make_zip_iterator(
+        thrust::make_tuple(d_tags, d_points)
+    );
+    const auto zip_end = zip_begin + N;
+
+    constexpr int threads_per_block = 256; // TODO: Don't hard-code
+    const int blocks = (N + threads_per_block - 1) / threads_per_block;
 
     const int max_levels = 31 - std::countl_zero(static_cast<uint32_t>(N));
-
-    Point* d_points;
-    const size_t bufferSize = N * sizeof(Point);
-    cudaMalloc(&d_points, bufferSize);
-    cudaMemcpy(d_points, points, bufferSize, cudaMemcpyHostToDevice);
-
-    // TODO: Don't hard-code
-    constexpr int threads_per_block = 256;
-    const int blocks = (N + threads_per_block - 1) / threads_per_block;
     for (int l = 0; l < max_levels; ++l) {
-        sort_tagged_data(d_tags, d_points, N, l);
+        sort(thrust::device, zip_begin, zip_end, ZipCompare { l % DIM });
         updateTags<<<blocks, threads_per_block>>>(d_tags, l, N);
     }
 
+    // One last sort to ensure every point is where it should be.
+    // They each have a unique tag, so dimension doesn't matter.
+    sort(thrust::device, zip_begin, zip_end, ZipCompare { 0 });
+
     cudaFree(d_tags);
-    cudaMemcpy(points, d_points, bufferSize, cudaMemcpyDeviceToHost);
+    cudaMemcpy(points, d_points, pointBufferSize, cudaMemcpyDeviceToHost);
 }

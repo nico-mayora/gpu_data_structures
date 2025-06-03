@@ -4,8 +4,8 @@
 static std::string pointCoords(const Point p) {
     return "("
         + std::to_string(p.coords[0]) + ", "
-        + std::to_string(p.coords[1]) + ", "
-        +/* std::to_string(p.coords[2]) + */")";
+        + std::to_string(p.coords[1]) + /* ", "
+        + std::to_string(p.coords[2]) + */")";
 }
 
 static void printPointBuffer(const Point *points, const int N) {
@@ -29,6 +29,7 @@ static void printKdTree(const Point *points, const int N) {
         std::cout << "Level " << l << ": ";
         for (int k = 0; k < inCurrLevel; ++k) {
             const int idx =  offset + k;
+            if (idx >= N) break;
             std::cout << "[" << points[idx].payload << ": " << pointCoords(points[idx]) << "]";
         }
         std::cout << "\n";
