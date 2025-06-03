@@ -33,4 +33,7 @@ struct ZipCompare {
     }
 };
 
-void __host__ buildKDTree(Point *points, const size_t N);
+/*
+ * Overwrites original pointer with a device buffer containing the kd-tree.
+ */
+void __host__ buildKDTree(Point *&points, const size_t N);

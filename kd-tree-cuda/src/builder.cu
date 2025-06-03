@@ -56,7 +56,7 @@ __global__ void updateTags(int* tags, const int l, const int N) {
     // else tag remains unchanged: node is already at its correct position.
 }
 
-void __host__ buildKDTree(Point* points, const size_t N) {
+void __host__ buildKDTree(Point *&points, const size_t N) {
     int* d_tags;
     const size_t tagBufferSize =  N * sizeof(int);
     Point* d_points;
@@ -88,5 +88,6 @@ void __host__ buildKDTree(Point* points, const size_t N) {
     sort(thrust::device, zip_begin, zip_end, ZipCompare { 0 });
 
     cudaFree(d_tags);
-    cudaMemcpy(points, d_points, pointBufferSize, cudaMemcpyDeviceToHost);
+    delete[] points;
+    points = d_points;
 }

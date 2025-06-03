@@ -60,6 +60,11 @@ int main() {
 
     std::cout << "Building KDTREE... \n";
     buildKDTree(points, N);
+    const auto host_points = new Point[N];
+    cudaMemcpy(host_points, points, N * sizeof(Point), cudaMemcpyDeviceToHost);
     std::cout << "KDTREE is: \n";
-    printKdTree(points, N);
+    printKdTree(host_points, N);
+
+    cudaFree(points);
+    delete[] host_points;
 }
