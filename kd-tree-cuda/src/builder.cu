@@ -57,18 +57,13 @@ __global__ void updateTags(int* tags, const int l, const int N) {
 }
 
 static void sort_tagged_data(int* d_tags, Point* d_data, const int n, const int l) {
-    printf("start!\n");
     const auto zip_begin = make_zip_iterator(
         thrust::make_tuple(d_tags, d_data)
     );
     const auto zip_end = zip_begin + n;
-    printf("middle!\n");
     // Sort with custom comparator
     auto less_op = custom_less {l};
-    printf("after!\n");
-
-    sort(zip_begin, zip_end, less_op);
-    printf("afters!\n");
+    sort(thrust::device, zip_begin, zip_end, less_op);
 }
 
 void __host__ buildKDTree(Point* points, const size_t N) {
@@ -83,16 +78,12 @@ void __host__ buildKDTree(Point* points, const size_t N) {
     cudaMalloc(&d_points, bufferSize);
     cudaMemcpy(d_points, points, bufferSize, cudaMemcpyHostToDevice);
 
-    printf("here!\n");
     // TODO: Don't hard-code
     constexpr int threads_per_block = 256;
     const int blocks = (N + threads_per_block - 1) / threads_per_block;
     for (int l = 0; l < max_levels; ++l) {
-        printf("before!\n");
         sort_tagged_data(d_tags, d_points, N, l);
-        printf("mid!\n");
         updateTags<<<blocks, threads_per_block>>>(d_tags, l, N);
-        printf("after!\n");
     }
 
     cudaFree(d_tags);

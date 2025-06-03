@@ -31,6 +31,7 @@ static void printKdTree(const Point *points, const int N) {
             const int idx =  offset + k;
             std::cout << "[" << points[idx].payload << ": " << pointCoords(points[idx]) << "]";
         }
+        std::cout << "\n";
         offset += inCurrLevel;
     }
 }
