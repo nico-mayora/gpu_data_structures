@@ -69,7 +69,7 @@ void __host__ buildKDTree(Point *&points, const size_t N) {
     cudaMemcpy(d_points, points, pointBufferSize, cudaMemcpyHostToDevice);
 
     // Create Thrust iterators for sorting
-    const auto zip_begin = thrust::make_zip_iterator(
+    const auto zip_begin = make_zip_iterator(
         thrust::make_tuple(d_tags, d_points)
     );
     const auto zip_end = zip_begin + N;
@@ -89,5 +89,5 @@ void __host__ buildKDTree(Point *&points, const size_t N) {
 
     cudaFree(d_tags);
     delete[] points;
-    points = d_points;
+    points = d_points; // Maybe return this value instead of destroying orig buffer?
 }
