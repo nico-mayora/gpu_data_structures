@@ -3,21 +3,11 @@
 #include <bit>
 #include <thrust/sort.h>
 #include <thrust/tuple.h>
+#include "data.cuh"
 
-constexpr int DIM = 2;
-
-/*
- * TODO: Generalise using templates and concepts:
- * * Point struct data fields.
- * * Point dimension
-*/
-struct Point {
-    char payload;
-    float coords[DIM];
-};
-
+/* Functor that implements custom tag-major, coordinate-minor order. */
 struct ZipCompare {
-    int dim;
+    int dim = 0; // by default, we split along x.
 
     __device__ bool operator()(
         const thrust::tuple<int, Point>& a,
@@ -34,6 +24,6 @@ struct ZipCompare {
 };
 
 /*
- * Overwrites original pointer with a device buffer containing the kd-tree.
+ * Takes a device buffer and creates a kd-tree inplace.
  */
-void __host__ buildKDTree(Point *&points, const size_t N);
+__host__ void build_kd_tree(Point *d_points, size_t N);

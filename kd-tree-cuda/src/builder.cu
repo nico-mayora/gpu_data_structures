@@ -6,11 +6,11 @@ __device__ int num_nodes_in_full_tree(const int depth) {
     return (1 << depth) - 1;
 }
 
-__device__ int lChild(const int i) {
+__device__ int l_child(const int i) {
     return 2 * i + 1;
 }
 
-__device__ int rChild(const int i) {
+__device__ int r_child(const int i) {
     return 2 * i + 2;
 }
 
@@ -18,55 +18,50 @@ __device__ int level(const int i) {
     return 31 - __clz(i + 1);
 }
 
-__device__ int numLevels(const int N) {
+__device__ int num_levels(const int N) {
     return level(N - 1) + 1;
 }
 
 // N won't be an argument in the future; it should be part of the template params.
-__device__ int subtreeSize(const int s, const int N) {
-    const auto L = numLevels(N);
-    const auto l = level(s);
-    const auto fullInner = (1 << (L - l - 1)) - 1;
-    const auto fllc_s = ~((~s) << (L - l - 1));
-    const auto lowest = thrust::min(thrust::max(0, N - fllc_s), 1 << (L - l - 1));
-    return fullInner + lowest;
+__device__ int subtree_size(const int s, const int N) {
+    const auto total_levels = num_levels(N);
+    const auto current_level = level(s);
+    const auto full_inner = (1 << (total_levels - current_level - 1)) - 1;
+    const auto fllc_s = ~((~s) << (total_levels - current_level - 1));
+    const auto lowest = thrust::min(thrust::max(0, N - fllc_s), 1 << (total_levels - current_level - 1));
+    return full_inner + lowest;
 }
 
-__device__ int segmentBegin(const int s, const int l, const int N) {
-    const auto L = numLevels(N);
-    const auto topLevels = (1 << l) - 1;
-    const auto nls_s = s - topLevels;
+__device__ int segment_begin(const int s, const int l, const int N) {
+    const auto L = num_levels(N);
+    const auto top_levels = (1 << l) - 1;
+    const auto nls_s = s - top_levels;
     const auto inner = nls_s * ((1 << (L - l - 1)) - 1);
     const auto lowest = thrust::min(nls_s * (1 << (L - l - 1)), N - ((1 << (L - 1)) - 1));
-    return topLevels + inner + lowest;
+    return top_levels + inner + lowest;
 }
 
 // DEVICE HELPER FUNCTIONS END
 
-__global__ void updateTags(int* tags, const int l, const int N) {
-    const int arrayIdx = threadIdx.x;
-    if (arrayIdx >= N || arrayIdx < num_nodes_in_full_tree(l))
+__global__ void update_tags(int* tags, const int l, const int N) {
+    const int array_idx = threadIdx.x;
+    if (array_idx >= N || array_idx < num_nodes_in_full_tree(l))
         return;
 
-    const int currentTag = tags[arrayIdx];
-    if (const int pivotPos = segmentBegin(currentTag, l, N) + subtreeSize(lChild(currentTag), N); arrayIdx < pivotPos)
-        tags[arrayIdx] = lChild(currentTag);
-    else if (arrayIdx > pivotPos)
-        tags[arrayIdx] = rChild(currentTag);
+    const int current_tag = tags[array_idx];
+    if (const int pivot_pos = segment_begin(current_tag, l, N) + subtree_size(l_child(current_tag), N); array_idx < pivot_pos)
+        tags[array_idx] = l_child(current_tag);
+    else if (array_idx > pivot_pos)
+        tags[array_idx] = r_child(current_tag);
     // else tag remains unchanged: node is already at its correct position.
 }
 
-void __host__ buildKDTree(Point *&points, const size_t N) {
+__host__ void build_kd_tree(Point *d_points, const size_t N) {
     int* d_tags;
-    const size_t tagBufferSize =  N * sizeof(int);
-    Point* d_points;
-    const size_t pointBufferSize = N * sizeof(Point);
-    // Allocate GPU buffers.
-    cudaMalloc(&d_tags, tagBufferSize);
-    cudaMalloc(&d_points, pointBufferSize);
-    // Initialise buffers.
-    cudaMemset(d_tags, 0, tagBufferSize);
-    cudaMemcpy(d_points, points, pointBufferSize, cudaMemcpyHostToDevice);
+    const size_t tag_buffer_size =  N * sizeof(int);
+    // Allocate and initialise tags buffer.
+    cudaMalloc(&d_tags, tag_buffer_size);
+    cudaMemset(d_tags, 0, tag_buffer_size);
 
     // Create Thrust iterators for sorting
     const auto zip_begin = make_zip_iterator(
@@ -74,20 +69,19 @@ void __host__ buildKDTree(Point *&points, const size_t N) {
     );
     const auto zip_end = zip_begin + N;
 
-    constexpr int threads_per_block = 256; // TODO: Don't hard-code
+    constexpr int threads_per_block = 256;
     const int blocks = (N + threads_per_block - 1) / threads_per_block;
 
+    // Equivalent to log2(N), the number of levels in a size N binary tree.
     const int max_levels = 31 - std::countl_zero(static_cast<uint32_t>(N));
     for (int l = 0; l < max_levels; ++l) {
         sort(thrust::device, zip_begin, zip_end, ZipCompare { l % DIM });
-        updateTags<<<blocks, threads_per_block>>>(d_tags, l, N);
+        update_tags<<<blocks, threads_per_block>>>(d_tags, l, N);
     }
 
     // One last sort to ensure every point is where it should be.
     // They each have a unique tag, so dimension doesn't matter.
-    sort(thrust::device, zip_begin, zip_end, ZipCompare { 0 });
+    sort(thrust::device, zip_begin, zip_end, ZipCompare());
 
     cudaFree(d_tags);
-    delete[] points;
-    points = d_points; // Maybe return this value instead of destroying orig buffer?
 }
