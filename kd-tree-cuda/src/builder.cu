@@ -1,4 +1,5 @@
 #include "builder.cuh"
+#include "queries.cuh"
 #include <thrust/iterator/zip_iterator.h>
 
 // DEVICE HELPER FUNCTIONS BEGIN
@@ -64,7 +65,7 @@ __host__ void build_kd_tree(Point *d_points, const size_t N) {
     cudaMemset(d_tags, 0, tag_buffer_size);
 
     // Create Thrust iterators for sorting
-    const auto zip_begin = make_zip_iterator(
+    const auto zip_begin = thrust::make_zip_iterator(
         thrust::make_tuple(d_tags, d_points)
     );
     const auto zip_end = zip_begin + N;
@@ -82,6 +83,7 @@ __host__ void build_kd_tree(Point *d_points, const size_t N) {
     // One last sort to ensure every point is where it should be.
     // They each have a unique tag, so dimension doesn't matter.
     sort(thrust::device, zip_begin, zip_end, ZipCompare());
+
 
     cudaFree(d_tags);
 }
