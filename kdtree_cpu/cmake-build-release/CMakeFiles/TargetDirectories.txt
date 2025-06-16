@@ -1,3 +1,0 @@
-C:/Users/Nico/CLionProjects/gpu_data_structures/kdtree_cpu/cmake-build-release/CMakeFiles/kdtree_cpu.dir
-C:/Users/Nico/CLionProjects/gpu_data_structures/kdtree_cpu/cmake-build-release/CMakeFiles/edit_cache.dir
-C:/Users/Nico/CLionProjects/gpu_data_structures/kdtree_cpu/cmake-build-release/CMakeFiles/rebuild_cache.dir
