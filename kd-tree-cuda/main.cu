@@ -43,7 +43,9 @@ static void print_kd_tree(const Point *points, const int N) {
 __global__ void fcp_kernel(const float *query_point, const Point *tree_buf, const size_t N, QueryResult *result) {
     if (threadIdx.x != 0 || blockIdx.x != 0) return;
 
+    result = alloc_query_result(1);
     fcp(query_point, tree_buf, N, result);
+    printf("idx: %lu\n", result->pointIndices[0]);
 }
 
 int main() {
@@ -85,26 +87,22 @@ int main() {
     print_kd_tree(host_points, N);
 
     // Perform simple query
-    float query_point[2] = {15.5f, 43.3f};
+    float query_point[2] = {68.5f, 21.9f};
     float *d_query_point;
     cudaMalloc(&d_query_point, 2 * sizeof(float));
     cudaMemcpy(d_query_point, query_point, 2 * sizeof(float), cudaMemcpyHostToDevice);
 
-    size_t *idxBuffer;
-    cudaMalloc(&idxBuffer, sizeof(size_t));
-    auto result = QueryResult {1, idxBuffer, 0};
-    QueryResult *d_result;
-    cudaMalloc(&d_result, sizeof(QueryResult));
-    cudaMemcpy(d_result, &result, sizeof(QueryResult), cudaMemcpyHostToDevice);
+    QueryResult *d_result = nullptr;
 
     std::cout << "FCP is: \n";
     fcp_kernel<<<1,1>>>(d_query_point, d_points, N, d_result);
     cudaDeviceSynchronize();
 
+    QueryResult result;
     cudaMemcpy(&result, d_result, sizeof(QueryResult), cudaMemcpyDeviceToHost);
 
     size_t h_indices[1];
-    cudaMemcpy(h_indices, idxBuffer, result.foundPoints * sizeof(size_t), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_indices, result.pointIndices, result.foundPoints * sizeof(size_t), cudaMemcpyDeviceToHost);
 
     std::cout << "Found points: " << result.foundPoints << "\n";
     if (result.foundPoints > 0) {

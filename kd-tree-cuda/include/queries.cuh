@@ -6,8 +6,13 @@ constexpr float REALLY_FAR = 1000000.f;
 struct QueryResult {
     size_t K;
     size_t *pointIndices;
+    float *pointDistances;
     size_t foundPoints = 0; /* <= K */
+
+    __device__ float addNode(float dist, size_t node_id);
 };
+
+__device__ QueryResult *alloc_query_result(size_t K);
 
 /* Return an index buffer with (at most) K values that index into the initial point buffer
 * QueryResult lifetime and allocation is managed by the caller.
