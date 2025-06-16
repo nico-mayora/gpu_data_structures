@@ -76,7 +76,7 @@ __device__ void get_closest_k_points_in_range(const float *query_pos, const P *t
             max_search_radius = result->addNode(dist2, curr);
         }
 
-        const int split_dim = curr % P::getDim();
+        const int split_dim = curr % P::dimension;
         const float split_pos = tree_buf[curr].coords[split_dim];
         const float signed_dist = query_pos[split_dim] - split_pos;
         const int close_side = signed_dist > 0.f;

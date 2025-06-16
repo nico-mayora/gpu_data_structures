@@ -8,7 +8,7 @@ static std::string print_coords(const Point<DIM> p) {
     std::string result = "(";
 #pragma unroll
     for (int d = 0; d < DIM; ++d) {
-        result += std::to_string(p.coords[0]) + " ";
+        result += std::to_string(p.coords[d]) + " ";
     }
     result.pop_back();
     return result + ")";
@@ -59,16 +59,16 @@ __global__ void fcp_kernel(const float *query_point, const Point<DIM> *tree_buf,
 
 int main() {
     std::vector points_vec = {
-        Point { 'a', {10., 15.} },
-        Point { 'b', {46., 63.} },
-        Point { 'c', {68., 21.} },
-        Point { 'd', {40., 33.} },
-        Point { 'e', {25., 54.} },
-        Point { 'f', {15., 43.} },
-        Point { 'g', {44., 58.} },
-        Point { 'h', {45., 40.} },
-        Point { 'i', {62., 69.} },
-        Point { 'j', {53., 67.} }
+        Point { {10., 15.}, 'a' },
+        Point { {46., 63.}, 'b' },
+        Point { {68., 21.}, 'c' },
+        Point { {40., 33.}, 'd' },
+        Point { {25., 54.}, 'e' },
+        Point { {15., 43.}, 'f' },
+        Point { {44., 58.}, 'g' },
+        Point { {45., 40.}, 'h' },
+        Point { {62., 69.}, 'i' },
+        Point { {53., 67.}, 'j' },
     };
 
     const auto points = &points_vec[0];

@@ -102,7 +102,7 @@ __host__ void build_kd_tree(P *d_points, const size_t N) {
     // Equivalent to log2(N), the number of levels in a size N binary tree.
     const int max_levels = 31 - std::countl_zero(static_cast<uint32_t>(N));
     for (int l = 0; l < max_levels; ++l) {
-        sort(thrust::device, zip_begin, zip_end, ZipCompare<P> { l % P::getDim() });
+        sort(thrust::device, zip_begin, zip_end, ZipCompare<P> { l % P::dimension });
         update_tags<<<blocks, threads_per_block>>>(d_tags, l, static_cast<int>(N));
     }
 

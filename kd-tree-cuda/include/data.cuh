@@ -2,9 +2,11 @@
 
 template<int DIM>
 struct Point {
-    //Required member fields:
-    static constexpr int dim = DIM;
+    //Required member
     float coords[DIM];
+
+    // This field is just a stand-in for any payload a custom point type would have.
+    char payload;
 
     /* Required method for performing queries.
      * Returns distance between this and a point buffer x.
@@ -20,6 +22,5 @@ struct Point {
         return acum;
     }
 
-    // This field is just a stand-in for any payload a custom point type would have.
-    char payload;
+    static constexpr int dimension = DIM;
 };
