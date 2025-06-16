@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.0)
+cmake_minimum_required(VERSION 3.31)
 project(kd_tree_cuda CUDA)
 
 set(CMAKE_CUDA_STANDARD 23)
