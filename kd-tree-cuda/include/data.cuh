@@ -1,32 +1,25 @@
 #pragma once
-#include <cstdio>
 
-constexpr int DIM = 2;
-
-/*
- * TODO: Generalise using templates:
- * * Point struct data fields.
- * * Point dimension
- * * Do we need a "registerPointType" method?
-*/
+template<int DIM>
 struct Point {
-    char payload;
+    //Required member fields:
+    static constexpr int dim = DIM;
     float coords[DIM];
-};
 
-// HELPER FUNCTIONS
-
-/* Return squared norm between to points */
-__device__ __inline__ float norm2(const float *x, const float *y) {
-    float acum = 0.;
+    /* Required method for performing queries.
+     * Returns distance between this and a point buffer x.
+     * We assume x's dimension is DIM.
+     */
+    __device__ __inline__ float dist2(const float *x) const {
+        float acum = 0.;
 #pragma unroll
-    for (int i = 0; i < DIM; ++i) {
-        const float diff = y[i] - x[i];
-        acum += diff * diff;
+        for (int i = 0; i < DIM; ++i) {
+            const float diff = coords[i] - x[i];
+            acum += diff * diff;
+        }
+        return acum;
     }
-    return acum;
-}
 
-static __device__ __inline__ int parent_node(const int p) {
-    return (p + 1) / 2 - 1;
-}
+    // This field is just a stand-in for any payload a custom point type would have.
+    char payload;
+};

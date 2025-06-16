@@ -3,14 +3,19 @@
 #include <iostream>
 #include <vector>
 
-static std::string print_coords(const Point p) {
-    return "("
-        + std::to_string(p.coords[0]) + ", "
-        + std::to_string(p.coords[1]) + /* ", "
-        + std::to_string(p.coords[2]) + */")";
+template<int DIM>
+static std::string print_coords(const Point<DIM> p) {
+    std::string result = "(";
+#pragma unroll
+    for (int d = 0; d < DIM; ++d) {
+        result += std::to_string(p.coords[0]) + " ";
+    }
+    result.pop_back();
+    return result + ")";
 }
 
-static void print_point_buffer(const Point *points, const int N) {
+template<int DIM>
+static void print_point_buffer(const Point<DIM> *points, const int N) {
     for (int i = 0; i < N; ++i) {
         std::cout << "Coords: " << print_coords(points[i]) << " Payload: '" << points[i].payload << "'\n";
     }
@@ -19,12 +24,14 @@ static void print_point_buffer(const Point *points, const int N) {
 static int nodes_in_level(const int l) {
     return 1 << l;
 }
-static int num_levels(const int N) {
+
+static int levels_count(const int N) {
     return 32 - std::countl_zero(static_cast<uint32_t>(N));
 }
 
-static void print_kd_tree(const Point *points, const int N) {
-    const int maxLvl = num_levels(N);
+template<int DIM>
+static void print_kd_tree(const Point<DIM> *points, const int N) {
+    const int maxLvl = levels_count(N);
     int offset = 0;
     for (int l = 0; l < maxLvl; ++l) {
         const int inCurrLevel = nodes_in_level(l);
@@ -40,7 +47,8 @@ static void print_kd_tree(const Point *points, const int N) {
 }
 
 // Just for testing
-__global__ void fcp_kernel(const float *query_point, const Point *tree_buf, const size_t N, FcpResult *result) {
+template<int DIM>
+__global__ void fcp_kernel(const float *query_point, const Point<DIM> *tree_buf, const size_t N, FcpResult *result) {
     if (threadIdx.x != 0 || blockIdx.x != 0) return;
 
     result = alloc_query_result<1>();
@@ -69,8 +77,10 @@ int main() {
     std::cout << "Points is: \n";
     print_point_buffer(points, N);
 
+    constexpr int dim = 2;
+
     // Create device buffer for points
-    Point *d_points;
+    Point<dim> *d_points;
     const size_t device_buffer_size = N * sizeof(points[0]);
     cudaMalloc(&d_points, device_buffer_size);
     cudaMemcpy(d_points, points, device_buffer_size, cudaMemcpyHostToDevice);
@@ -80,7 +90,7 @@ int main() {
     build_kd_tree(d_points, N);
 
     // Copy it back to the host
-    const auto host_points = new Point[N];
+    const auto host_points = new Point<2>[N];
     cudaMemcpy(host_points, d_points, device_buffer_size, cudaMemcpyDeviceToHost);
 
     // Print it in level-order

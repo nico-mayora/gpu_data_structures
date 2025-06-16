@@ -47,11 +47,15 @@ __device__ QueryResult<K> *alloc_query_result() {
     return result_ptr;
 }
 
+static __device__ __inline__ int parent_node(const int p) {
+    return (p + 1) / 2 - 1;
+}
+
 /* Return an index buffer with (at most) K values that index into the initial point buffer
 * QueryResult lifetime and allocation is managed by the caller.
 * */
-template<int K>
-__device__ void get_closest_k_points_in_range(const float *query_pos, const Point *tree_buf, const size_t N,
+template<int K, typename P>
+__device__ void get_closest_k_points_in_range(const float *query_pos, const P *tree_buf, const size_t N,
                                               const float query_range, QueryResult<K> *result) {
     int curr = 0;
     int prev = -1;
@@ -68,11 +72,11 @@ __device__ void get_closest_k_points_in_range(const float *query_pos, const Poin
 
         const bool from_parent = prev < curr;
         if (from_parent) {
-            const float dist = norm2(query_pos, tree_buf[curr].coords);
-            max_search_radius = result->addNode(dist, curr);
+            const float dist2 = tree_buf[curr].dist2(query_pos);
+            max_search_radius = result->addNode(dist2, curr);
         }
 
-        const int split_dim = curr % DIM;
+        const int split_dim = curr % P::getDim();
         const float split_pos = tree_buf[curr].coords[split_dim];
         const float signed_dist = query_pos[split_dim] - split_pos;
         const int close_side = signed_dist > 0.f;
@@ -94,19 +98,20 @@ __device__ void get_closest_k_points_in_range(const float *query_pos, const Poin
     }
 }
 
-template<int K>
-__device__ __inline__ void points_in_range(const float *query_pos, const Point *tree_buf, const size_t N,
+template<int K, typename P>
+__device__ __inline__ void points_in_range(const float *query_pos, const P *tree_buf, const size_t N,
                                            const float query_range, QueryResult<K> *result) {
     get_closest_k_points_in_range(query_pos, tree_buf, N, query_range, result);
 }
 
-__device__ __inline__ void fcp(const float *query_pos, const Point *tree_buf, const size_t N, FcpResult *result) {
+template<typename P>
+__device__ __inline__ void fcp(const float *query_pos, const P *tree_buf, const size_t N, FcpResult *result) {
     const float query_range = INFTY;
     get_closest_k_points_in_range(query_pos, tree_buf, N, query_range, result);
 }
 
-template<int K>
-__device__ __inline__ void knn(const float *query_pos, const Point *tree_buf, const size_t N, QueryResult<K> *result) {
+template<int K, typename P>
+__device__ __inline__ void knn(const float *query_pos, const P *tree_buf, const size_t N, QueryResult<K> *result) {
     const float query_range = INFTY;
     get_closest_k_points_in_range(query_pos, tree_buf, N, query_range, result);
 }
