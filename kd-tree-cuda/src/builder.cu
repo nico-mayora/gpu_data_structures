@@ -84,6 +84,5 @@ __host__ void build_kd_tree(Point *d_points, const size_t N) {
     // They each have a unique tag, so dimension doesn't matter.
     sort(thrust::device, zip_begin, zip_end, ZipCompare());
 
-
     cudaFree(d_tags);
 }

@@ -14,6 +14,8 @@ struct Point {
     float coords[DIM];
 };
 
+// HELPER FUNCTIONS
+
 /* Return squared norm between to points */
 __device__ __inline__ float norm2(const float *x, const float *y) {
     float acum = 0.;
@@ -23,4 +25,8 @@ __device__ __inline__ float norm2(const float *x, const float *y) {
         acum += diff * diff;
     }
     return acum;
+}
+
+static __device__ __inline__ int parent_node(const int p) {
+    return (p + 1) / 2 - 1;
 }
