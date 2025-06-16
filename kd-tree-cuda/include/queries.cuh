@@ -1,7 +1,7 @@
 #pragma once
 #include "data.cuh"
 
-constexpr float INFTY = __int_as_float(0x7f800000);
+#define INFTY __int_as_float(0x7f800000);
 
 template<int K>
 struct QueryResult {
@@ -11,6 +11,7 @@ struct QueryResult {
 
     __device__ float addNode(float dist, size_t node_id) {
         foundPoints = (foundPoints < K) ? foundPoints + 1 : K;
+#pragma unroll
         for (int i = 0; i < K; ++i) {
             if (dist < this->pointDistances[i]) {
                 const auto old_dist = pointDistances[i];
@@ -34,9 +35,9 @@ __device__ QueryResult<K> *alloc_query_result() {
     auto idx_buf = static_cast<size_t *>(malloc(K * sizeof(size_t)));
     auto *dist_buf = static_cast<float *>(malloc(K * sizeof(float)));
 
-    memset(idx_buf, NULL, K * sizeof(size_t));
 #pragma unroll
     for (int i = 0; i < K; ++i) {
+        idx_buf[i] = 0;
         dist_buf[i] = INFTY;
     }
 
@@ -99,8 +100,7 @@ __device__ __inline__ void points_in_range(const float *query_pos, const Point *
     get_closest_k_points_in_range(query_pos, tree_buf, N, query_range, result);
 }
 
-template<int K>
-__device__ __inline__ void fcp(const float *query_pos, const Point *tree_buf, const size_t N, QueryResult<K> *result) {
+__device__ __inline__ void fcp(const float *query_pos, const Point *tree_buf, const size_t N, FcpResult *result) {
     const float query_range = INFTY;
     get_closest_k_points_in_range(query_pos, tree_buf, N, query_range, result);
 }
