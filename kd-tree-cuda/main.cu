@@ -1,6 +1,7 @@
 #include "builder.cuh"
 #include "queries.cuh"
 #include <iostream>
+#include <vector>
 
 static std::string print_coords(const Point p) {
     return "("
@@ -38,6 +39,15 @@ static void print_kd_tree(const Point *points, const int N) {
     }
 }
 
+// Just for testing
+__global__ void fcp_kernel(const float *query_point, const Point *tree_buf, const size_t N, FcpResult *result) {
+    if (threadIdx.x != 0 || blockIdx.x != 0) return;
+
+    result = alloc_query_result<1>();
+    fcp(query_point, tree_buf, N, result);
+    printf("idx: %lu\n", result->pointIndices[0]);
+    cudaFree(result);
+}
 
 int main() {
     std::vector points_vec = {
@@ -54,7 +64,7 @@ int main() {
     };
 
     const auto points = &points_vec[0];
-    const int N = points_vec.size();
+    const int N = static_cast<int>(points_vec.size());
 
     std::cout << "Points is: \n";
     print_point_buffer(points, N);
@@ -77,7 +87,22 @@ int main() {
     std::cout << "KDTREE is: \n";
     print_kd_tree(host_points, N);
 
+    // Perform simple query
+    float query_point[2] = {68.5f, 21.9f};
+    float *d_query_point;
+    cudaMalloc(&d_query_point, 2 * sizeof(float));
+    cudaMemcpy(d_query_point, query_point, 2 * sizeof(float), cudaMemcpyHostToDevice);
+
+    FcpResult *d_result = nullptr;
+
+    std::cout << "FCP is: \n";
+    fcp_kernel<<<1,1>>>(d_query_point, d_points, N, d_result);
+    cudaDeviceSynchronize();
+
+    FcpResult result;
+    cudaMemcpy(&result, d_result, sizeof(FcpResult), cudaMemcpyDeviceToHost);
+
     // Clean up
-    cudaFree(points);
+    cudaFree(d_points);
     delete[] host_points;
 }
