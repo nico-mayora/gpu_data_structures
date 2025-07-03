@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.31)
+cmake_minimum_required(VERSION 3.27)
 project(kd_tree_cuda CUDA)
 
 set(CMAKE_CUDA_STANDARD 23)
@@ -17,5 +17,31 @@ target_include_directories(kd_tree_cuda PRIVATE
 )
 
 set_target_properties(kd_tree_cuda PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
+)
+
+add_executable(test_correctness
+        test_correctness.cu
+        ${CUDA_SOURCES}
+)
+
+target_include_directories(test_correctness PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+set_target_properties(test_correctness PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
+)
+
+add_executable(test_performance
+        test_performance.cu
+        ${CUDA_SOURCES}
+)
+
+target_include_directories(test_performance PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+set_target_properties(test_performance PROPERTIES
         CUDA_SEPARABLE_COMPILATION ON
 )
