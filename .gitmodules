@@ -1,0 +1,15 @@
+[submodule "externals/owl"]
+	path = externals/owl
+	url = https://github.com/owl-project/owl/
+[submodule "externals/stb"]
+	path = externals/stb
+	url = https://github.com/nothings/stb
+[submodule "externals/tinyobjloader"]
+	path = externals/tinyobjloader
+	url = https://github.com/tinyobjloader/tinyobjloader
+[submodule "externals/tinyxml2"]
+	path = externals/tinyxml2
+	url = https://github.com/leethomason/tinyxml2
+[submodule "externals/glfw"]
+	path = externals/glfw
+	url = https://github.com/glfw/glfw
