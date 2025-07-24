@@ -1,0 +1,15 @@
+[submodule "ray-tracer/externals/owl"]
+	path = ray-tracer/externals/owl
+	url = https://github.com/owl-project/owl/
+[submodule "ray-tracer/externals/stb"]
+	path = ray-tracer/externals/stb
+	url = https://github.com/nothings/stb
+[submodule "ray-tracer/externals/tinyobjloader"]
+	path = ray-tracer/externals/tinyobjloader
+	url = https://github.com/tinyobjloader/tinyobjloader
+[submodule "ray-tracer/externals/tinyxml2"]
+	path = ray-tracer/externals/tinyxml2
+	url = https://github.com/leethomason/tinyxml2
+[submodule "ray-tracer/externals/glfw"]
+	path = ray-tracer/externals/glfw
+	url = https://github.com/glfw/glfw
