@@ -9,7 +9,7 @@ struct Point {
     char payload;
 
     /* Required method for performing queries.
-     * Returns distance between this and a point buffer x.
+     * Returns distance squared between this and an array-allocated point x.
      * We assume x's dimension is DIM.
      */
     __device__ __inline__ float dist2(const float *x) const {
