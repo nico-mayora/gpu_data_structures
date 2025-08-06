@@ -1,14 +1,14 @@
 #pragma once
-#include "data.cuh"
 
 #define INFTY __int_as_float(0x7f800000);
 
 template<int K>
-struct QueryResult {
+struct FixedQueryResult {
     size_t *pointIndices;
     float *pointDistances;
     size_t foundPoints = 0; /* <= K */
 
+    // Returns max distance for points to be considered.
     __device__ float addNode(float dist, size_t node_id) {
         foundPoints = (foundPoints < K) ? foundPoints + 1 : K;
 #pragma unroll
@@ -23,29 +23,103 @@ struct QueryResult {
             }
         }
 
-        return pointDistances[K - 1];
+        return (foundPoints < K) ? 0.f : pointDistances[K - 1];
     }
 };
 
-using FcpResult = QueryResult<1>;
-
+// Implementation with a max heap. Furthest point is easily accessible; if we attempt toadd a point
+// to an already full heap, we remove heap[0], insert the new candidate, and let it percolate down.
+// Trade-off: Results distance to query point not in ascending order.
 template<int K>
-__device__ QueryResult<K> *alloc_query_result() {
-    QueryResult<K> *result_ptr = static_cast<QueryResult<K> *>(malloc(sizeof(QueryResult<K>)));
-    auto idx_buf = static_cast<size_t *>(malloc(K * sizeof(size_t)));
-    auto *dist_buf = static_cast<float *>(malloc(K * sizeof(float)));
+struct HeapQueryResult {
+    size_t *pointIndices;
+    float *pointDistances;
+    size_t foundPoints = 0; /* <= K */
 
-#pragma unroll
-    for (int i = 0; i < K; ++i) {
-        idx_buf[i] = 0;
-        dist_buf[i] = INFTY;
+    __device__ void percolateUp(size_t idx) {
+        while (idx > 0) {
+            const size_t parent = (idx - 1) / 2;
+            if (pointDistances[idx] <= pointDistances[parent]) break; // Node at correct position.
+
+            // Swap idx with parent
+            const float tmpIdx = pointIndices[idx];
+            const float tmpDist = pointDistances[idx];
+            pointIndices[idx] = pointIndices[parent];
+            pointDistances[idx] = pointIndices[parent];
+            pointIndices[parent] = tmpIdx;
+            pointDistances[parent] = tmpDist;
+
+            idx = parent;
+        }
     }
 
-    result_ptr->pointDistances = dist_buf;
-    result_ptr->pointIndices = idx_buf;
+    __device__ void percolateDown(size_t idx) {
+        for (;;) {
+            size_t largest = idx;
+            const size_t left = 2 * idx + 1;
+            const size_t right = 2 * idx + 2;
 
-    return result_ptr;
-}
+            if (left < foundPoints && pointDistances[left] > pointDistances[largest]) {
+                largest = left;
+            }
+            if (right < foundPoints && pointDistances[right] > pointDistances[right]) {
+                largest = right;
+            }
+
+            if (largest == idx) break;
+
+            // Swap idx with the largest child
+            const float tmpIdx = pointIndices[idx];
+            const float tmpDist = pointDistances[idx];
+            pointIndices[idx] = pointIndices[largest];
+            pointDistances[idx] = pointIndices[largest];
+            pointIndices[largest] = tmpIdx;
+            pointDistances[largest] = tmpDist;
+
+            idx = largest;
+        }
+    }
+
+    __device__ bool isFull() const {
+        return foundPoints == K;
+    }
+
+    // Returns max distance for points to be considered.
+    __device__ float addNode(float dist, size_t node_id) {
+        // If heap is full and furthest point is still closer, discard it.
+        if (isFull() && pointDistances[0] < dist) return pointDistances[0];
+
+        if (isFull()) {
+            // Replace root and percolate down
+            pointDistances[0] = dist;
+            pointIndices[0] = node_id;
+            percolateDown(0);
+        } else {
+            // Add to the end and percolate up
+            pointDistances[foundPoints] = dist;
+            pointIndices[foundPoints] = node_id;
+            percolateUp(foundPoints);
+            foundPoints++;
+        }
+
+        return pointDistances[0];
+    }
+};
+
+struct FcpResult {
+    int32_t closestPointIndex = -1;
+    float distance = INFTY;
+
+    __device__ float addNode(float dist, size_t node_id) {
+        if (distance > dist) {
+            distance = dist;
+            closestPointIndex = node_id;
+        }
+
+        return distance;
+
+    }
+};
 
 static __device__ __inline__ int parent_node(const int p) {
     return (p + 1) / 2 - 1;
