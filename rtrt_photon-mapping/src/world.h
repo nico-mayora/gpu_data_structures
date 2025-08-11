@@ -82,6 +82,7 @@ struct Camera {
 
 struct World {
     std::vector<Model*> models;
+    PointLight scene_light;
 
     Camera *cam;
 };

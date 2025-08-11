@@ -1,25 +1,53 @@
 #include "pathTracer.h"
 #include "helpers.cu"
+#include "kdtree.cuh"
 #include <optix_device.h>
 
+#define K_PHOTONS 100
 
 inline __device__
 owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
     owl::vec3f colour_acum = 1.f;
 
-    for (int depth = 0; depth < self.depth; depth++) {
-        traceRay(self.world, ray, prd);
+    uint32_t p0, p1;
+    owl::packPointer(&prd, p0, p1);
+    optixTrace(
+        self.world,
+        ray.origin,
+        ray.direction,
+        EPS,
+        INFTY,
+        0.f,
+        OptixVisibilityMask(255),
+        OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+        PRIMARY,
+        RAY_TYPES_COUNT,
+        PRIMARY,
+        p0, p1
+    );
 
-        if (prd.event == MISSED || prd.event == CANCELLED)
-            return colour_acum * prd.colour.emitted;
+    if (prd.event == MISSED || prd.event == CANCELLED)
+        return colour_acum;
 
-        // if (prd.event == REFLECTED_DIFFUSE):
-        colour_acum *= prd.colour.reflected;
-        owl::vec3f org = prd.hitPoint;
-        owl::vec3f dir = prd.normalAtHp + random_in_unit_sphere(prd.random);
-        dir = (length(dir) < EPS) ? prd.normalAtHp : normalize(dir);
-        ray = owl::Ray(org, dir, EPS, INFTY);
+    auto direct_illumination_fact = calculateDirectIllumination(self, prd);
+    auto diffuse_term = diffusePhotonGather();
+    // Photon gather pass
+
+    // WARN: The new operator in device code allocates memory on a per-thread heap,
+    // not directly from global memory in the same way cudaMalloc does.
+    // We might need to change this `new` to a cudaMalloc if performance isn't acceptable.
+
+    auto photon_indices = new QueryResult<K_PHOTONS>;
+    const float pos_arr[] = { prd.hitPoint.x, prd.hitPoint.y, prd.hitPoint.z };
+    knn(pos_arr, self.photon_map, self.num_photons, photon_indices);
+
+#pragma unroll
+    for (int i = 0; i < K_PHOTONS; ++i) {
+
     }
+
+    delete photon_indices;
+
     return colour_acum;
 }
 
@@ -59,7 +87,6 @@ OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
 
 OPTIX_MISS_PROGRAM(miss)()
 {
-    const owl::vec2i pixelID = owl::getLaunchIndex();
     const MissProgData &self = owl::getProgramData<MissProgData>();
 
     auto &prd = owl::getPRD<PerRayData>();
@@ -81,12 +108,6 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
     const owl::vec3f tMax = optixGetRayTmax();
     const owl::vec3f rayOrg = optixGetWorldRayOrigin();
 
-    if (self.material->matType == EMISSIVE) {
-        prd.colour.reflected = 0.f;
-        const float dir_dot_ng = dot(Ng, rayDir);
-        prd.colour.emitted = dir_dot_ng < 0.f ? self.material->albedo : 0.f;
-        prd.event = CANCELLED;
-    }
     if (self.material->matType == LAMBERTIAN) {
         prd.colour.reflected = self.material->albedo;
         prd.colour.emitted = 0.f;
@@ -96,3 +117,13 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
     prd.hitPoint = rayOrg + tMax * rayDir;
     prd.normalAtHp = (dot(Ng, rayDir) > 0.f) ? -Ng : Ng;
 }
+
+OPTIX_MISS_PROGRAM(shadow)()
+{
+    // we didn't hit anything, so the light is visible
+    owl::vec3f &lightVisbility = owl::getPRD<owl::vec3f>();
+    lightVisbility = owl::vec3f(1.f);
+}
+
+OPTIX_CLOSEST_HIT_PROGRAM(shadow)() { /* unused */ }
+OPTIX_ANY_HIT_PROGRAM(shadow)() { /* unused */ }

@@ -26,6 +26,7 @@ Viewer::Viewer(const World *world) {
                           triangles_geom_vars,-1);
     owlGeomTypeSetClosestHit(triangles_geom_type,PRIMARY,
                              module,"TriangleMesh");
+    owlGeomTypeSetClosestHit(triangles_geom_type, SHADOW, module,"shadow");
 
     std::cout << "Building geometries...\n";
 
@@ -80,6 +81,8 @@ Viewer::Viewer(const World *world) {
       = owlMissProgCreate(context,module,"miss",sizeof(MissProgData),
                           missProgVars,-1);
     owlMissProgSet3f(missProg,"sky_colour",owl3f{.1f,.01f,.2f});
+
+    owlMissProgCreate(context, module,"shadow",0,nullptr,-1);
 
     OWLVarDecl rayGenVars[] = {
         { "fbPtr",         OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,fbPtr)},

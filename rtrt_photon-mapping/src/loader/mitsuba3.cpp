@@ -12,7 +12,7 @@ Mitsuba3Loader::Mitsuba3Loader(const std::string& scene_name) {
 }
 
 World *Mitsuba3Loader::load() {
-    auto root = sceneDesc.RootElement();
+    const auto root = sceneDesc.RootElement();
     for (auto node = root->FirstChild();
          node;
          node = node->NextSibling())
@@ -47,7 +47,7 @@ World *Mitsuba3Loader::load() {
     return world;
 }
 
-void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
+void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) const {
     const std::string type = shape->Attribute("type");
     Mesh *mesh;
     if (type == "rectangle") {
@@ -82,9 +82,8 @@ void Mitsuba3Loader::loadMaterial(const tinyxml2::XMLElement *bsdf) {
     auto material = new Material;
 
     std::string name = bsdf->Attribute("id");
-    std::string type = inner_bsdf->Attribute("type");
 
-    if (type == "diffuse") {
+    if (const std::string type = inner_bsdf->Attribute("type"); type == "diffuse") {
         material->matType = LAMBERTIAN;
         const auto reflectance = inner_bsdf->FirstChildElement("rgb");
         assert(std::string(reflectance->Attribute("name")) == "reflectance");
@@ -102,7 +101,7 @@ void Mitsuba3Loader::loadSensor(const tinyxml2::XMLElement *sensor) {
     {
         // Handle properties straight inside the `sensor` element.
         const auto name_cstr = elem->Attribute("name");
-        if (std::string name = name_cstr ? name_cstr : ""; name == "fov") {
+        if (std::string name = (name_cstr != nullptr) ? name_cstr : ""; name == "fov") {
             world->cam->image.fov = resolveValue<float>(elem->Attribute("value"));
         } else if (name == "to_world") {
             const auto tf = load_transform(elem);
@@ -115,11 +114,11 @@ void Mitsuba3Loader::loadSensor(const tinyxml2::XMLElement *sensor) {
         // Handle sampler and film
         std::string elem_name = elem->Name();
         if (elem_name == "sampler") {
-            auto child = elem->FirstChildElement("integer");
+            const auto child = elem->FirstChildElement("integer");
             assert(!strcmp(child->Attribute("name"), "sample_count"));
             world->cam->image.pixel_samples = resolveValue<int>(child->Attribute("value"));
 
-            auto sibling = child->NextSiblingElement("integer");
+            const auto sibling = child->NextSiblingElement("integer");
             assert(!strcmp(sibling->Attribute("name"), "diffuse_scattered"));
             world->cam->image.num_diffuse_scattered = resolveValue<int>(sibling->Attribute("value"));
             continue;

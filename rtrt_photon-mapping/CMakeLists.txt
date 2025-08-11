@@ -27,16 +27,19 @@ set(sources
 
 add_executable(pathTracer ${sources})
 
+set(owl_dir ${PROJECT_SOURCE_DIR}/externals/owl)
 include_directories(
         ${glfw_dir}/include
         ${owl_dir}/samples/common # For OWLViewer
 )
 add_subdirectory(${glfw_dir})
 
-set(owl_dir ${PROJECT_SOURCE_DIR}/externals/owl)
 add_subdirectory(${owl_dir} EXCLUDE_FROM_ALL)
+add_subdirectory(${owl_dir}/samples/common/owlViewer)
 
 set(tinyxml2_dir ${PROJECT_SOURCE_DIR}/externals/tinyxml2)
 add_subdirectory(${tinyxml2_dir} EXCLUDE_FROM_ALL)
 
 target_link_libraries(pathTracer PRIVATE pathTracer_ptx owl::owl owl_viewer tinyxml2::tinyxml2)
+
+# FIXME: If owl is not found, copy the .dll/.so into the executable folder.
