@@ -3,6 +3,7 @@
 #include <bit>
 #include <thrust/sort.h>
 #include <thrust/tuple.h>
+#include <limits>
 
 struct Photon {
     static constexpr uint32_t DIM = 3;
@@ -136,8 +137,7 @@ __host__ void build_kd_tree(P *d_points, const size_t N) {
     cudaFree(d_tags);
 }
 
-
-#define INFTY __int_as_float(0x7f800000);
+static constexpr float INFTY = std::numeric_limits<float>::infinity();
 
 template<int K>
 struct QueryResult {
