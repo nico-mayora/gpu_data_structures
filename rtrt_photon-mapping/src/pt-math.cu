@@ -1,4 +1,4 @@
-#include "pt-math.h"
+#include "pt-math.cuh"
 
 owl::vec3f parseVec3f(const std::string& str) {
     std::istringstream ss(str);

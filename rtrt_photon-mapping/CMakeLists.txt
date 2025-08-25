@@ -19,10 +19,10 @@ embed_ptx(
 )
 
 set(sources
-        src/main.cpp
-        src/loader/mitsuba3.cpp
-        src/pt-math.cpp
-        src/viewer.cpp
+        src/main.cu
+        src/loader/mitsuba3.cu
+        src/pt-math.cu
+        src/viewer.cu
 )
 
 add_executable(pathTracer ${sources})

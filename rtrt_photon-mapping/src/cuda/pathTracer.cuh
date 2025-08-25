@@ -1,5 +1,4 @@
 #pragma once
-#include "kdtree.cuh"
 #include "owl/APIHandle.h"
 #include "owl/include/owl/common/math/random.h"
 
@@ -36,6 +35,31 @@ struct PointLight {
     owl::vec3f power;
 };
 
+struct Photon {
+    static constexpr uint32_t DIM = 3;
+    //Required member
+    float coords[DIM]; //xyz
+
+    float colour[3];
+    float power[3];
+    float dir[DIM];
+
+    /* Required method for performing queries.
+     * Returns distance between this and a point buffer x.
+     * We assume x's dimension is DIM.
+     */
+
+    __device__ __inline__ float dist2(const float *x) const {
+        float acum = 0.;
+#pragma unroll
+        for (int i = 0; i < DIM; ++i) {
+            const float diff = coords[i] - x[i];
+            acum += diff * diff;
+        }
+        return acum;
+    }
+};
+
 struct RayGenData {
     uint32_t *fbPtr;
     owl::vec2i resolution;
@@ -68,6 +92,7 @@ enum RayEvent {
 struct PerRayData {
     Random random;
     RayEvent event;
+    owl::vec3f colour;
 
     Material hpMaterial;
     owl::vec3f hitPoint;

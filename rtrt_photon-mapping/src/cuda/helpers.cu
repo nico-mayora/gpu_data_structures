@@ -1,6 +1,6 @@
-#define EPS 1e-3f
-#define INFTY 1e10f
 #define PI_INV (float)0.3183098861
+
+#include "kdtree/constants.cuh"
 
 inline __device__
 float norm_squared(owl::vec3f v) {
@@ -47,7 +47,7 @@ inline __device__ owl::vec3f calculateDirectIllumination(const RayGenData &self,
         u0, u1
     );
 
-    auto diffuse_brdf = prd.hpMaterial.albedo * PI_INV;
+    owl::vec3f diffuse_brdf = prd.hpMaterial.albedo * PI_INV;
 
     // TODO
     // auto specular_brdf = specularBrdf(prd.hit_record.material.specular,
@@ -56,8 +56,8 @@ inline __device__ owl::vec3f calculateDirectIllumination(const RayGenData &self,
     // prd.hit_record.normal_at_hitpoint);
 
     return light_visibility
-      * light->power
       * light_dot_norm
       * (1.f / (distance_to_light * distance_to_light))
-      * (diffuse_brdf /* + specular_brdf */);
+      * (diffuse_brdf /* + specular_brdf */) *2.f
+    ;
 }

@@ -3,8 +3,8 @@
 #include <unordered_map>
 
 #include "tinyxml2.h"
-#include "../pt-math.h"
-#include "../world.h"
+#include "../pt-math.cuh"
+#include "../world.cuh"
 
 class Mitsuba3Loader {
     const std::string scenesFolder = R"(..\scenes)";
@@ -20,6 +20,7 @@ class Mitsuba3Loader {
 
     void memoizeDefaultValue(const tinyxml2::XMLElement *defaultElem);
     void loadIntegrator(const tinyxml2::XMLElement *integrator);
+    void loadLight(const tinyxml2::XMLElement *light);
     void loadSensor(const tinyxml2::XMLElement *sensor);
     void loadMaterial(const tinyxml2::XMLElement *bsdf);
     void loadShape(const tinyxml2::XMLElement *shape);

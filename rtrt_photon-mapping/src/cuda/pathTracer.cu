@@ -1,13 +1,13 @@
-#include "pathTracer.h"
+#include "pathTracer.cuh"
 #include "helpers.cu"
-#include "kdtree.cuh"
+#include "kdtree/queries.cuh"
 #include <optix_device.h>
 
 #define K_PHOTONS 100
 
 inline __device__
 owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
-    owl::vec3f colour_acum = 1.f;
+    owl::vec3f colour_acum = 0.f;
 
     uint32_t p0, p1;
     owl::packPointer(&prd, p0, p1);
@@ -30,23 +30,24 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
         return colour_acum;
 
     auto direct_illumination_fact = calculateDirectIllumination(self, prd);
-    auto diffuse_term = diffusePhotonGather();
+    colour_acum += direct_illumination_fact;
+    //auto diffuse_term = diffusePhotonGather();
     // Photon gather pass
 
     // WARN: The new operator in device code allocates memory on a per-thread heap,
     // not directly from global memory in the same way cudaMalloc does.
     // We might need to change this `new` to a cudaMalloc if performance isn't acceptable.
 
-    auto photon_indices = new QueryResult<K_PHOTONS>;
-    const float pos_arr[] = { prd.hitPoint.x, prd.hitPoint.y, prd.hitPoint.z };
-    knn(pos_arr, self.photon_map, self.num_photons, photon_indices);
-
-#pragma unroll
-    for (int i = 0; i < K_PHOTONS; ++i) {
-
-    }
-
-    delete photon_indices;
+//     auto photon_indices = new QueryResult<K_PHOTONS>;
+//     const float pos_arr[] = { prd.hitPoint.x, prd.hitPoint.y, prd.hitPoint.z };
+//     knn(pos_arr, self.photon_map, self.num_photons, photon_indices);
+//
+// #pragma unroll
+//     for (int i = 0; i < K_PHOTONS; ++i) {
+//
+//     }
+//
+//     delete photon_indices;
 
     return colour_acum;
 }
@@ -94,7 +95,7 @@ OPTIX_MISS_PROGRAM(miss)()
     owl::vec3f rayDir = optixGetWorldRayDirection();
     rayDir = normalize(rayDir);
     prd.event = MISSED;
-    prd.colour.emitted = self.sky_colour * (rayDir.y * .5f + 1.f);
+    prd.colour = self.sky_colour * (rayDir.y * .5f + 1.f);
 }
 
 OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
@@ -109,8 +110,11 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
     const owl::vec3f rayOrg = optixGetWorldRayOrigin();
 
     if (self.material->matType == LAMBERTIAN) {
-        prd.colour.reflected = self.material->albedo;
-        prd.colour.emitted = 0.f;
+        prd.hpMaterial.matType = LAMBERTIAN;
+        prd.hpMaterial.albedo = self.material->albedo;
+        prd.hpMaterial.diffuse = self.material->diffuse;
+
+        prd.colour = self.material->albedo;
         prd.event = REFLECTED_DIFFUSE;
     }
 

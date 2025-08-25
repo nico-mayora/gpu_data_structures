@@ -2,7 +2,7 @@
 
 #include "owl/owl_host.h"
 #include "owlViewer/OWLViewer.h"
-#include "world.h"
+#include "world.cuh"
 
 struct Viewer : owl::viewer::OWLViewer {
     explicit Viewer(const World *world);

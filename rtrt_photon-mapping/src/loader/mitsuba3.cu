@@ -1,5 +1,5 @@
-#include "mitsuba3.h"
-#include "../world.h"
+#include "mitsuba3.cuh"
+#include "../world.cuh"
 
 Mitsuba3Loader::Mitsuba3Loader(const std::string& scene_name) {
     sceneDir = scenesFolder + '\\' + scene_name;
@@ -15,8 +15,7 @@ World *Mitsuba3Loader::load() {
     const auto root = sceneDesc.RootElement();
     for (auto node = root->FirstChild();
          node;
-         node = node->NextSibling())
-    {
+         node = node->NextSibling()) {
         std::string name = node->Value();
 
         if (name == "default") {
@@ -39,6 +38,10 @@ World *Mitsuba3Loader::load() {
             loadShape(node->ToElement());
             continue;
         }
+        if (name == "emitter") {
+            loadLight(node->ToElement());
+            continue;
+        }
 
         std::cerr << "ERROR: Unknown element: " << name << std::endl;
         std::abort();
@@ -47,7 +50,22 @@ World *Mitsuba3Loader::load() {
     return world;
 }
 
-void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) const {
+void Mitsuba3Loader::loadLight(const tinyxml2::XMLElement *light) {
+    world->scene_light = new PointLight;
+
+    const auto intensity = light->FirstChildElement("rgb");
+    assert(std::string(intensity->Attribute("name")) == "intensity");
+    world->scene_light->power = parseVec3f(intensity->Attribute("value"));
+
+    const auto position = intensity->NextSiblingElement("point");
+    assert(std::string(position->Attribute("name")) == "position");
+    const auto pos_x = resolveValue<float>(position->Attribute("x"));
+    const auto pos_y = resolveValue<float>(position->Attribute("y"));
+    const auto pos_z = resolveValue<float>(position->Attribute("z"));
+    world->scene_light->position = owl::vec3f(pos_x, pos_y, pos_z);
+}
+
+void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
     const std::string type = shape->Attribute("type");
     Mesh *mesh;
     if (type == "rectangle") {
@@ -66,13 +84,6 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) const {
     auto model = new Model;
     model->mesh = mesh;
     model->material = materials.at(mat_id);
-
-    if (const auto emitter = shape->FirstChildElement("emitter")) {
-        model->material->matType = EMISSIVE;
-        model->material->albedo = parseVec3f(
-            emitter->FirstChildElement("rgb")->Attribute("value")
-        );
-    }
 
     world->models.emplace_back(model);
 }

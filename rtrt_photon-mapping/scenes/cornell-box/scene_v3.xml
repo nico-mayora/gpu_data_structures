@@ -59,11 +59,6 @@
 			<rgb name="reflectance" value="0.725, 0.71, 0.68" />
 		</bsdf>
 	</bsdf>
-	<bsdf type="twosided" id="LightBSDF">
-		<bsdf type="diffuse">
-			<rgb name="reflectance" value="0, 0, 0" />
-		</bsdf>
-	</bsdf>
 	<shape type="rectangle" id="Floor">
 		<transform name="to_world">
 			<matrix value="-4.37114e-008 1 4.37114e-008 0 0 -8.74228e-008 2 0 1 4.37114e-008 1.91069e-015 0 0 0 0 1" />
@@ -106,13 +101,8 @@
 		</transform>
 		<ref id="TallBoxBSDF" />
 	</shape>
-	<shape type="rectangle" id="Light">
-		<transform name="to_world">
-			<matrix value="0.235 -1.66103e-008 -7.80685e-009 -0.005 -2.05444e-008 3.90343e-009 -0.0893 1.98 2.05444e-008 0.19 8.30516e-009 -0.03 0 0 0 1" />
-		</transform>
-		<ref id="LightBSDF" />
-		<emitter type="area">
-			<rgb name="radiance" value="17, 12, 4" />
-		</emitter>
-	</shape>
+	<emitter type="point" id="Light">
+		<rgb name="intensity" value="1, 1, 1"/>
+		<point name="position" x="0" y="1.5" z="0.75"/>
+	</emitter>
 </scene>

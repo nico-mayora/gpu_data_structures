@@ -1,7 +1,6 @@
-#include "viewer.h"
-
-#include "world.h"
-#include "cuda/pathTracer.h"
+#include "viewer.cuh"
+#include "world.cuh"
+#include "cuda/pathTracer.cuh"
 
 extern "C" char pathTracer_ptx[];
 
@@ -95,12 +94,16 @@ Viewer::Viewer(const World *world) {
         { "camera.dir_00", OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.dir_00)},
         { "camera.dir_dv", OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.dir_dv)},
         { "camera.dir_du", OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.dir_du)},
-        { /* sentinel to mark end of list */ }
+        { "scene_light", OWL_BUFPTR, OWL_OFFSETOF(RayGenData,scene_light)},
+        { /* sentinel to mark end of list */ },
     };
 
     rayGen
         = owlRayGenCreate(context,module,"ptRayGen", sizeof(RayGenData), rayGenVars,-1);
     owlRayGenSetGroup(rayGen,"world", owl_world);
+
+    auto scene_light_buf = owlDeviceBufferCreate(context, OWL_USER_TYPE(PointLight), 1, world->scene_light);
+    owlRayGenSetBuffer(rayGen,"scene_light", scene_light_buf);
 
     // Initialise Viewer camera with params from scene description.
     camera.setOrientation(world->cam->lookFrom,

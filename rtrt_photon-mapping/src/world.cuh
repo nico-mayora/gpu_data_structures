@@ -2,8 +2,8 @@
 #include <vector>
 
 #include "owl/common/math/vec.h"
-#include "pt-math.h"
-#include "cuda/pathTracer.h"
+#include "pt-math.cuh"
+#include "cuda/pathTracer.cuh"
 
 struct Mesh {
     std::vector<owl::vec3i> indices;
@@ -82,7 +82,7 @@ struct Camera {
 
 struct World {
     std::vector<Model*> models;
-    PointLight scene_light;
+    PointLight *scene_light;
 
     Camera *cam;
 };
