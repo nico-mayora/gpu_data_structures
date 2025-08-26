@@ -49,15 +49,50 @@ inline __device__ owl::vec3f calculateDirectIllumination(const RayGenData &self,
 
     owl::vec3f diffuse_brdf = prd.hpMaterial.albedo * PI_INV;
 
-    // TODO
-    // auto specular_brdf = specularBrdf(prd.hit_record.material.specular,
-    // light_dir,
-    // ray.direction,
-    // prd.hit_record.normal_at_hitpoint);
-
     return light_visibility
       * light_dot_norm
       * (1.f / (distance_to_light * distance_to_light))
-      * (diffuse_brdf /* + specular_brdf */) *2.f
+      * diffuse_brdf * 2.f
     ;
+}
+
+inline __device__ owl::vec3f reflect(const owl::vec3f &incoming, const owl::vec3f &normal) {
+    return incoming - 2.f * dot(incoming, normal) * normal;
+}
+
+inline __device__
+owl::vec3f reflect_or_refract_ray(const Material& material,
+                                  const owl::vec3f& ray_dir,
+                                  const owl::vec3f& normal,
+                                  Random rand,
+                                  bool& absorbed,
+                                  float& coef)
+{
+    absorbed = false;
+
+    if (material.matType == CONDUCTOR) {
+        coef = material.specular;
+        return reflect(ray_dir, normal);
+    }
+
+    if (material.matType == DIELECTRIC) {
+        float cos_theta = dot(-ray_dir, normal);
+        float fresnel = calculate_fresnel(material.ior, cos_theta);
+
+        if (rand() < fresnel) { // Reflect
+            coef = fresnel;
+            return reflect(ray_dir, normal);
+        }
+
+        // Refract
+        coef = 1.0f - fresnel;
+        owl::vec3f refracted = calculate_refracted(material, ray_dir, normal, rand);
+
+        if (length(refracted) == 0.0f) { // Total Internal Reflection
+            coef = 1.0f;
+            return reflect(ray_dir, normal);
+        }
+
+        return refracted;
+    }
 }

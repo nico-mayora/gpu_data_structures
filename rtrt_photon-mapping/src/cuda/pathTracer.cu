@@ -9,50 +9,44 @@ inline __device__
 owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
     owl::vec3f colour_acum = 0.f;
 
-    uint32_t p0, p1;
-    owl::packPointer(&prd, p0, p1);
-    optixTrace(
-        self.world,
-        ray.origin,
-        ray.direction,
-        EPS,
-        INFTY,
-        0.f,
-        OptixVisibilityMask(255),
-        OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-        PRIMARY,
-        RAY_TYPES_COUNT,
-        PRIMARY,
-        p0, p1
-    );
+    for (int32_t i = 0; i < self.depth; ++i) {
+        uint32_t p0, p1;
+        owl::packPointer(&prd, p0, p1);
+        optixTrace(
+            self.world,
+            ray.origin,
+            ray.direction,
+            EPS,
+            INFTY,
+            0.f,
+            OptixVisibilityMask(255),
+            OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+            PRIMARY,
+            RAY_TYPES_COUNT,
+            PRIMARY,
+            p0, p1
+        );
 
-    if (prd.event == MISSED || prd.event == CANCELLED)
-        return colour_acum;
+        if (prd.event == MISSED || prd.event == CANCELLED)
+            return colour_acum;
 
+##### Updated upstream
     // if (prd.event == REFLECTED_SPECULAR) {
     //
     //     continue;
     // }
+%%%%%%%%%%%%%
+        if (prd.event == REFLECTED_SPECULAR) {
+            
+            continue;
+        }
 
-    auto direct_illumination_fact = calculateDirectIllumination(self, prd);
-    colour_acum += direct_illumination_fact;
-    //auto diffuse_term = diffusePhotonGather();
-    // Photon gather pass
+        auto direct_illumination_fact = calculateDirectIllumination(self, prd);
+        colour_acum += direct_illumination_fact;
 
-    // WARN: The new operator in device code allocates memory on a per-thread heap,
-    // not directly from global memory in the same way cudaMalloc does.
-    // We might need to change this `new` to a cudaMalloc if performance isn't acceptable.
-
-//     auto photon_indices = new QueryResult<K_PHOTONS>;
-//     const float pos_arr[] = { prd.hitPoint.x, prd.hitPoint.y, prd.hitPoint.z };
-//     knn(pos_arr, self.photon_map, self.num_photons, photon_indices);
-//
-// #pragma unroll
-//     for (int i = 0; i < K_PHOTONS; ++i) {
-//
-//     }
-//
-//     delete photon_indices;
+        // TODO Add photon gather. That handles caustics and diffuse reflections.
+    }
+######## Stashed changes
 
     return colour_acum;
 }

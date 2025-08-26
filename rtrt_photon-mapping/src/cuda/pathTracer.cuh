@@ -8,6 +8,8 @@ enum RayTypes {
     RAY_TYPES_COUNT
 };
 
+// For simplicity, we only handle materials that
+// are ONE of the following, not combinations.
 enum MaterialType {
     LAMBERTIAN,
     DIELECTRIC,
