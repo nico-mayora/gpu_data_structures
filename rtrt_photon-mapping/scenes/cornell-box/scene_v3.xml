@@ -50,8 +50,8 @@
 		</bsdf>
 	</bsdf>
 	<bsdf type="twosided" id="ShortBoxBSDF">
-		<bsdf type="diffuse">
-			<rgb name="reflectance" value="0.725, 0.71, 0.68" />
+		<bsdf type="dielectric">
+			<float name="int_ior" value="1.504"/>
 		</bsdf>
 	</bsdf>
 	<bsdf type="twosided" id="TallBoxBSDF">

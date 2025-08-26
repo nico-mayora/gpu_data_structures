@@ -29,6 +29,11 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
     if (prd.event == MISSED || prd.event == CANCELLED)
         return colour_acum;
 
+    if (prd.event == REFLECTED_SPECULAR) {
+
+        continue;
+    }
+
     auto direct_illumination_fact = calculateDirectIllumination(self, prd);
     colour_acum += direct_illumination_fact;
     //auto diffuse_term = diffusePhotonGather();
@@ -109,13 +114,26 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
     const owl::vec3f tMax = optixGetRayTmax();
     const owl::vec3f rayOrg = optixGetWorldRayOrigin();
 
-    if (self.material->matType == LAMBERTIAN) {
-        prd.hpMaterial.matType = LAMBERTIAN;
-        prd.hpMaterial.albedo = self.material->albedo;
-        prd.hpMaterial.diffuse = self.material->diffuse;
+    switch (self.material->matType) {
+        case LAMBERTIAN: {
+            prd.hpMaterial.matType = LAMBERTIAN;
+            prd.hpMaterial.albedo = self.material->albedo;
+            prd.hpMaterial.diffuse = self.material->diffuse;
 
-        prd.colour = self.material->albedo;
-        prd.event = REFLECTED_DIFFUSE;
+            prd.colour = self.material->albedo;
+            prd.event = REFLECTED_DIFFUSE;
+            break;
+        }
+        case DIELECTRIC: {
+            prd.hpMaterial.matType = DIELECTRIC;
+            prd.hpMaterial.ior = self.material->ior;
+
+            prd.colour = self.material->albedo;
+            prd.event = REFLECTED_DIFFUSE;
+            break;
+        }
+        default:
+            printf("[WARNING] - Material type not implemented. Expect visual glitches!");
     }
 
     prd.hitPoint = rayOrg + tMax * rayDir;

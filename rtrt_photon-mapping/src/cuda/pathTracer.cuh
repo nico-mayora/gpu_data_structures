@@ -10,12 +10,16 @@ enum RayTypes {
 
 enum MaterialType {
     LAMBERTIAN,
+    DIELECTRIC,
+    CONDUCTOR,
 };
 
 struct Material {
     MaterialType matType;
     owl::vec3f albedo;
     float diffuse;
+    float specular;
+    float ior;
 };
 
 struct TrianglesGeomData {
@@ -86,6 +90,7 @@ typedef owl::LCG<> Random;
 enum RayEvent {
     MISSED,
     REFLECTED_DIFFUSE,
+    REFLECTED_SPECULAR,
     CANCELLED
 };
 
