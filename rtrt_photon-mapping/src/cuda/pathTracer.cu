@@ -29,10 +29,10 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
     if (prd.event == MISSED || prd.event == CANCELLED)
         return colour_acum;
 
-    if (prd.event == REFLECTED_SPECULAR) {
-
-        continue;
-    }
+    // if (prd.event == REFLECTED_SPECULAR) {
+    //
+    //     continue;
+    // }
 
     auto direct_illumination_fact = calculateDirectIllumination(self, prd);
     colour_acum += direct_illumination_fact;
