@@ -1,0 +1,30 @@
+[submodule "ray-tracer/externals/owl"]
+	path = ray-tracer/externals/owl
+	url = https://github.com/owl-project/owl/
+[submodule "ray-tracer/externals/stb"]
+	path = ray-tracer/externals/stb
+	url = https://github.com/nothings/stb
+[submodule "ray-tracer/externals/tinyobjloader"]
+	path = ray-tracer/externals/tinyobjloader
+	url = https://github.com/tinyobjloader/tinyobjloader
+[submodule "ray-tracer/externals/tinyxml2"]
+	path = ray-tracer/externals/tinyxml2
+	url = https://github.com/leethomason/tinyxml2
+[submodule "ray-tracer/externals/glfw"]
+	path = ray-tracer/externals/glfw
+	url = https://github.com/glfw/glfw
+[submodule "photon-emitter/externals/glfw"]
+	path = photon-emitter/externals/glfw
+	url = git@github.com:glfw/glfw.git
+[submodule "photon-emitter/externals/owl"]
+	path = photon-emitter/externals/owl
+	url = git@github.com:owl-project/owl.git
+[submodule "photon-emitter/externals/stb"]
+	path = photon-emitter/externals/stb
+	url = git@github.com:nothings/stb.git
+[submodule "photon-emitter/externals/tinyobjloader"]
+	path = photon-emitter/externals/tinyobjloader
+	url = git@github.com:tinyobjloader/tinyobjloader.git
+[submodule "photon-emitter/externals/tinyxml2"]
+	path = photon-emitter/externals/tinyxml2
+	url = git@github.com:leethomason/tinyxml2.git

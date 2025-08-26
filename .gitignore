@@ -2,3 +2,5 @@ kd-tree-cuda/cmake-build-debug
 kd-tree-cuda/cmake-build-release
 kdtree_cpu/cmake-build-debug
 kdtree_cpu/cmake-build-release
+photon-emitter/cmake-build-debug
+photon-emitter/cmake-build-release
