@@ -1,9 +1,9 @@
 <scene version="3.0.0">
 	<default name="integrator" value="path" />
-	<default name="spp" value="100" />
+	<default name="spp" value="16" />
 	<default name="resx" value="800" />
 	<default name="resy" value="800" />
-	<default name="max_depth" value="20" />
+	<default name="max_depth" value="12" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>
@@ -50,9 +50,12 @@
 		</bsdf>
 	</bsdf>
 	<bsdf type="twosided" id="ShortBoxBSDF">
-		<bsdf type="dielectric">
-			<float name="int_ior" value="1.504"/>
+		<bsdf type="conductor">
+			<float name="specular" value="1"/>
 		</bsdf>
+<!--		<bsdf type="dielectric">-->
+<!--			<float name="int_ior" value="1.504"/>-->
+<!--		</bsdf>-->
 	</bsdf>
 	<bsdf type="twosided" id="TallBoxBSDF">
 		<bsdf type="diffuse">

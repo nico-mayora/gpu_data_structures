@@ -30,14 +30,12 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
         if (prd.event == MISSED || prd.event == CANCELLED)
             return colour_acum;
 
-##### Updated upstream
-    // if (prd.event == REFLECTED_SPECULAR) {
-    //
-    //     continue;
-    // }
-%%%%%%%%%%%%%
         if (prd.event == REFLECTED_SPECULAR) {
-            
+            owl::vec3f new_ray_dir = reflect_or_refract_ray(
+                prd.hpMaterial, ray.direction, prd.normalAtHp, prd.random
+            );
+
+            ray = owl::Ray(prd.hitPoint, new_ray_dir, EPS, INFTY);
             continue;
         }
 
@@ -45,8 +43,9 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
         colour_acum += direct_illumination_fact;
 
         // TODO Add photon gather. That handles caustics and diffuse reflections.
+        // When a ray hits a diffuse material, perform one bounce (random) and gather photons.
+        break;
     }
-######## Stashed changes
 
     return colour_acum;
 }
@@ -122,8 +121,14 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
             prd.hpMaterial.matType = DIELECTRIC;
             prd.hpMaterial.ior = self.material->ior;
 
-            prd.colour = self.material->albedo;
-            prd.event = REFLECTED_DIFFUSE;
+            prd.event = REFLECTED_SPECULAR;
+            break;
+        }
+        case CONDUCTOR: {
+            prd.hpMaterial.matType = CONDUCTOR;
+            prd.hpMaterial.specular = self.material->specular;
+
+            prd.event = REFLECTED_SPECULAR;
             break;
         }
         default:
