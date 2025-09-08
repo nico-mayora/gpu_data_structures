@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.29)
+cmake_minimum_required(VERSION 3.27.8)
 project(rtrt_photon-mapping CUDA CXX C)
 
 set(CMAKE_CUDA_STANDARD 20)
