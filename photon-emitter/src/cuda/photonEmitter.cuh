@@ -1,107 +1,133 @@
 #pragma once
-#include "owl/APIHandle.h"
-#include "owl/include/owl/common/math/random.h"
 
-enum RayTypes {
-    PRIMARY,
-    SHADOW,
-    RAY_TYPES_COUNT
+#include "owl/include/owl/owl.h"
+#include "owl/include/owl/common/math/vec.h"
+#include "owl/include/owl/common/math/random.h"
+#include <vector>
+
+struct Photon
+{
+    owl::vec3f pos;
+    owl::vec3f dir;
+    int power;
+    owl::vec3f color;
 };
 
-// For simplicity, we only handle materials that
-// are ONE of the following, not combinations.
-enum MaterialType {
-    LAMBERTIAN,
-    DIELECTRIC,
-    CONDUCTOR,
+struct PhotonMapperRGD
+{
+    Photon *photons;
+    int *photonsCount;
+    OptixTraversableHandle world;
+    int maxDepth;
+    bool causticsMode;
+};
+
+struct PointLightRGD: public PhotonMapperRGD
+{
+    owl::vec3f position;
+    owl::vec3f color;
+    float intensity;
+};
+
+enum RayEvent
+{
+    MISS = 0,
+    ABSORBED = 1,
+    SCATTER_DIFFUSE = 2,
+    SCATTER_SPECULAR = 4,
+    SCATTER_REFRACT = 8,
+};
+
+struct PhotonMapperPRD
+{
+    owl::LCG<> random;
+    owl::vec3f color;
+    RayEvent event;
+    struct {
+        owl::vec3f origin;
+        owl::vec3f direction;
+        owl::vec3f color;
+    } scattered;
 };
 
 struct Material {
-    MaterialType matType;
     owl::vec3f albedo;
     float diffuse;
     float specular;
-    float ior;
+    float transmission;
+    float refraction_idx;
 };
 
-struct TrianglesGeomData {
+/* variables for the triangle mesh geometry */
+struct TrianglesGeomData
+{
     Material *material;
-    owl::vec3f *vertex;
     owl::vec3i *index;
-    owl::vec3f *normal;
-    bool faceted;
+    owl::vec3f *vertex;
 };
 
-struct MissProgData {
-    owl::vec3f sky_colour;
+/* The vectors need to be (trivially) transformed into regular arrays
+   before being passed into OptiX */
+struct Mesh {
+    std::string name;
+    std::vector<owl::vec3f> vertices;
+    std::vector<owl::vec3i> indices;
+    std::shared_ptr<Material> material;
 };
 
-struct PointLight {
-    owl::vec3f position;
-    owl::vec3f power;
+enum LightType {
+    POINT_LIGHT,
+    SQUARE_LIGHT,
 };
 
-struct Photon {
-    static constexpr uint32_t DIM = 3;
-    //Required member
-    float coords[DIM]; //xyz
+struct LightSource {
+    LightType source_type;
+    owl::vec3f pos;
+    double power;
+    owl::vec3f rgb;
+    /* for emission surface */
+    owl::vec3f normal;
+    double side_length;
 
-    float colour[3];
-    float power[3];
-    float dir[DIM];
-
-    /* Required method for performing queries.
-     * Returns distance between this and a point buffer x.
-     * We assume x's dimension is DIM.
-     */
-
-    __device__ __inline__ float dist2(const float *x) const {
-        float acum = 0.;
-#pragma unroll
-        for (int i = 0; i < DIM; ++i) {
-            const float diff = coords[i] - x[i];
-            acum += diff * diff;
-        }
-        return acum;
-    }
+    /* calculated values */
+    int num_photons;
 };
 
-struct RayGenData {
-    uint32_t *fbPtr;
-    owl::vec2i resolution;
-    OptixTraversableHandle world;
-    int depth;
-    int pixel_samples;
-    int num_diffuse_scattered;
-
-    Photon *photon_map;
-    size_t num_photons;
-
-    struct {
-        owl::vec3f pos;
-        owl::vec3f dir_00;
-        owl::vec3f dir_dv;
-        owl::vec3f dir_du;
-    } camera;
-
-    PointLight *scene_light;
+/* This holds all the state required for the path tracer to function.
+ * As we use the STL, this is code in C++ land that needs a bit of
+ * glue to transform to data that can be held in the GPU.
+ */
+struct World {
+    std::vector<LightSource> light_sources;
+    std::vector<Mesh> meshes;
 };
 
-typedef owl::LCG<> Random;
-
-enum RayEvent {
-    MISSED,
-    REFLECTED_DIFFUSE,
-    REFLECTED_SPECULAR,
-    CANCELLED
+struct GeometryData {
+    std::vector<OWLGeom> geometry;
+    OWLGeomType trianglesGeomType;
+    OWLGroup trianglesGroup;
+    OWLGroup worldGroup;
 };
 
-struct PerRayData {
-    Random random;
-    RayEvent event;
-    owl::vec3f colour;
+GeometryData loadGeometry(OWLContext &owlContext, const std::unique_ptr<World> &world);
 
-    Material hpMaterial;
-    owl::vec3f hitPoint;
-    owl::vec3f normalAtHp;
+struct Program {
+    OWLContext owlContext;
+    OWLModule owlModule;
+    OWLRayGen rayGen;
+
+    std::unique_ptr<World> world;
+
+    GeometryData geometryData;
+
+    OWLBuffer photonsBuffer;
+    OWLBuffer photonsCount;
+    OWLBuffer causticsPhotonsBuffer;
+    OWLBuffer causticsPhotonsCount;
+
+    int maxDepth;
+    int castedCausticsPhotons;
+    int castedDiffusePhotons;
+    int photonsPerWatt;
+    int causticsPhotonsPerWatt;
 };
