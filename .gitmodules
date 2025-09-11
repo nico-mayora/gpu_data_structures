@@ -1,15 +1,30 @@
+[submodule "rtrt_photon-mapping/externals/glfw"]
+	path = rtrt_photon-mapping/externals/glfw
+	url = https://github.com/glfw/glfw
+[submodule "rtrt_photon-mapping/externals/owl"]
+	path = rtrt_photon-mapping/externals/owl
+	url = https://github.com/owl-project/owl/
+[submodule "rtrt_photon-mapping/externals/stb"]
+	path = rtrt_photon-mapping/externals/stb
+	url = https://github.com/nothings/stb
+[submodule "rtrt_photon-mapping/externals/tinyxml2"]
+	path = rtrt_photon-mapping/externals/tinyxml2
+	url = https://github.com/leethomason/tinyxml2
+[submodule "rtrt_photon-mapping/externals/tinyobjloader"]
+	path = rtrt_photon-mapping/externals/tinyobjloader
+	url = https://github.com/tinyobjloader/tinyobjloader
+[submodule "ray-tracer/externals/glfw"]
+	path = ray-tracer/externals/glfw
+	url = https://github.com/glfw/glfw
 [submodule "ray-tracer/externals/owl"]
 	path = ray-tracer/externals/owl
 	url = https://github.com/owl-project/owl/
 [submodule "ray-tracer/externals/stb"]
 	path = ray-tracer/externals/stb
 	url = https://github.com/nothings/stb
-[submodule "ray-tracer/externals/tinyobjloader"]
-	path = ray-tracer/externals/tinyobjloader
-	url = https://github.com/tinyobjloader/tinyobjloader
 [submodule "ray-tracer/externals/tinyxml2"]
 	path = ray-tracer/externals/tinyxml2
 	url = https://github.com/leethomason/tinyxml2
-[submodule "ray-tracer/externals/glfw"]
-	path = ray-tracer/externals/glfw
-	url = https://github.com/glfw/glfw
+[submodule "ray-tracer/externals/tinyobjloader"]
+	path = ray-tracer/externals/tinyobjloader
+	url = https://github.com/tinyobjloader/tinyobjloader
