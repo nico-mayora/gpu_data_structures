@@ -107,8 +107,45 @@ inline __device__ void scatterRefract(PhotonMapperPRD &prd, const TrianglesGeomD
 
   prd.event = SCATTER_REFRACT;
   prd.scattered.origin = hitPoint;
-  prd.scattered.direction = refract(rayDir, normal, self.material->refraction_idx);
+  prd.scattered.direction = refract(rayDir, normal, self.material->ior);
   prd.scattered.color = multiplyColor(self.material->albedo, prd.color);
+}
+
+inline __device__
+float calculate_fresnel(float ior, float cos_theta) {
+  cos_theta = fabsf(cos_theta);
+
+  // Schlick
+  float r0 = (1.0f - ior) / (1.0f + ior);
+  r0 = r0 * r0;
+  float one_minus_cos = 1.0f - cos_theta;
+  float one_minus_cos5 = one_minus_cos * one_minus_cos * one_minus_cos * one_minus_cos * one_minus_cos;
+
+  return r0 + (1.0f - r0) * one_minus_cos5;
+}
+
+inline __device__
+RayEvent reflect_or_refract_ray(float index_of_refraction,
+                                  const owl::vec3f& ray_dir,
+                                  const owl::vec3f& normal,
+                                  Random& rand)
+{
+  float cos_theta = dot(-ray_dir, normal);
+  float fresnel = calculate_fresnel(index_of_refraction, cos_theta);
+
+  if (rand() < fresnel) { // Reflect
+    return SCATTER_SPECULAR;
+  }
+
+  // Refract
+  return SCATTER_REFRACT;
+
+  // Yikes
+//  if (length(refracted) == 0.0f) { // Total Internal Reflection
+//    return reflect(ray_dir, normal);
+//  }
+//
+//  return refracted;
 }
 
 OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
@@ -117,17 +154,28 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
 
   const float diffuseProb = self.material->diffuse;
   const float specularProb = self.material->specular + diffuseProb;
-  const float transmissionProb = self.material->transmission + specularProb;
+//  const float transmissionProb = self.material->ior + specularProb;
 
   const float randomProb = prd.random();
-  if (randomProb < diffuseProb) {
-    scatterDiffuse(prd, self);
-  } else if (randomProb < specularProb) {
-    scatterSpecular(prd, self);
-  } else if (randomProb < transmissionProb) {
-    scatterRefract(prd, self);
-  } else {
-    prd.event = ABSORBED;
+  if (self.material->matType == LAMBERTIAN) {
+    if (randomProb < diffuseProb)
+      scatterDiffuse(prd, self);
+    else
+      prd.event = ABSORBED;
+  } else if (self.material->matType == CONDUCTOR) {
+    if (randomProb < specularProb)
+      scatterSpecular(prd, self);
+    else
+      prd.event = ABSORBED;
+  } else if (self.material->matType == DIELECTRIC) {
+    auto event = reflect_or_refract_ray(self.material->ior,
+                                        optixGetWorldRayDirection(),
+                                        getPrimitiveNormal(self),
+                                        prd.random);
+    if (event == SCATTER_SPECULAR)
+      scatterSpecular(prd, self);
+    else
+      scatterRefract(prd, self);
   }
 }
 

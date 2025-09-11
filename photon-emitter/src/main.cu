@@ -5,6 +5,8 @@
 #include "./cuda/photonEmitter.cuh"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "../../externals/stb/stb_image_write.h"
+#include "loader/mitsuba3.cuh"
+#include "writer/photon-file-manager.h"
 
 #define LOG(message)                                            \
   std::cout << OWL_TERMINAL_BLUE;                               \
@@ -58,11 +60,68 @@ void setupPointLightRayGenProgram(Program &program) {
   owlRayGenSet1i(program.rayGen,"maxDepth",program.maxDepth);
 }
 
-void runPointLightRayGen(Program &program, const LightSource &light, bool causticsMode) {
+GeometryData loadGeometry(OWLContext &owlContext, World* world){
+  GeometryData data;
+
+  OWLVarDecl trianglesGeomVars[] = {
+          { "index",  OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,index)},
+          { "vertex", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,vertex)},
+          { "material", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,material)},
+          { nullptr /* Sentinel to mark end-of-list */}
+  };
+
+  data.trianglesGeomType = owlGeomTypeCreate(owlContext,
+                                             OWL_TRIANGLES,
+                                             sizeof(TrianglesGeomData),
+                                             trianglesGeomVars,-1);
+
+//  const int numMeshes = static_cast<int>(world->meshes.size());
+
+  for (const auto model : world->models) {
+    auto mesh = model->mesh;
+    auto vertices = mesh->vertices;
+    auto indices = mesh->indices;
+    auto material = model->material;
+
+    std::vector<Material> mats_vec = { *material };
+
+    OWLBuffer vertexBuffer
+            = owlDeviceBufferCreate(owlContext,OWL_FLOAT3,vertices.size(), vertices.data());
+    OWLBuffer indexBuffer
+            = owlDeviceBufferCreate(owlContext,OWL_INT3,indices.size(), indices.data());
+    OWLBuffer materialBuffer
+            = owlDeviceBufferCreate(owlContext,OWL_USER_TYPE(Material),1, mats_vec.data());
+
+    OWLGeom trianglesGeom
+            = owlGeomCreate(owlContext,data.trianglesGeomType);
+
+    owlTrianglesSetVertices(trianglesGeom,vertexBuffer,
+                            vertices.size(),sizeof(owl::vec3f),0);
+    owlTrianglesSetIndices(trianglesGeom,indexBuffer,
+                           indices.size(),sizeof(owl::vec3i),0);
+
+    owlGeomSetBuffer(trianglesGeom,"vertex",vertexBuffer);
+    owlGeomSetBuffer(trianglesGeom,"index",indexBuffer);
+    owlGeomSetBuffer(trianglesGeom,"material", materialBuffer);
+
+    data.geometry.push_back(trianglesGeom);
+  }
+
+  data.trianglesGroup = owlTrianglesGeomGroupCreate(owlContext,data.geometry.size(),data.geometry.data());
+  owlGroupBuildAccel(data.trianglesGroup);
+
+  data.worldGroup = owlInstanceGroupCreate(owlContext,1);
+  owlInstanceGroupSetChild(data.worldGroup,0,data.trianglesGroup);
+  owlGroupBuildAccel(data.worldGroup);
+
+  return data;
+}
+
+void runPointLightRayGen(Program &program, const PointLight* light, bool causticsMode) {
   owlRayGenSet1b(program.rayGen,"causticsMode",causticsMode);
-  owlRayGenSet3f(program.rayGen,"position",reinterpret_cast<const owl3f&>(light.pos));
-  owlRayGenSet3f(program.rayGen,"color",reinterpret_cast<const owl3f&>(light.rgb));
-  owlRayGenSet1f(program.rayGen,"intensity",light.power);
+  owlRayGenSet3f(program.rayGen,"position",reinterpret_cast<const owl3f&>(light->position));
+  owlRayGenSet3f(program.rayGen,"color",reinterpret_cast<const owl3f&>(light->power));
+  owlRayGenSet1f(program.rayGen,"intensity",1);
 
   if (causticsMode) {
     owlRayGenSetBuffer(program.rayGen,"photons",program.causticsPhotonsBuffer);
@@ -72,7 +131,7 @@ void runPointLightRayGen(Program &program, const LightSource &light, bool causti
     owlRayGenSetBuffer(program.rayGen,"photonsCount",program.photonsCount);
   }
 
-  const int initialPhotons = light.power * (causticsMode ? program.causticsPhotonsPerWatt : program.photonsPerWatt);
+  const int initialPhotons = program.photonsPerWatt * (light->power.x + light->power.y + light->power.z);
 
   owlBuildSBT(program.owlContext);
   owlRayGenLaunch2D(program.rayGen,initialPhotons,1);
@@ -82,48 +141,25 @@ void initPhotonBuffers(Program &program) {
   program.photonsBuffer = owlHostPinnedBufferCreate(program.owlContext, OWL_USER_TYPE(Photon), program.castedDiffusePhotons * program.maxDepth);
   program.photonsCount = owlHostPinnedBufferCreate(program.owlContext, OWL_INT, 1);
   owlBufferClear(program.photonsCount);
-
-  program.causticsPhotonsBuffer = owlHostPinnedBufferCreate(program.owlContext,OWL_USER_TYPE(Photon),program.castedCausticsPhotons * program.maxDepth);
-  program.causticsPhotonsCount = owlHostPinnedBufferCreate(program.owlContext, OWL_INT, 1);
-  owlBufferClear(program.causticsPhotonsCount);
 }
 
 void computePhotonsPerWatt(Program &program) {
-  double totalWatts = 0;
-  for (auto light : program.world->light_sources) {
-    totalWatts += light.power;
-  }
+  auto light = program.world->scene_light;
+  auto totalWatts = light->power.x + light->power.y + light->power.z;
 
   program.photonsPerWatt = program.castedDiffusePhotons / totalWatts;
-  program.causticsPhotonsPerWatt = program.castedCausticsPhotons / totalWatts;
 }
 
 void runNormal(Program &program, const std::string &output_filename) {
   LOG("launching normal photons ...")
 
-  for (auto light : program.world->light_sources) {
-    runPointLightRayGen(program, light, false);
-  }
+  runPointLightRayGen(program, program.world->scene_light, false);
 
   LOG("done with launch, writing photons ...")
   auto *fb = static_cast<const Photon*>(owlBufferGetPointer(program.photonsBuffer, 0));
   auto count = *(int*)owlBufferGetPointer(program.photonsCount, 0);
 
-  writeAlivePhotons(fb, count, output_filename);
-}
-
-void runCaustics(Program &program, const std::string &output_filename) {
-  LOG("launching caustics photons ...")
-
-  for (auto light : program.world->light_sources) {
-    runPointLightRayGen(program, light, true);
-  }
-
-  LOG("done with launch, writing caustics photons ...")
-  auto *fb = static_cast<const Photon*>(owlBufferGetPointer(program.causticsPhotonsBuffer, 0));
-  auto count = *(int*)owlBufferGetPointer(program.causticsPhotonsCount, 0);
-
-  writeAlivePhotons(fb, count, output_filename);
+  PhotonFileManager::savePhotonsToFile(fb, count, output_filename);
 }
 
 int main(int ac, char **av)
@@ -137,17 +173,13 @@ int main(int ac, char **av)
 
   LOG("Loading Config file...")
 
-//  auto cfg = parse_config();
+  const auto loader = new Mitsuba3Loader("cornell-box");
+  program.world = loader->load();
 
-  auto photons_filename = "photons.txt"; // cfg["data"]["photons_file"].as_string();
-  auto caustics_photons_filename = "photons.txt"; // cfg["data"]["caustics_photons_file"].as_string();
-  auto model_path = "model.txt"; // cfg["data"]["model_path"].as_string();
-  program.castedDiffusePhotons = 100; // cfg["photon-mapper"]["casted_diffuse_photons"].as_integer();
-  program.castedCausticsPhotons = 100; // cfg["photon-mapper"]["casted_caustics_photons"].as_integer();
-  program.maxDepth = 10; // cfg["photon-mapper"]["max_depth"].as_integer();
-
-//  auto *ai_importer = new Assimp::Importer;
-//  program.world =  assets::import_scene(ai_importer, model_path);
+  auto photons_filename = "photons.txt";
+  program.castedDiffusePhotons = 1'000'000;
+  program.castedCausticsPhotons = 100;
+  program.maxDepth = 10;
 
   LOG_OK("Loaded world.")
 
@@ -167,7 +199,6 @@ int main(int ac, char **av)
   LOG("launching ...")
 
   runNormal(program, photons_filename);
-  // runCaustics(program, caustics_photons_filename);
 
   LOG("destroying devicegroup ...");
   owlContextDestroy(program.owlContext);

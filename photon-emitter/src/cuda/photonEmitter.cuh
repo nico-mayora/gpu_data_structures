@@ -4,6 +4,7 @@
 #include "owl/include/owl/common/math/vec.h"
 #include "owl/include/owl/common/math/random.h"
 #include <vector>
+#include "../world.cuh"
 
 struct Photon
 {
@@ -50,13 +51,13 @@ struct PhotonMapperPRD
     } scattered;
 };
 
-struct Material {
-    owl::vec3f albedo;
-    float diffuse;
-    float specular;
-    float transmission;
-    float refraction_idx;
-};
+//struct Material {
+//    owl::vec3f albedo;
+//    float diffuse;
+//    float specular;
+//    float transmission;
+//    float refraction_idx;
+//};
 
 /* variables for the triangle mesh geometry */
 struct TrianglesGeomData
@@ -68,12 +69,12 @@ struct TrianglesGeomData
 
 /* The vectors need to be (trivially) transformed into regular arrays
    before being passed into OptiX */
-struct Mesh {
-    std::string name;
-    std::vector<owl::vec3f> vertices;
-    std::vector<owl::vec3i> indices;
-    std::shared_ptr<Material> material;
-};
+//struct Mesh {
+//    std::string name;
+//    std::vector<owl::vec3f> vertices;
+//    std::vector<owl::vec3i> indices;
+//    std::shared_ptr<Material> material;
+//};
 
 enum LightType {
     POINT_LIGHT,
@@ -97,10 +98,10 @@ struct LightSource {
  * As we use the STL, this is code in C++ land that needs a bit of
  * glue to transform to data that can be held in the GPU.
  */
-struct World {
-    std::vector<LightSource> light_sources;
-    std::vector<Mesh> meshes;
-};
+//struct World {
+//    std::vector<LightSource> light_sources;
+//    std::vector<Mesh> meshes;
+//};
 
 struct GeometryData {
     std::vector<OWLGeom> geometry;
@@ -109,15 +110,13 @@ struct GeometryData {
     OWLGroup worldGroup;
 };
 
-GeometryData loadGeometry(OWLContext &owlContext, const std::unique_ptr<World> &world);
-
 struct Program {
     OWLContext owlContext;
     OWLModule owlModule;
     OWLRayGen rayGen;
 
-    std::unique_ptr<World> world;
-
+//    std::unique_ptr<World> world;
+    World* world;
     GeometryData geometryData;
 
     OWLBuffer photonsBuffer;

@@ -3,7 +3,6 @@
 
 #include "owl/common/math/vec.h"
 #include "pt-math.cuh"
-#include "cuda/photonEmitter.cuh"
 
 struct Mesh {
     std::vector<owl::vec3i> indices;
@@ -61,6 +60,22 @@ struct Mesh {
     }
 };
 
+// For simplicity, we only handle materials that
+// are ONE of the following, not combinations.
+enum MaterialType {
+    LAMBERTIAN,
+    DIELECTRIC,
+    CONDUCTOR,
+};
+
+struct Material {
+    MaterialType matType;
+    owl::vec3f albedo;
+    float diffuse;
+    float specular;
+    float ior;
+};
+
 struct Model {
     Mesh *mesh;
     Material *material;
@@ -78,6 +93,11 @@ struct Camera {
         owl::vec2i resolution;
         float fov;
     } image;
+};
+
+struct PointLight {
+    owl::vec3f position;
+    owl::vec3f power;
 };
 
 struct World {

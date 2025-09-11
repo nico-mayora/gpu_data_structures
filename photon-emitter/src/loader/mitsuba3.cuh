@@ -24,6 +24,10 @@ class Mitsuba3Loader {
     void loadSensor(const tinyxml2::XMLElement *sensor);
     void loadMaterial(const tinyxml2::XMLElement *bsdf);
     void loadShape(const tinyxml2::XMLElement *shape);
+
+    float getDiffuseCoeff(const Material* mat, const tinyxml2::XMLElement *bsdf);
+    float getSpecularCoeff(const Material* mat, const tinyxml2::XMLElement *bsdf);
+    float getTransmissionCoeff(const Material* mat, const tinyxml2::XMLElement *bsdf);
 public:
     explicit Mitsuba3Loader(const std::string& scene_name);
 

@@ -22,7 +22,7 @@ set(sources
         src/main.cu
         src/loader/mitsuba3.cu
         src/pt-math.cu
-        src/viewer.cu
+        src/writer/photon-file-manager.cpp
 )
 
 add_executable(photonEmitter ${sources})
