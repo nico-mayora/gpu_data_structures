@@ -23,6 +23,7 @@ set(sources
         src/loader/mitsuba3.cu
         src/pt-math.cu
         src/viewer.cu
+        src/writer/photon-file-manager.cu
 )
 
 add_executable(pathTracer ${sources})

@@ -88,6 +88,8 @@ Viewer::Viewer(const World *world) {
         { "depth", OWL_INT, OWL_OFFSETOF(RayGenData,depth)},
         { "pixel_samples", OWL_INT, OWL_OFFSETOF(RayGenData,pixel_samples)},
         { "num_diffuse_scattered", OWL_INT, OWL_OFFSETOF(RayGenData,num_diffuse_scattered)},
+        { "photon_map", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,photon_map)},
+        { "num_photons", OWL_INT, OWL_OFFSETOF(RayGenData,num_photons)},
         { "resolution", OWL_INT2, OWL_OFFSETOF(RayGenData,resolution)},
         { "world",         OWL_GROUP,  OWL_OFFSETOF(RayGenData,world)},
         { "camera.pos",    OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.pos)},
@@ -114,6 +116,8 @@ Viewer::Viewer(const World *world) {
     // Set RayGen constant attributes
     owlRayGenSet1i(rayGen, "pixel_samples", world->cam->image.pixel_samples);
     owlRayGenSet1i(rayGen, "num_diffuse_scattered", world->cam->image.num_diffuse_scattered);
+    owlRayGenSetPointer(rayGen, "photon_map", world->photon_map);
+    owlRayGenSet1i(rayGen, "num_photons", world->num_photons);
     owlRayGenSet1i(rayGen, "depth", world->cam->image.depth);
     owlRayGenSet2i(rayGen, "resolution", reinterpret_cast<const owl2i&>(world->cam->image.resolution));
     setWindowSize(world->cam->image.resolution);

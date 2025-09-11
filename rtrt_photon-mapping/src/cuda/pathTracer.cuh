@@ -42,7 +42,7 @@ struct PointLight {
 };
 
 struct Photon {
-    static constexpr uint32_t DIM = 3;
+    static constexpr int DIM = 3;
     //Required member
     float coords[DIM]; //xyz
 
@@ -64,6 +64,8 @@ struct Photon {
         }
         return acum;
     }
+
+    static constexpr int dimension = DIM;
 };
 
 struct RayGenData {
@@ -75,7 +77,7 @@ struct RayGenData {
     int num_diffuse_scattered;
 
     Photon *photon_map;
-    size_t num_photons;
+    int num_photons;
 
     struct {
         owl::vec3f pos;

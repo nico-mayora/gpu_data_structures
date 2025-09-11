@@ -173,11 +173,11 @@ __device__ void get_closest_k_points_in_range(const float *query_pos, const P *t
 template<typename P>
 __device__ __inline__ void fcp(const float *query_pos, const P *tree_buf, const size_t N, FcpResult *result) {
     const float query_range = INFTY;
-    get_closest_k_points_in_range(query_pos, tree_buf, N, query_range, result);
+    get_closest_k_points_in_range<P>(query_pos, tree_buf, N, query_range, result);
 }
 
 template<int K, typename P, typename ResultType>
 __device__ __inline__ void knn(const float *query_pos, const P *tree_buf, const size_t N, ResultType *result) {
     const float query_range = INFTY;
-    get_closest_k_points_in_range(query_pos, tree_buf, N, query_range, result);
+    get_closest_k_points_in_range<K,P,ResultType>(query_pos, tree_buf, N, query_range, result);
 }
