@@ -88,6 +88,24 @@ inline __device__ owl::vec3f multiplyColor(const owl::vec3f &a, const owl::vec3f
   return owl::vec3f(a.x * b.x, a.y * b.y, a.z * b.z);
 }
 
+inline __device__ float pIndex(const owl::vec3f &photon_color, const owl::vec3f &material_coeffs) {
+  const auto pd_top = max(material_coeffs.x * photon_color.x,
+                        max(material_coeffs.y * photon_color.y,
+                            material_coeffs.z * photon_color.z));
+  const auto pd_bottom = max(photon_color.x,
+                         max(photon_color.y,
+                             photon_color.z));
+  return pd_top / pd_bottom;
+}
+
+inline __device__ owl::vec3f calculatePhotonColor(const owl::vec3f &photon_color, const owl::vec3f &material_coeffs) {
+  const auto p_index = pIndex(photon_color, material_coeffs);
+
+  return {photon_color.x * material_coeffs.x / p_index,
+          photon_color.y * material_coeffs.y / p_index,
+          photon_color.z * material_coeffs.z / p_index};
+}
+
 inline __device__
 bool refract(const owl::vec3f& v,
              const owl::vec3f& n,

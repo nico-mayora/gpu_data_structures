@@ -82,7 +82,7 @@ inline __device__ void scatterDiffuse(PhotonMapperPRD &prd, const TrianglesGeomD
   prd.event = SCATTER_DIFFUSE;
   prd.scattered.origin = hitPoint;
   prd.scattered.direction = reflectDiffuse(normal, prd.random);
-  prd.scattered.color = multiplyColor(self.material->albedo, prd.color);
+  prd.scattered.color = calculatePhotonColor(prd.color, self.material->albedo);
 }
 
 inline __device__ void scatterSpecular(PhotonMapperPRD &prd, const TrianglesGeomData &self) {
@@ -156,27 +156,48 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
   const float specularProb = self.material->specular + diffuseProb;
 //  const float transmissionProb = self.material->ior + specularProb;
 
+  const auto p_index = pIndex(prd.color, self.material->albedo);
   const float randomProb = prd.random();
-  if (self.material->matType == LAMBERTIAN) {
-    if (randomProb < diffuseProb)
-      scatterDiffuse(prd, self);
-    else
-      prd.event = ABSORBED;
-  } else if (self.material->matType == CONDUCTOR) {
-    if (randomProb < specularProb)
-      scatterSpecular(prd, self);
-    else
-      prd.event = ABSORBED;
-  } else if (self.material->matType == DIELECTRIC) {
-    auto event = reflect_or_refract_ray(self.material->ior,
-                                        optixGetWorldRayDirection(),
-                                        getPrimitiveNormal(self),
-                                        prd.random);
-    if (event == SCATTER_SPECULAR)
-      scatterSpecular(prd, self);
-    else
-      scatterRefract(prd, self);
+
+  if (randomProb < p_index) {
+    switch (self.material->matType) {
+      case LAMBERTIAN:
+        scatterDiffuse(prd, self);
+        break;
+      case CONDUCTOR:
+        scatterSpecular(prd, self);
+        break;
+      case DIELECTRIC: {
+        auto event = reflect_or_refract_ray(self.material->ior,  optixGetWorldRayDirection(), getPrimitiveNormal(self), prd.random);
+        if (event == SCATTER_SPECULAR)
+          scatterSpecular(prd, self);
+        else
+          scatterRefract(prd, self);
+        break;
+      }
+    }
   }
+
+  // if (self.material->matType == LAMBERTIAN) {
+  //   if (randomProb < diffuseProb)
+  //     scatterDiffuse(prd, self);
+  //   else
+  //     prd.event = ABSORBED;
+  // } else if (self.material->matType == CONDUCTOR) {
+  //   if (randomProb < specularProb)
+  //     scatterSpecular(prd, self);
+  //   else
+  //     prd.event = ABSORBED;
+  // } else if (self.material->matType == DIELECTRIC) {
+  //   auto event = reflect_or_refract_ray(self.material->ior,
+  //                                       optixGetWorldRayDirection(),
+  //                                       getPrimitiveNormal(self),
+  //                                       prd.random);
+  //   if (event == SCATTER_SPECULAR)
+  //     scatterSpecular(prd, self);
+  //   else
+  //     scatterRefract(prd, self);
+  // }
 }
 
 OPTIX_MISS_PROGRAM(miss)(){
