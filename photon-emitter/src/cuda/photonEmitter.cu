@@ -176,7 +176,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
         break;
       }
     }
-  }
+  } else prd.event = ABSORBED;
 
   // if (self.material->matType == LAMBERTIAN) {
   //   if (randomProb < diffuseProb)
