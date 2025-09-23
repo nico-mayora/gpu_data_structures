@@ -49,6 +49,7 @@ struct PhotonMapperPRD
         owl::vec3f direction;
         owl::vec3f color;
     } scattered;
+    bool debug;
 };
 
 //struct Material {

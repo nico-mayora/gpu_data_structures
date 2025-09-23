@@ -104,6 +104,14 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
     owlGeomSetBuffer(trianglesGeom,"index",indexBuffer);
     owlGeomSetBuffer(trianglesGeom,"material", materialBuffer);
 
+    std::cout << "All info about mesh: " << "\n";
+    std::cout << " #vertices: " << vertices.size() << "\n";
+    std::cout << " #triangles: " << indices.size() << "\n";
+    std::cout << " #material: " << material->albedo.x << " "
+              << material->albedo.y << " "
+              << material->albedo.z << "\n";
+    std::cout << "---------------------------------------\n";
+
     data.geometry.push_back(trianglesGeom);
   }
 
@@ -179,7 +187,7 @@ int main(int ac, char **av)
   auto photons_filename = "photons.txt";
   program.castedDiffusePhotons = 1'000'000;
   program.castedCausticsPhotons = 100;
-  program.maxDepth = 10;
+  program.maxDepth = 2;
 
   LOG_OK("Loaded world.")
 

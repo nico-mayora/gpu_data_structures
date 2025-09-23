@@ -15,6 +15,14 @@ inline __device__ void savePhoton(const PhotonMapperRGD &self, PhotonMapperPRD &
   photon->color = prd.color;
   photon->pos = prd.scattered.origin;
   photon->dir = prd.scattered.direction;
+
+  if (prd.debug) {
+    printf("Saved photon at index %d: pos(%f, %f, %f), dir(%f, %f, %f), color(%f, %f, %f)\n",
+           photonIndex,
+           photon->pos.x, photon->pos.y, photon->pos.z,
+           photon->dir.x, photon->dir.y, photon->dir.z,
+           photon->color.x, photon->color.y, photon->color.z);
+  }
 }
 
 inline __device__ void updateScatteredRay(Ray &ray, PhotonMapperPRD &prd) {
@@ -24,8 +32,39 @@ inline __device__ void updateScatteredRay(Ray &ray, PhotonMapperPRD &prd) {
 }
 
 inline __device__ void shootPhoton(const PhotonMapperRGD &self, Ray &ray, PhotonMapperPRD &prd) {
+  auto id = owl::getLaunchIndex();
+
   for (int i = 0; i < self.maxDepth; i++) {
+//    if (prd.debug) {
+//      printf("Depth %d, Ray Origin: (%f, %f, %f), Direction: (%f, %f, %f), Color: (%f, %f, %f)\n",
+//             i,
+//             ray.origin.x, ray.origin.y, ray.origin.z,
+//             ray.direction.x, ray.direction.y, ray.direction.z,
+//             prd.color.x, prd.color.y, prd.color.z);
+//    }
+
+
     owl::traceRay(self.world, ray, prd);
+
+    vec3f targetColor = {0.14f, 0.45f, 0.091f};
+    vec3f targetDir = {0.939488f, -0.342164f, 0.016907f};
+//    if (i == 0 && prd.event == SCATTER_DIFFUSE && prd.scattered.color == targetColor) {
+    if (prd.debug) {
+//    if (ray.direction == targetDir) {
+//      printf("HIT WITH TARGET COLOR AT DEPTH 0\n");
+      printf("id: (%d, %d),  Ray Origin: (%f, %f, %f), Direction: (%f, %f, %f), Color: (%f, %f, %f), isTargetDir: %d, %d, %d - %d\n",
+             id.x, id.y,
+             ray.origin.x, ray.origin.y, ray.origin.z,
+             ray.direction.x, ray.direction.y, ray.direction.z,
+             prd.scattered.color.x, prd.scattered.color.y, prd.scattered.color.z,
+             ray.direction.x == targetDir.x,
+             ray.direction.y == targetDir.y,
+             ray.direction.z == targetDir.z,
+             ray.direction == targetDir);
+      printf("Raydir: (%f, %f, %f), targetDir: (%f, %f, %f)\n",
+             ray.direction.x, ray.direction.y, ray.direction.z,
+             targetDir.x, targetDir.y, targetDir.z);
+    }
 
     if (prd.event == SCATTER_DIFFUSE) {
       if (i > 0) savePhoton(self, prd);
@@ -65,6 +104,13 @@ OPTIX_RAYGEN_PROGRAM(pointLightRayGen)(){
   ray.direction = randomPointInUnitSphere(prd.random);
   ray.tmin = EPS;
 
+  if (id == vec2i(0)) {
+    prd.debug = true;
+    ray.direction = {0.939488f, -0.342164f, 0.016907f};
+  } else {
+    prd.debug = false;
+  }
+
   if (self.causticsMode) {
     shootCausticsPhoton(self, ray, prd);
   } else {
@@ -79,10 +125,23 @@ inline __device__ void scatterDiffuse(PhotonMapperPRD &prd, const TrianglesGeomD
 
   const vec3f normal = getPrimitiveNormal(self);
 
+//  vec3f targetDir = {0.939488f, -0.342164f, 0.016907f};
+  if (prd.debug) {
+//    printf("HIT WITH TARGET COLOR\n");
+//    printf("material albedo: (%f, %f, %f)\n",
+//           self.material->albedo.x,
+//           self.material->albedo.y,
+//           self.material->albedo.z);
+  }
+
   prd.event = SCATTER_DIFFUSE;
   prd.scattered.origin = hitPoint;
   prd.scattered.direction = reflectDiffuse(normal, prd.random);
-  prd.scattered.color = calculatePhotonColor(prd.color, self.material->albedo);
+//  prd.scattered.color = self.material->albedo;
+  prd.scattered.color = calculatePhotonColor(prd.color, self.material->albedo, prd.debug);
+  if (prd.debug) {
+    prd.scattered.direction = -rayDir;
+  }
 }
 
 inline __device__ void scatterSpecular(PhotonMapperPRD &prd, const TrianglesGeomData &self) {
@@ -156,8 +215,26 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
   const float specularProb = self.material->specular + diffuseProb;
 //  const float transmissionProb = self.material->ior + specularProb;
 
-  const auto p_index = pIndex(prd.color, self.material->albedo);
-  const float randomProb = prd.random();
+//  vec3f targetDir = {0.939488f, -0.342164f, 0.016907f};
+//  vec3f dir = optixGetWorldRayDirection();
+  const auto p_index = pIndex(prd.color, self.material->albedo, prd.debug);
+  float randomProb = prd.random();
+
+
+  if (prd.debug) {
+//    printf("HIT WITH TARGET COLOR\n");
+//    printf("material albedo: (%f, %f, %f)\n",
+//           self.material->albedo.x,
+//           self.material->albedo.y,
+//           self.material->albedo.z);
+//    printf("photon color: (%f, %f, %f)\n",
+//           prd.color.x,
+//           prd.color.y,
+//           prd.color.z);
+//
+//    printf("p_index: %f, randomProb: %f\n", p_index, randomProb);
+    randomProb = 0.0f; // force to scatter
+  }
 
   if (randomProb < p_index) {
     switch (self.material->matType) {

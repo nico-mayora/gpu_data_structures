@@ -88,17 +88,18 @@ inline __device__ owl::vec3f multiplyColor(const owl::vec3f &a, const owl::vec3f
   return owl::vec3f(a.x * b.x, a.y * b.y, a.z * b.z);
 }
 
-inline __device__ float pIndex(const owl::vec3f &photon_color, const owl::vec3f &material_coeffs) {
+inline __device__ float pIndex(const owl::vec3f &photon_color, const owl::vec3f &material_coeffs, bool debug=false) {
   const auto pd_top = max(material_coeffs.x * photon_color.x,
                         max(material_coeffs.y * photon_color.y,
                             material_coeffs.z * photon_color.z));
   const auto pd_bottom = max(photon_color.x,
                          max(photon_color.y,
                              photon_color.z));
+  if (debug) printf("pd_top: %f, pd_bottom: %f\n", pd_top, pd_bottom);
   return pd_top / pd_bottom;
 }
 
-inline __device__ owl::vec3f calculatePhotonColor(const owl::vec3f &photon_color, const owl::vec3f &material_coeffs) {
+inline __device__ owl::vec3f calculatePhotonColor(const owl::vec3f &photon_color, const owl::vec3f &material_coeffs, bool debug=false) {
   const auto p_index = pIndex(photon_color, material_coeffs);
 
   return {photon_color.x * material_coeffs.x / p_index,
