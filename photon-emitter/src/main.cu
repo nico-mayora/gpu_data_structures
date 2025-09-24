@@ -66,6 +66,7 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
   OWLVarDecl trianglesGeomVars[] = {
           { "index",  OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,index)},
           { "vertex", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,vertex)},
+          { "normal", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,normal)},
           { "material", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,material)},
           { nullptr /* Sentinel to mark end-of-list */}
   };
@@ -89,6 +90,8 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
             = owlDeviceBufferCreate(owlContext,OWL_FLOAT3,vertices.size(), vertices.data());
     OWLBuffer indexBuffer
             = owlDeviceBufferCreate(owlContext,OWL_INT3,indices.size(), indices.data());
+    OWLBuffer normal_buffer
+            = owlDeviceBufferCreate(owlContext, OWL_FLOAT3, mesh->normals.size(), mesh->normals.data());
     OWLBuffer materialBuffer
             = owlDeviceBufferCreate(owlContext,OWL_USER_TYPE(Material),1, mats_vec.data());
 
@@ -100,13 +103,21 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
     owlTrianglesSetIndices(trianglesGeom,indexBuffer,
                            indices.size(),sizeof(owl::vec3i),0);
 
+
     owlGeomSetBuffer(trianglesGeom,"vertex",vertexBuffer);
     owlGeomSetBuffer(trianglesGeom,"index",indexBuffer);
+    owlGeomSetBuffer(trianglesGeom,"normal", normal_buffer);
     owlGeomSetBuffer(trianglesGeom,"material", materialBuffer);
 
     std::cout << "All info about mesh: " << "\n";
     std::cout << " #vertices: " << vertices.size() << "\n";
     std::cout << " #triangles: " << indices.size() << "\n";
+    std::cout << " #normals: " << mesh->normals.size() << "\n";
+    for (int i = 0; i < mesh->normals.size(); i++) {
+      std::cout << "normal[" << i << "]: " << mesh->normals[i].x << " "
+                << mesh->normals[i].y << " "
+                << mesh->normals[i].z << "\n";
+    }
     std::cout << " #material: " << material->albedo.x << " "
               << material->albedo.y << " "
               << material->albedo.z << "\n";
@@ -184,7 +195,7 @@ int main(int ac, char **av)
   const auto loader = new Mitsuba3Loader("cornell-box");
   program.world = loader->load();
 
-  auto photons_filename = "photons.txt";
+  auto photons_filename = "global_sphere_photons.txt";
   program.castedDiffusePhotons = 1'000'000;
   program.castedCausticsPhotons = 100;
   program.maxDepth = 2;

@@ -76,6 +76,7 @@ inline __device__ owl::vec3f refract(const owl::vec3f &incoming, const owl::vec3
 inline __device__ owl::vec3f getPrimitiveNormal(const TrianglesGeomData& self) {
   using namespace owl;
   const unsigned int primID = optixGetPrimitiveIndex();
+  return normalize(self.normal[primID]);
   const vec3i index  = self.index[primID];
   const vec3f &A     = self.vertex[index.x];
   const vec3f &B     = self.vertex[index.y];

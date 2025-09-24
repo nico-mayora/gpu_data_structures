@@ -66,6 +66,7 @@ struct TrianglesGeomData
     Material *material;
     owl::vec3i *index;
     owl::vec3f *vertex;
+    owl::vec3f *normal;
 };
 
 /* The vectors need to be (trivially) transformed into regular arrays
