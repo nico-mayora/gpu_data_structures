@@ -54,9 +54,12 @@ struct Mesh {
             v = owl::vec3f(transformed_vtx);
         }
 
+        const auto rotMatrix = tf.getRotation();
         for (auto &n: normals) {
-            auto transformed_vtx = tf * owl::vec4f(n, 0);
-            n = owl::vec3f(transformed_vtx);
+            auto transformed_vec = rotMatrix * owl::vec4f(n, 0);
+            n = normalize(owl::vec3f(transformed_vec));
+            //n = owl::vec3f(-1.f, 0.f, 0.f);
+            printf("normal is: %f %f %f\n", n.x, n.y, n.z);
         }
     }
 };
