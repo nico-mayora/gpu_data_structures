@@ -135,8 +135,9 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
             printf("[WARNING] - Material type not implemented. Expect visual glitches!");
     }
 
+
     prd.hitPoint = rayOrg + tMax * rayDir;
-    prd.normalAtHp = (dot(Ng, rayDir) > 0.f) ? -Ng : Ng;
+    prd.normalAtHp = /*(dot(Ng, rayDir) > 0.f) ? -Ng :*/ Ng;
 }
 
 OPTIX_MISS_PROGRAM(shadow)()

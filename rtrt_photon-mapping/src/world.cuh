@@ -58,7 +58,6 @@ struct Mesh {
         for (auto &n: normals) {
             auto transformed_vec = rotMatrix * owl::vec4f(n, 0);
             n = normalize(owl::vec3f(transformed_vec));
-            printf("normal is: %f %f %f\n", n.x, n.y, n.z);
         }
     }
 };
