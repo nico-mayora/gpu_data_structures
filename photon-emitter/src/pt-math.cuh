@@ -10,6 +10,7 @@ class  Mat4f {
 
 public:
     Mat4f() : data{0} {}
+    Mat4f(const std::array<float, 16>& init_data) : data(init_data) {}
 
     /* Create the matrix from 16 column-major numbers separated by spaces. */
     explicit Mat4f(const std::string& str) {
@@ -101,6 +102,21 @@ public:
             }
             std::cout << std::endl;
         }
+    }
+
+    Mat4f getRotation() const {
+      const float scale_x = length(owl::vec3f((*this)(0, 0), (*this)(1, 0), (*this)(2, 0)));
+      const float scale_y = length(owl::vec3f((*this)(0, 1), (*this)(1, 1), (*this)(2, 1)));
+      const float scale_z = length(owl::vec3f((*this)(0, 2), (*this)(1, 2), (*this)(2, 2)));
+
+      const Mat4f rotMatrix{std::array{
+              (*this)(0, 0) / scale_x, (*this)(0, 1) / scale_y, (*this)(0, 2) / scale_z, 0.f,
+              (*this)(1, 0) / scale_x, (*this)(1, 1) / scale_y, (*this)(1, 2) / scale_z, 0.f,
+              (*this)(2, 0) / scale_x, (*this)(2, 1) / scale_y, (*this)(2, 2) / scale_z, 0.f,
+              0.f, 0.f, 0.f, 1.f
+      }};
+
+      return rotMatrix;
     }
 };
 

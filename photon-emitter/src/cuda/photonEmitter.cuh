@@ -43,6 +43,7 @@ struct PhotonMapperPRD
 {
     owl::LCG<> random;
     owl::vec3f color;
+    owl::vec3f direction;
     RayEvent event;
     struct {
         owl::vec3f origin;

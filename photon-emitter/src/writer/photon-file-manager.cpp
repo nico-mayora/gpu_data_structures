@@ -78,9 +78,9 @@ bool PhotonFileManager::saveText(const std::vector<Photon>& photons, const std::
         return false;
     }
     
-    file << "# PHOTON_MAP_V1" << std::endl;
-    file << "# PhotonCount: " << photons.size() << std::endl;
-    file << "# Format: x y z r g b power_r power_g power_b dir_x dir_y dir_z" << std::endl;
+//    file << "# PHOTON_MAP_V1" << std::endl;
+//    file << "# PhotonCount: " << photons.size() << std::endl;
+//    file << "# Format: x y z r g b power_r power_g power_b dir_x dir_y dir_z" << std::endl;
     
     // Write photon data
     for (const auto& photon : photons) {
