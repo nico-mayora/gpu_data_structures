@@ -1,6 +1,6 @@
 <scene version="3.0.0">
 	<default name="integrator" value="path" />
-	<default name="spp" value="16" />
+	<default name="spp" value="4" />
 	<default name="resx" value="800" />
 	<default name="resy" value="800" />
 	<default name="max_depth" value="12" />
@@ -96,7 +96,7 @@
 		<transform name="to_world">
 			<matrix value="0.0851643 0.289542 1.31134e-008 0.328631 3.72265e-009 1.26563e-008 -0.3 0.3 -0.284951 0.0865363 5.73206e-016 0.374592 0 0 0 1" />
 		</transform>
-		<ref id="ShortBoxBSDF" />
+		<ref id="TallBoxBSDF" />
 	</shape>
 	<shape type="cube" id="TallBox">
 		<transform name="to_world">

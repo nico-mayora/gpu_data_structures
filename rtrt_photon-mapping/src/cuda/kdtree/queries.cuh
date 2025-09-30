@@ -100,7 +100,7 @@ struct HeapQueryResult {
             foundPoints++;
         }
 
-        return pointDistances[0]; // Check this
+        return pointDistances[0];
     }
 };
 

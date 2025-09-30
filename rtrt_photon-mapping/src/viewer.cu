@@ -133,6 +133,7 @@ void Viewer::render()
         owlBuildSBT(context);
         sbtDirty = false;
     }
+    std::cout << "Launching...\n";
     owlRayGenLaunch2D(rayGen,fbSize.x,fbSize.y);
 }
 

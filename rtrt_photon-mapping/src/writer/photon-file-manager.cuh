@@ -3,14 +3,13 @@
 #include <vector>
 #include <string>
 #include "../cuda/pathTracer.cuh"
-#include "../cuda/kdtree/builder.cuh"
 
 enum class PhotonFileFormat {
     BINARY,
     TEXT
 };
 
-class PhotonFileManager {
+class   PhotonFileManager {
 public:
     static bool savePhotonsToFile(const Photon* photons, int count,
                                   const std::string& filename,
@@ -18,13 +17,10 @@ public:
     static bool savePhotonsToFile(const std::vector<Photon>& photons, 
                                   const std::string& filename, 
                                   PhotonFileFormat format = PhotonFileFormat::TEXT);
-    static bool loadKdTreeFromFile(const std::string& filename,
-                                   Photon *&photon_ptr,
-                                   int &photon_count,
-                                   PhotonFileFormat format = PhotonFileFormat::TEXT);
-
+    
     static std::vector<Photon> loadPhotonsFromFile(const std::string& filename, 
                                                    PhotonFileFormat format = PhotonFileFormat::TEXT);
+    static bool loadKdTreeFromFile(const std::string&, Photon*&, int&, PhotonFileFormat);
 private:
     static bool saveBinary(const std::vector<Photon>& photons, const std::string& filename);
     static bool saveText(const std::vector<Photon>& photons, const std::string& filename);

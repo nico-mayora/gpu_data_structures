@@ -5,6 +5,8 @@
 #include <filesystem>
 #include <stdexcept>
 
+#include "../cuda/kdtree/builder.cuh"
+
 bool PhotonFileManager::savePhotonsToFile(const Photon* photons, int count,
                                           const std::string& filename,
                                           PhotonFileFormat format) {
@@ -49,7 +51,7 @@ bool PhotonFileManager::savePhotonsToFile(const std::vector<Photon>& photons,
     }
 }
 
-std::vector<Photon> PhotonFileManager::loadPhotonsFromFile(const std::string& filename, 
+std::vector<Photon> PhotonFileManager::loadPhotonsFromFile(const std::string& filename,
                                                            PhotonFileFormat format) {
     if (!std::filesystem::exists(filename)) {
         std::cerr << "Error: File does not exist: " << filename << std::endl;
@@ -129,7 +131,7 @@ std::vector<Photon> PhotonFileManager::loadText(const std::string& filename) {
     return photons;
 }
 
-bool PhotonFileManager::loadKdTreeFromFile(const std::string& filename,
+bool PhotonFileManager::loadKdTreeFromFile(const std::string &filename,
                                            Photon *&photon_ptr,
                                            int &photon_count,
                                            PhotonFileFormat format) {

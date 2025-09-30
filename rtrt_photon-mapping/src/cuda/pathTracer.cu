@@ -3,7 +3,7 @@
 #include "kdtree/queries.cuh"
 #include <optix_device.h>
 
-#define K_PHOTONS 1
+#define K_PHOTONS 5
 #define PI float(3.141592653)
 
 inline __device__
@@ -44,12 +44,12 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
         colour_acum += direct_illumination_fact;
 
         const float query_pos[] = {prd.hitPoint.x, prd.hitPoint.y, prd.hitPoint.z};
-        size_t point_indices[K_PHOTONS] = {0};
-        float point_distances[K_PHOTONS] = {0.f};
-        HeapQueryResult<K_PHOTONS> photon_result {&point_indices[0], &point_distances[0]};
+        size_t point_indices[K_PHOTONS] = {0,0,0,0,0};
+        float point_distances[K_PHOTONS] = {INFTY, INFTY, INFTY, INFTY,INFTY};
+        HeapQueryResult<K_PHOTONS> photon_result {point_indices, point_distances};
 
         knn<K_PHOTONS, Photon, HeapQueryResult<K_PHOTONS>>(
-            &query_pos[0],
+            query_pos,
             self.photon_map,
             self.num_photons,
             &photon_result
@@ -58,18 +58,19 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
         owl::vec3f photon_illumination = 0.f;
 #pragma unroll
         for (int p = 0; p < K_PHOTONS; p++) {
-            if (point_distances[p] == 0.f) break;
+            if (point_distances[p] == INFTY) break;
 
             const Photon &photon = self.photon_map[point_indices[p]];
-            const float distance2 = point_distances[p];
-            const float weight = 1.f - owl::common::polymorphic::rsqrt(distance2) / owl::common::polymorphic::rsqrt(point_distances[0]);
+            //printf("photon dist: %f\n", point_distances[0]);
+            const float weight = 1.f - point_distances[p]
+                / (point_distances[0] > 0.f) ? point_distances[0] : 1.f;
             photon_illumination += owl::vec3f(photon.colour[0], photon.colour[1], photon.colour[2]) * weight;
 
-            photon_illumination = owl::vec3f(photon.colour[0], photon.colour[1], photon.colour[2]);
+            //photon_illumination = owl::vec3f(photon.colour[0], photon.colour[1], photon.colour[2]);
         }
 
-//        colour_acum += photon_illumination * (prd.hpMaterial.diffuse / PI);
-        colour_acum = photon_illumination;
+
+        colour_acum = photon_illumination * (1.f / PI) * 1000;
         // TODO Photon bounce When a ray hits a diffuse material, perform one bounce (random) and gather photons.
         break;
     }
