@@ -4,7 +4,7 @@
 #include "loader/mitsuba3.cuh"
 #include "writer/photon-file-manager.cuh"
 
-int main()
+void main()
 {
     std::cout << "start!\n";
     // TODO: pass scene name as argv
