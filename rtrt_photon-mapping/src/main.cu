@@ -4,8 +4,7 @@
 #include "loader/mitsuba3.cuh"
 #include "writer/photon-file-manager.cuh"
 
-void main()
-{
+void main() {
     std::cout << "start!\n";
     // TODO: pass scene name as argv
     const auto loader = new Mitsuba3Loader("cornell-box");

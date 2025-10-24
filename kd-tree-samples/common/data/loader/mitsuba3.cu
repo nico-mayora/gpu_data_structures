@@ -3,7 +3,10 @@
 
 Mitsuba3Loader::Mitsuba3Loader(const std::string& scene_name) {
     sceneDir = scenesFolder + '\\' + scene_name;
-    const auto scene_path = sceneDir + "\\scene_v3.xml";
+    auto scene_path = sceneDir + "\\scene_v3.xml";
+#ifdef __linux__
+    std::ranges::replace(scene_path, '\\', '/');
+#endif
     std::cout << "Loading scene from: " << scene_path << std::endl;
     sceneDesc.LoadFile(scene_path.c_str());
 
