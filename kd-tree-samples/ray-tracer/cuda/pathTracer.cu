@@ -3,14 +3,14 @@
 #include "../../common/kdtree/queries.cuh"
 #include <optix_device.h>
 
-#define K_PHOTONS 5
+#define K_PHOTONS 128
 #define PI float(3.141592653)
 
 inline __device__
-owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
+owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, int threadID) {
     owl::vec3f colour_acum = 0.f;
 
-    for (int32_t i = 0; i < 1; ++i) {
+    for (int32_t i = 0; i < self.depth; ++i) {
         uint32_t p0, p1;
         owl::packPointer(&prd, p0, p1);
         optixTrace(
@@ -44,8 +44,16 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
         colour_acum += direct_illumination_fact;
 
         const float query_pos[] = {prd.hitPoint.x, prd.hitPoint.y, prd.hitPoint.z};
-        size_t point_indices[K_PHOTONS] = {0,0,0,0,0};
-        float point_distances[K_PHOTONS] = {INFTY, INFTY, INFTY, INFTY,INFTY};
+
+        size_t *point_indices = self.heap_indices + threadID * K_PHOTONS;
+        float *point_distances = self.heap_distances + threadID * K_PHOTONS;
+#pragma unroll
+        for (int k = 0; k < K_PHOTONS; k++) {
+            point_indices[k] = 0;
+            point_distances[k] = INFTY;
+        }
+
+        // Move photon gather to secondary rays.
         HeapQueryResult<K_PHOTONS> photon_result {point_indices, point_distances};
 
         knn<K_PHOTONS, Photon, HeapQueryResult<K_PHOTONS>>(
@@ -61,18 +69,27 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
             if (point_distances[p] == INFTY) break;
 
             const Photon &photon = self.photon_map[point_indices[p]];
-            //printf("photon dist: %f\n", point_distances[0]);
-            const float weight = 1.f - point_distances[p]
-                / (point_distances[0] > 0.f) ? point_distances[0] : 1.f;
-            photon_illumination += owl::vec3f(photon.colour[0], photon.colour[1], photon.colour[2]) * weight;
+            owl::vec3f diff = into_vec3f(photon.coords) - prd.hitPoint;
+            float distance = length(diff);
+            float radius = owl::sqrt(point_distances[0]);
 
-            //photon_illumination = owl::vec3f(photon.colour[0], photon.colour[1], photon.colour[2]);
+            // cone filter
+            float cone_weight = max(0.f, 1.f - distance / radius);
+            cone_weight *= 3.f;
+            owl::vec3f wi = -into_vec3f(photon.dir);
+
+            // lambert
+            float cosTheta = max(0.f, dot(prd.normalAtHp, wi));
+            if (cosTheta <= 0.0f) continue;
+
+            owl::vec3f brdf = prd.hpMaterial.albedo / static_cast<float>(M_PI);
+            owl::vec3f contribution = into_vec3f(photon.colour) * brdf * cosTheta * cone_weight;
+
+            photon_illumination += contribution;
         }
 
-
-        colour_acum = photon_illumination * (1.f / PI) * 1000;
-        // TODO Photon bounce When a ray hits a diffuse material, perform one bounce (random) and gather photons.
-        break;
+        photon_illumination = photon_illumination / (PI * point_distances[0] * 50'000);
+        colour_acum = photon_illumination;
     }
 
     return colour_acum;
@@ -81,6 +98,8 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
 OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
     const RayGenData &self = owl::getProgramData<RayGenData>();
     const owl::vec2i pixelID = owl::getLaunchIndex();
+
+    const int threadID = pixelID.x + self.resolution.x * pixelID.y;
 
     PerRayData prd;
     prd.random.init(pixelID.x,pixelID.y);
@@ -102,7 +121,7 @@ OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
         ray.origin = origin;
         ray.direction = direction;
 
-        colour += trace_path(self, ray, prd);
+        colour += trace_path(self, ray, prd, threadID);
     }
 
     colour *= 1.f / self.pixel_samples;

@@ -1,9 +1,10 @@
 #pragma once
+#include "constants.cuh"
 
 template<int K>
 struct FixedQueryResult {
     size_t *pointIndices;
-    float *pointDistances;
+    float *pointDistances; // distance squared
     size_t foundPoints = 0; /* <= K */
 
     // Returns max distance for points to be considered.
@@ -31,7 +32,7 @@ struct FixedQueryResult {
 template<int K>
 struct HeapQueryResult {
     size_t *pointIndices;
-    float *pointDistances;
+    float *pointDistances; // distance squared
     size_t foundPoints = 0; /* <= K */
 
     __device__ void percolateUp(size_t idx) {
@@ -40,10 +41,10 @@ struct HeapQueryResult {
             if (pointDistances[idx] <= pointDistances[parent]) break; // Node at correct position.
 
             // Swap idx with parent
-            const float tmpIdx = pointIndices[idx];
+            const size_t tmpIdx = pointIndices[idx];
             const float tmpDist = pointDistances[idx];
             pointIndices[idx] = pointIndices[parent];
-            pointDistances[idx] = pointIndices[parent];
+            pointDistances[idx] = pointDistances[parent];
             pointIndices[parent] = tmpIdx;
             pointDistances[parent] = tmpDist;
 
@@ -60,17 +61,17 @@ struct HeapQueryResult {
             if (left < foundPoints && pointDistances[left] > pointDistances[largest]) {
                 largest = left;
             }
-            if (right < foundPoints && pointDistances[right] > pointDistances[right]) {
+            if (right < foundPoints && pointDistances[right] > pointDistances[largest]) {
                 largest = right;
             }
 
             if (largest == idx) break;
 
             // Swap idx with the largest child
-            const float tmpIdx = pointIndices[idx];
+            const size_t tmpIdx = pointIndices[idx];
             const float tmpDist = pointDistances[idx];
             pointIndices[idx] = pointIndices[largest];
-            pointDistances[idx] = pointIndices[largest];
+            pointDistances[idx] = pointDistances[largest];
             pointIndices[largest] = tmpIdx;
             pointDistances[largest] = tmpDist;
 
@@ -131,7 +132,7 @@ __device__ void get_closest_k_points_in_range(const float *query_pos, const P *t
                                               const float query_range, ResultType *result) {
     int curr = 0;
     int prev = -1;
-    float max_search_radius = query_range;
+    float max_search_radius = (query_range == INFTY) ? INFTY : query_range * query_range;
 
     for (;;) {
         const int parent = parent_node(curr);
@@ -148,13 +149,14 @@ __device__ void get_closest_k_points_in_range(const float *query_pos, const P *t
             max_search_radius = result->addNode(dist2, curr);
         }
 
-        const int split_dim = curr % P::dimension;
+        const int level = 31 - __clz(curr + 1);
+        const int split_dim = level % P::dimension;
         const float split_pos = tree_buf[curr].coords[split_dim];
         const float signed_dist = query_pos[split_dim] - split_pos;
         const int close_side = signed_dist > 0.f;
         const int close_child = 2 * curr + 1 + close_side;
         const int far_child = 2 * curr + 2 - close_side;
-        const bool far_in_range = fabsf(signed_dist) <= max_search_radius;
+        const bool far_in_range = signed_dist * signed_dist <= max_search_radius;
 
         int next = parent;
         if (from_parent)
@@ -173,7 +175,7 @@ __device__ void get_closest_k_points_in_range(const float *query_pos, const P *t
 template<typename P>
 __device__ __inline__ void fcp(const float *query_pos, const P *tree_buf, const size_t N, FcpResult *result) {
     const float query_range = INFTY;
-    get_closest_k_points_in_range<P>(query_pos, tree_buf, N, query_range, result);
+    get_closest_k_points_in_range<1, P, FcpResult>(query_pos, tree_buf, N, query_range, result);
 }
 
 template<int K, typename P, typename ResultType>

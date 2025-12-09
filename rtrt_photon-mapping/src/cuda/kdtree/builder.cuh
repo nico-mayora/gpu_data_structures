@@ -67,7 +67,8 @@ static __device__ __inline__  int segment_begin(const int s, const int l, const 
 // DEVICE HELPER FUNCTIONS END
 
 static __global__ void update_tags(int* tags, const int l, const int N) {
-    const int array_idx = static_cast<int>(threadIdx.x);
+    const int array_idx = threadIdx.x + blockIdx.x * blockDim.x;
+    //printf("arrayidx: %d\n", array_idx);
     if (array_idx >= N || array_idx < num_nodes_in_full_tree(l))
         return;
 
@@ -97,7 +98,7 @@ __host__ void build_kd_tree(P *d_points, const size_t N) {
     const auto zip_end = zip_begin + N;
 
     constexpr int threads_per_block = 256;
-    const int blocks = static_cast<int>(N + threads_per_block - 1) / threads_per_block;
+    const int blocks = std::ceil(static_cast<double>(N) / threads_per_block);
 
     // Equivalent to log2(N), the number of levels in a size N binary tree.
     const int max_levels = 31 - std::countl_zero(static_cast<uint32_t>(N));
@@ -109,6 +110,16 @@ __host__ void build_kd_tree(P *d_points, const size_t N) {
     // One last sort to ensure every point is where it should be.
     // They each have a unique tag, so dimension doesn't matter.
     sort(thrust::device, zip_begin, zip_end, ZipCompare<P>());
+
+    const auto h_tags = static_cast<int*>(malloc(tag_buffer_size));
+    cudaMemcpy(h_tags, d_tags, tag_buffer_size, cudaMemcpyDeviceToHost);
+
+    for (int i = 0; i < N; ++i) {
+        printf("meow tag %d: %d\n", i, h_tags[i]);
+    }
+
+    free(h_tags);
+
 
     cudaFree(d_tags);
 }

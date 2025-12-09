@@ -85,14 +85,14 @@ bool PhotonFileManager::saveText(const std::vector<Photon>& photons, const std::
     // Write photon data
     for (const auto& photon : photons) {
 // DEBUG FILE SAVER
-      file << photon.pos[0] << " " << photon.pos[1] << " " << photon.pos[2] << " "
-           << photon.dir[0] << " " << photon.dir[1] << " " << photon.dir[2] << " "
-           << photon.color[0] << " " << photon.color[1] << " " << photon.color[2] << std::endl;
+      // file << photon.pos[0] << " " << photon.pos[1] << " " << photon.pos[2] << " "
+      //      << photon.dir[0] << " " << photon.dir[1] << " " << photon.dir[2] << " "
+      //      << photon.color[0] << " " << photon.color[1] << " " << photon.color[2] << std::endl;
 
-//        file << photon.pos[0] << " " << photon.pos[1] << " " << photon.pos[2] << " "
-//             << photon.color[0] << " " << photon.color[1] << " " << photon.color[2] << " "
-//             << photon.power << " " << photon.power << " " << photon.power << " "
-//             << photon.dir[0] << " " << photon.dir[1] << " " << photon.dir[2] << std::endl;
+        file << photon.pos[0] << " " << photon.pos[1] << " " << photon.pos[2] << " "
+             << photon.color[0] << " " << photon.color[1] << " " << photon.color[2] << " "
+             << photon.power << " " << photon.power << " " << photon.power << " "
+             << photon.dir[0] << " " << photon.dir[1] << " " << photon.dir[2] << std::endl;
     }
     
     file.close();

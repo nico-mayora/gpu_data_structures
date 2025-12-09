@@ -4,6 +4,8 @@
 #include "../common/data/loader/mitsuba3.cuh"
 #include "../common/data/photon/photon-file-manager.cuh"
 
+#define K_PHOTONS 1000
+
 int main()
 {
     std::cout << "start!\n";
@@ -14,6 +16,14 @@ int main()
                                           world->photon_map,
                                           world->num_photons,
                                           PhotonFileFormat::TEXT);
+
+    const int parallelThreads = world->cam->image.resolution.x *
+                            world->cam->image.resolution.y;
+
+    const size_t heap_size = parallelThreads * K_PHOTONS;
+    cudaMalloc(reinterpret_cast<void**>(&world->heap_indices), sizeof(size_t) * heap_size);
+    cudaMalloc(reinterpret_cast<void**>(&world->heap_distances), sizeof(float) * heap_size);
+
 
     auto lf = world->cam->lookFrom;
     std::cout << "cam: " << lf.x << " " << lf.y << " " << lf.z << '\n';

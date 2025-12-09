@@ -136,6 +136,8 @@ struct World {
 
     Photon *photon_map;
     int num_photons;
+    size_t *heap_indices;
+    float *heap_distances;
 
     Camera *cam;
 };

@@ -143,3 +143,8 @@ owl::vec3f reflect_or_refract_ray(const Material& material,
         return refracted;
     }
 }
+
+inline __device__
+owl::vec3f into_vec3f(const float *arr) {
+    return owl::vec3f(arr[0], arr[1], arr[2]);
+}

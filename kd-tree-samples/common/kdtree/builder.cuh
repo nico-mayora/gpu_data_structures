@@ -67,7 +67,7 @@ static __device__ __inline__  int segment_begin(const int s, const int l, const 
 // DEVICE HELPER FUNCTIONS END
 
 static __global__ void update_tags(int* tags, const int l, const int N) {
-    const int array_idx = static_cast<int>(threadIdx.x);
+    const int array_idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (array_idx >= N || array_idx < num_nodes_in_full_tree(l))
         return;
 
@@ -97,7 +97,7 @@ __host__ void build_kd_tree(P *d_points, const size_t N) {
     const auto zip_end = zip_begin + N;
 
     constexpr int threads_per_block = 256;
-    const int blocks = static_cast<int>(N + threads_per_block - 1) / threads_per_block;
+    const int blocks = std::ceil(static_cast<double>(N) / threads_per_block);
 
     // Equivalent to log2(N), the number of levels in a size N binary tree.
     const int max_levels = 31 - std::countl_zero(static_cast<uint32_t>(N));
