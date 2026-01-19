@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "owl/common/math/vec.h"
+#include "owl/include/owl/common/math/random.h"
 #include "pt-math.cuh"
 //#include "cuda/pathTracer.cuh"
 
@@ -103,6 +104,15 @@ struct PointLight {
     owl::vec3f power;
 };
 
+// TODO: Remove this, deprecated
+struct EmittedPhoton
+{
+    owl::vec3f pos;
+    owl::vec3f dir;
+    int power;
+    owl::vec3f color;
+};
+
 struct Photon {
     static constexpr int DIM = 3;
     //Required member
@@ -140,4 +150,24 @@ struct World {
     float *heap_distances;
 
     Camera *cam;
+};
+
+// Device types
+
+struct TrianglesGeomData {
+    Material *material;
+    owl::vec3f *vertex;
+    owl::vec3i *index;
+    owl::vec3f *normal;
+    bool faceted; // TODO: Make array
+};
+
+typedef owl::LCG<> Random;
+
+enum RayEvent {
+    MISS,
+    SCATTER_DIFFUSE,
+    SCATTER_SPECULAR,
+    SCATTER_REFRACT,
+    ABSORBED,
 };

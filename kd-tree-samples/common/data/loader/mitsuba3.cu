@@ -91,6 +91,53 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
     world->models.emplace_back(model);
 }
 
+float Mitsuba3Loader::getDiffuseCoeff(const Material* mat, const tinyxml2::XMLElement *inner_bsdf=nullptr) {
+    if (mat->matType == LAMBERTIAN) {
+        return 1.f;
+    }
+    if (mat->matType == DIELECTRIC) {
+        return 0.f;
+    }
+    if (mat->matType == CONDUCTOR) {
+        return 0.f;
+    }
+    std::cerr << "ERROR: Unknown material type in getDiffuseCoeff" << std::endl;
+    std::abort();
+}
+
+float Mitsuba3Loader::getSpecularCoeff(const Material* mat, const tinyxml2::XMLElement *inner_bsdf=nullptr) {
+    if (mat->matType == LAMBERTIAN) {
+        return 0.f;
+    }
+    if (mat->matType == DIELECTRIC) {
+        return 0.f;
+    }
+    if (mat->matType == CONDUCTOR) {
+      const auto specular = inner_bsdf->FirstChildElement("float");
+      assert(std::string(specular->Attribute("name")) == "specular");
+      return resolveValue<float>(specular->Attribute("value"));
+    }
+    std::cerr << "ERROR: Unknown material type in getSpecularCoeff" << std::endl;
+    std::abort();
+}
+
+float Mitsuba3Loader::getTransmissionCoeff(const Material* mat, const tinyxml2::XMLElement *inner_bsdf=nullptr) {
+    if (mat->matType == LAMBERTIAN) {
+        return 0.f;
+    }
+    if (mat->matType == DIELECTRIC) {
+        // We assume ext_ior to always be 1.0
+        const auto ior = inner_bsdf->FirstChildElement("float");
+        assert(std::string(ior->Attribute("name")) == "int_ior");
+        return resolveValue<float>(ior->Attribute("value"));
+    }
+    if (mat->matType == CONDUCTOR) {
+        return 0.f;
+    }
+    std::cerr << "ERROR: Unknown material type in getIor" << std::endl;
+    std::abort();
+}
+
 void Mitsuba3Loader::loadMaterial(const tinyxml2::XMLElement *bsdf) {
     const auto inner_bsdf = bsdf->FirstChildElement("bsdf");
     auto material = new Material;
@@ -102,21 +149,21 @@ void Mitsuba3Loader::loadMaterial(const tinyxml2::XMLElement *bsdf) {
         const auto reflectance = inner_bsdf->FirstChildElement("rgb");
         assert(std::string(reflectance->Attribute("name")) == "reflectance");
         material->albedo = parseVec3f(reflectance->Attribute("value"));
+        material->diffuse = getDiffuseCoeff(material, inner_bsdf);
+        material->specular = getSpecularCoeff(material, inner_bsdf);
+        material->ior = getTransmissionCoeff(material, inner_bsdf);
     } else if (type == "dielectric") {
         material->matType = DIELECTRIC;
-        // We assume ext_ior to always be 1.0
-        const auto ior = inner_bsdf->FirstChildElement("float");
-        assert(std::string(ior->Attribute("name")) == "int_ior");
-        material->albedo = 0.f;
-        material->diffuse = material->specular = 0.f;
-        material->ior = resolveValue<float>(ior->Attribute("value"));
+        material->albedo = 1.f;
+        material->diffuse = getDiffuseCoeff(material, inner_bsdf);
+        material->specular = getSpecularCoeff(material, inner_bsdf);
+        material->ior = getTransmissionCoeff(material, inner_bsdf);
     } else if (type == "conductor") {
         material->matType = CONDUCTOR;
-        const auto specular = inner_bsdf->FirstChildElement("float");
-        assert(std::string(specular->Attribute("name")) == "specular");
-        material->albedo = 0.f;
-        material->diffuse = material->ior = 0.f;
-        material->specular = resolveValue<float>(specular->Attribute("value"));
+        material->albedo = 1.f;
+        material->diffuse = getDiffuseCoeff(material, inner_bsdf);
+        material->ior = getTransmissionCoeff(material, inner_bsdf);
+        material->specular = getSpecularCoeff(material, inner_bsdf);
     }
 
     materials.emplace(name, material);

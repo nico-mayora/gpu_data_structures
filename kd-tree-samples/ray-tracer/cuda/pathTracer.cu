@@ -3,7 +3,8 @@
 #include "../../common/kdtree/queries.cuh"
 #include <optix_device.h>
 
-#define K_PHOTONS 128
+#define K_PHOTONS 64
+#define SECONDARY_RAYS 8
 #define PI float(3.141592653)
 
 inline __device__
@@ -28,10 +29,10 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
             p0, p1
         );
 
-        if (prd.event == MISSED || prd.event == CANCELLED)
+        if (prd.event == MISS || prd.event == ABSORBED)
             return colour_acum;
 
-        if (prd.event == REFLECTED_SPECULAR) {
+        if (prd.event == SCATTER_SPECULAR) {
             owl::vec3f new_ray_dir = reflect_or_refract_ray(
                 prd.hpMaterial, ray.direction, prd.normalAtHp, prd.random
             );
@@ -43,53 +44,81 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
         auto direct_illumination_fact = calculateDirectIllumination(self, prd);
         colour_acum += direct_illumination_fact;
 
-        const float query_pos[] = {prd.hitPoint.x, prd.hitPoint.y, prd.hitPoint.z};
-
-        size_t *point_indices = self.heap_indices + threadID * K_PHOTONS;
-        float *point_distances = self.heap_distances + threadID * K_PHOTONS;
+        owl::vec3f diffuse_contrib = 0.f;
 #pragma unroll
-        for (int k = 0; k < K_PHOTONS; k++) {
-            point_indices[k] = 0;
-            point_distances[k] = INFTY;
-        }
+        for (uint32_t j = 0; j < SECONDARY_RAYS; ++j) {
+            owl::vec3f rand_offset = owl::vec3f { prd.random(), prd.random(), prd.random() } * 2.f - 1.f;
+            owl::vec3f diffuse_vector_dir = normalize(prd.normalAtHp + rand_offset);
 
-        // Move photon gather to secondary rays.
-        HeapQueryResult<K_PHOTONS> photon_result {point_indices, point_distances};
+            if (norm_squared(diffuse_vector_dir) < 100*EPS) {
+                diffuse_vector_dir = prd.normalAtHp;
+            }
 
-        knn<K_PHOTONS, Photon, HeapQueryResult<K_PHOTONS>>(
-            query_pos,
-            self.photon_map,
-            self.num_photons,
-            &photon_result
-        );
+            uint32_t q0, q1;
+            PerRayData sprd;
+            owl::packPointer(&sprd, q0, q1);
+            optixTrace(
+                self.world,
+                prd.hitPoint,
+                diffuse_vector_dir,
+                EPS,
+                INFTY,
+                0.f,
+                OptixVisibilityMask(255),
+                OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+                PRIMARY,
+                RAY_TYPES_COUNT,
+                PRIMARY,
+                q0, q1
+            );
 
-        owl::vec3f photon_illumination = 0.f;
+            const float query_pos[] = {sprd.hitPoint.x, sprd.hitPoint.y, sprd.hitPoint.z};
+
+            size_t *point_indices = self.heap_indices + threadID * K_PHOTONS;
+            float *point_distances = self.heap_distances + threadID * K_PHOTONS;
 #pragma unroll
-        for (int p = 0; p < K_PHOTONS; p++) {
-            if (point_distances[p] == INFTY) break;
+            for (int k = 0; k < K_PHOTONS; k++) {
+                point_indices[k] = 0;
+                point_distances[k] = INFTY;
+            }
 
-            const Photon &photon = self.photon_map[point_indices[p]];
-            owl::vec3f diff = into_vec3f(photon.coords) - prd.hitPoint;
-            float distance = length(diff);
-            float radius = owl::sqrt(point_distances[0]);
+            HeapQueryResult<K_PHOTONS> photon_result {point_indices, point_distances};
 
-            // cone filter
-            float cone_weight = max(0.f, 1.f - distance / radius);
-            cone_weight *= 3.f;
-            owl::vec3f wi = -into_vec3f(photon.dir);
+            knn<K_PHOTONS, Photon, HeapQueryResult<K_PHOTONS>>(
+                query_pos,
+                self.photon_map,
+                self.num_photons,
+                &photon_result
+            );
 
-            // lambert
-            float cosTheta = max(0.f, dot(prd.normalAtHp, wi));
-            if (cosTheta <= 0.0f) continue;
+            owl::vec3f photon_illumination = 0.f;
+#pragma unroll
+            for (int p = 0; p < K_PHOTONS; p++) {
+                if (point_distances[p] == INFTY) break;
 
-            owl::vec3f brdf = prd.hpMaterial.albedo / static_cast<float>(M_PI);
-            owl::vec3f contribution = into_vec3f(photon.colour) * brdf * cosTheta * cone_weight;
+                const Photon &photon = self.photon_map[point_indices[p]];
+                owl::vec3f diff = into_vec3f(photon.coords) - sprd.hitPoint;
+                float distance = length(diff);
+                float radius = owl::sqrt(point_distances[0]);
 
-            photon_illumination += contribution;
+                // cone filter
+                float cone_weight = max(0.f, 1.f - distance / radius);
+                cone_weight *= 3.f;
+                owl::vec3f wi = -into_vec3f(photon.dir);
+
+                // lambert
+                float cosTheta = max(0.f, dot(sprd.normalAtHp, wi));
+                if (cosTheta <= 0.0f) continue;
+
+                owl::vec3f brdf = sprd.hpMaterial.albedo / static_cast<float>(M_PI);
+                owl::vec3f contribution = into_vec3f(photon.colour) * brdf * cosTheta * cone_weight;
+                photon_illumination += contribution;
+            }
+
+            photon_illumination = photon_illumination / (PI * point_distances[0]);
+            diffuse_contrib += photon_illumination;
         }
-
-        photon_illumination = photon_illumination / (PI * point_distances[0] * 50'000);
-        colour_acum = photon_illumination;
+        colour_acum += 0.000005f * diffuse_contrib * prd.hpMaterial.albedo;
     }
 
     return colour_acum;
@@ -139,7 +168,7 @@ OPTIX_MISS_PROGRAM(miss)()
 
     owl::vec3f rayDir = optixGetWorldRayDirection();
     rayDir = normalize(rayDir);
-    prd.event = MISSED;
+    prd.event = MISS;
     prd.colour = self.sky_colour * (rayDir.y * .5f + 1.f);
 }
 
@@ -161,21 +190,21 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
             prd.hpMaterial.diffuse = self.material->diffuse;
 
             prd.colour = self.material->albedo;
-            prd.event = REFLECTED_DIFFUSE;
+            prd.event = SCATTER_DIFFUSE;
             break;
         }
         case DIELECTRIC: {
             prd.hpMaterial.matType = DIELECTRIC;
             prd.hpMaterial.ior = self.material->ior;
 
-            prd.event = REFLECTED_SPECULAR;
+            prd.event = SCATTER_SPECULAR;
             break;
         }
         case CONDUCTOR: {
             prd.hpMaterial.matType = CONDUCTOR;
             prd.hpMaterial.specular = self.material->specular;
 
-            prd.event = REFLECTED_SPECULAR;
+            prd.event = SCATTER_SPECULAR;
             break;
         }
         default:

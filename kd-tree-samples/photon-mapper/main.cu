@@ -3,10 +3,8 @@
 #include <iomanip>
 #include "owl/owl.h"
 #include "./cuda/photonEmitter.cuh"
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "../../externals/stb/stb_image_write.h"
-#include "loader/mitsuba3.cuh"
-#include "writer/photon-file-manager.h"
+#include "../common/data/loader/mitsuba3.cuh"
+#include "../common/data/photon/photon-file-manager.cuh"
 
 #define LOG(message)                                            \
   std::cout << OWL_TERMINAL_BLUE;                               \
@@ -18,26 +16,6 @@
   std::cout << OWL_TERMINAL_DEFAULT;
 
 extern "C" char photonEmitter_ptx[];
-
-void writeAlivePhotons(const Photon* photons, int count, const std::string& filename) {
-  std::ofstream outFile(filename);
-
-  if (!outFile.is_open()) {
-    std::cerr << "Error opening file: " << filename << std::endl;
-    return;
-  }
-
-  outFile << std::fixed << std::setprecision(6);
-
-  for (int i = 0; i < count; i++) {
-    auto photon = photons[i];
-    outFile << photon.pos.x << " " << photon.pos.y << " " << photon.pos.z << " "
-            << photon.dir.x << " " << photon.dir.y << " " << photon.dir.z << " "
-            << photon.color.x << " " << photon.color.y << " " << photon.color.z << "\n";
-  }
-
-  outFile.close();
-}
 
 void setupPointLightRayGenProgram(Program &program) {
   OWLVarDecl rayGenVars[] = {
@@ -157,7 +135,7 @@ void runPointLightRayGen(Program &program, const PointLight* light, bool caustic
 }
 
 void initPhotonBuffers(Program &program) {
-  program.photonsBuffer = owlHostPinnedBufferCreate(program.owlContext, OWL_USER_TYPE(Photon), program.castedDiffusePhotons * program.maxDepth);
+  program.photonsBuffer = owlHostPinnedBufferCreate(program.owlContext, OWL_USER_TYPE(EmittedPhoton), program.castedDiffusePhotons * program.maxDepth);
   program.photonsCount = owlHostPinnedBufferCreate(program.owlContext, OWL_INT, 1);
   owlBufferClear(program.photonsCount);
 }
@@ -175,7 +153,7 @@ void runNormal(Program &program, const std::string &output_filename) {
   runPointLightRayGen(program, program.world->scene_light, false);
 
   LOG("done with launch, writing photons ...")
-  auto *fb = static_cast<const Photon*>(owlBufferGetPointer(program.photonsBuffer, 0));
+  auto *fb = static_cast<const EmittedPhoton*>(owlBufferGetPointer(program.photonsBuffer, 0));
   auto count = *(int*)owlBufferGetPointer(program.photonsCount, 0);
 
   PhotonFileManager::savePhotonsToFile(fb, count, output_filename);
@@ -195,8 +173,8 @@ int main(int ac, char **av)
   const auto loader = new Mitsuba3Loader("cornell-box");
   program.world = loader->load();
 
-  auto photons_filename = "global_sphere_photons.txt";
-  program.castedDiffusePhotons = 1'000'000;
+  auto photons_filename = "cornell-box-photons.txt";
+  program.castedDiffusePhotons = 3'000'000;
   program.castedCausticsPhotons = 100;
   program.maxDepth = 10;
 

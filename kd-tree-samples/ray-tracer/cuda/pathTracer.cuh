@@ -9,14 +9,6 @@ enum RayTypes {
     RAY_TYPES_COUNT
 };
 
-struct TrianglesGeomData {
-    Material *material;
-    owl::vec3f *vertex;
-    owl::vec3i *index;
-    owl::vec3f *normal;
-    bool faceted;
-};
-
 struct MissProgData {
     owl::vec3f sky_colour;
 };
@@ -42,15 +34,6 @@ struct RayGenData {
     } camera;
 
     PointLight *scene_light;
-};
-
-typedef owl::LCG<> Random;
-
-enum RayEvent {
-    MISSED,
-    REFLECTED_DIFFUSE,
-    REFLECTED_SPECULAR,
-    CANCELLED
 };
 
 struct PerRayData {

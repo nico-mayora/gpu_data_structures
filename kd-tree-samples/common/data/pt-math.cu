@@ -1,5 +1,6 @@
 #include "pt-math.cuh"
 
+// TODO: Move to header
 owl::vec3f parseVec3f(const std::string& str) {
     std::istringstream ss(str);
     std::string token;

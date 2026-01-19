@@ -88,7 +88,7 @@ inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray
       savePhoton(self, prd);
     }
 
-    if (prd.event & (SCATTER_SPECULAR | SCATTER_REFRACT)) {
+    if (prd.event == SCATTER_SPECULAR || prd.event == SCATTER_REFRACT) {
       updateScatteredRay(ray, prd);
     } else {
       break;
@@ -258,9 +258,9 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
   auto &prd = owl::getPRD<PhotonMapperPRD>();
   const auto &self = owl::getProgramData<TrianglesGeomData>();
 
-//  const float diffuseProb = self.material->diffuse;
-//  const float specularProb = self.material->specular + diffuseProb;
-//  const float transmissionProb = self.material->ior + specularProb;
+  // const float diffuseProb = self.material->diffuse;
+  // const float specularProb = self.material->specular + diffuseProb;
+  // const float transmissionProb = self.material->ior + specularProb;
 
 //  vec3f targetDir = {0.939488f, -0.342164f, 0.016907f};
 //  vec3f dir = optixGetWorldRayDirection();

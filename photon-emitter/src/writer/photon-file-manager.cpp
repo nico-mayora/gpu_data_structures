@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <stdexcept>
 
-bool PhotonFileManager::savePhotonsToFile(const Photon* photons, int count,
+bool PhotonFileManager::savePhotonsToFile(const EmittedPhoton* photons, int count,
                                           const std::string& filename,
                                           PhotonFileFormat format) {
     if (count <= 0 || photons == nullptr) {
@@ -15,7 +15,7 @@ bool PhotonFileManager::savePhotonsToFile(const Photon* photons, int count,
 
     std::cout << "Saving " << count << " photons to: " << filename << std::endl;
 
-    std::vector<Photon> photonVec(photons, photons + count);
+    std::vector<EmittedPhoton> photonVec(photons, photons + count);
 
     switch (format) {
         case PhotonFileFormat::BINARY:
@@ -28,7 +28,7 @@ bool PhotonFileManager::savePhotonsToFile(const Photon* photons, int count,
     }
 }
 
-bool PhotonFileManager::savePhotonsToFile(const std::vector<Photon>& photons, 
+bool PhotonFileManager::savePhotonsToFile(const std::vector<EmittedPhoton>& photons,
                                           const std::string& filename, 
                                           PhotonFileFormat format) {
     if (photons.empty()) {
@@ -49,7 +49,7 @@ bool PhotonFileManager::savePhotonsToFile(const std::vector<Photon>& photons,
     }
 }
 
-std::vector<Photon> PhotonFileManager::loadPhotonsFromFile(const std::string& filename, 
+std::vector<EmittedPhoton> PhotonFileManager::loadPhotonsFromFile(const std::string& filename,
                                                            PhotonFileFormat format) {
     if (!std::filesystem::exists(filename)) {
         std::cerr << "Error: File does not exist: " << filename << std::endl;
@@ -67,11 +67,11 @@ std::vector<Photon> PhotonFileManager::loadPhotonsFromFile(const std::string& fi
     }
 }
 
-bool PhotonFileManager::saveBinary(const std::vector<Photon>& photons, const std::string& filename) {
+bool PhotonFileManager::saveBinary(const std::vector<EmittedPhoton>& photons, const std::string& filename) {
     throw std::runtime_error("Binary format save not implemented yet");
 }
 
-bool PhotonFileManager::saveText(const std::vector<Photon>& photons, const std::string& filename) {
+bool PhotonFileManager::saveText(const std::vector<EmittedPhoton>& photons, const std::string& filename) {
     std::ofstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Error: Cannot open file for writing: " << filename << std::endl;
@@ -101,25 +101,25 @@ bool PhotonFileManager::saveText(const std::vector<Photon>& photons, const std::
 }
 
 
-std::vector<Photon> PhotonFileManager::loadBinary(const std::string& filename) {
+std::vector<EmittedPhoton> PhotonFileManager::loadBinary(const std::string& filename) {
     throw std::runtime_error("Binary format load not implemented yet");
 }
 
-std::vector<Photon> PhotonFileManager::loadText(const std::string& filename) {
+std::vector<EmittedPhoton> PhotonFileManager::loadText(const std::string& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Error: Cannot open file for reading: " << filename << std::endl;
         return {};
     }
     
-    std::vector<Photon> photons;
+    std::vector<EmittedPhoton> photons;
     std::string line;
     
     while (std::getline(file, line)) {
         if (line.empty() || line[0] == '#') continue; // Skip header/comments
         
         std::istringstream iss(line);
-        Photon photon;
+        EmittedPhoton photon;
         
         if (iss >> photon.pos[0] >> photon.pos[1] >> photon.pos[2] >>
                   photon.color[0] >> photon.color[1] >> photon.color[2] >>

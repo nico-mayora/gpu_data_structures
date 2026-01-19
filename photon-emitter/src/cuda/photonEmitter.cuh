@@ -6,7 +6,7 @@
 #include <vector>
 #include "../world.cuh"
 
-struct Photon
+struct EmittedPhoton
 {
     owl::vec3f pos;
     owl::vec3f dir;
@@ -16,7 +16,7 @@ struct Photon
 
 struct PhotonMapperRGD
 {
-    Photon *photons;
+    EmittedPhoton *photons;
     int *photonsCount;
     OptixTraversableHandle world;
     int maxDepth;

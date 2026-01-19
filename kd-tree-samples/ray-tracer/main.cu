@@ -4,7 +4,7 @@
 #include "../common/data/loader/mitsuba3.cuh"
 #include "../common/data/photon/photon-file-manager.cuh"
 
-#define K_PHOTONS 1000
+#define K_PHOTONS 64
 
 int main()
 {

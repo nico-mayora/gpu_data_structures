@@ -11,10 +11,10 @@ enum class PhotonFileFormat {
 
 class   PhotonFileManager {
 public:
-    static bool savePhotonsToFile(const Photon* photons, int count,
+    static bool savePhotonsToFile(const EmittedPhoton* photons, int count,
                                   const std::string& filename,
                                   PhotonFileFormat format = PhotonFileFormat::TEXT);
-    static bool savePhotonsToFile(const std::vector<Photon>& photons, 
+    static bool savePhotonsToFile(const std::vector<EmittedPhoton>& photons,
                                   const std::string& filename, 
                                   PhotonFileFormat format = PhotonFileFormat::TEXT);
     
@@ -22,8 +22,8 @@ public:
                                                    PhotonFileFormat format = PhotonFileFormat::TEXT);
     static bool loadKdTreeFromFile(const std::string&, Photon*&, int&, PhotonFileFormat);
 private:
-    static bool saveBinary(const std::vector<Photon>& photons, const std::string& filename);
-    static bool saveText(const std::vector<Photon>& photons, const std::string& filename);
+    static bool saveBinary(const std::vector<EmittedPhoton>& photons, const std::string& filename);
+    static bool saveText(const std::vector<EmittedPhoton>& photons, const std::string& filename);
     
     static std::vector<Photon> loadBinary(const std::string& filename);
     static std::vector<Photon> loadText(const std::string& filename);

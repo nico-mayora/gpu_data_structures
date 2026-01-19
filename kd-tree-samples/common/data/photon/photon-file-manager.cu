@@ -7,7 +7,7 @@
 
 #include "../../kdtree/builder.cuh"
 
-bool PhotonFileManager::savePhotonsToFile(const Photon* photons, int count,
+bool PhotonFileManager::savePhotonsToFile(const EmittedPhoton* photons, int count,
                                           const std::string& filename,
                                           PhotonFileFormat format) {
     if (count <= 0 || photons == nullptr) {
@@ -17,7 +17,7 @@ bool PhotonFileManager::savePhotonsToFile(const Photon* photons, int count,
 
     std::cout << "Saving " << count << " photons to: " << filename << std::endl;
 
-    std::vector<Photon> photonVec(photons, photons + count);
+    std::vector<EmittedPhoton> photonVec(photons, photons + count);
 
     switch (format) {
         case PhotonFileFormat::BINARY:
@@ -30,7 +30,7 @@ bool PhotonFileManager::savePhotonsToFile(const Photon* photons, int count,
     }
 }
 
-bool PhotonFileManager::savePhotonsToFile(const std::vector<Photon>& photons, 
+bool PhotonFileManager::savePhotonsToFile(const std::vector<EmittedPhoton>& photons,
                                           const std::string& filename, 
                                           PhotonFileFormat format) {
     if (photons.empty()) {
@@ -69,11 +69,11 @@ std::vector<Photon> PhotonFileManager::loadPhotonsFromFile(const std::string& fi
     }
 }
 
-bool PhotonFileManager::saveBinary(const std::vector<Photon>& photons, const std::string& filename) {
+bool PhotonFileManager::saveBinary(const std::vector<EmittedPhoton>& photons, const std::string& filename) {
     throw std::runtime_error("Binary format save not implemented yet");
 }
 
-bool PhotonFileManager::saveText(const std::vector<Photon>& photons, const std::string& filename) {
+bool PhotonFileManager::saveText(const std::vector<EmittedPhoton>& photons, const std::string& filename) {
     std::ofstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Error: Cannot open file for writing: " << filename << std::endl;
@@ -86,9 +86,9 @@ bool PhotonFileManager::saveText(const std::vector<Photon>& photons, const std::
     
     // Write photon data
     for (const auto& photon : photons) {
-        file << photon.coords[0] << " " << photon.coords[1] << " " << photon.coords[2] << " "
-             << photon.colour[0] << " " << photon.colour[1] << " " << photon.colour[2] << " "
-             << photon.power[0] << " " << photon.power[1] << " " << photon.power[2] << " "
+        file << photon.pos[0] << " " << photon.pos[1] << " " << photon.pos[2] << " "
+             << photon.color[0] << " " << photon.color[1] << " " << photon.color[2] << " "
+             << photon.power << " " << photon.power << " " << photon.power << " "
              << photon.dir[0] << " " << photon.dir[1] << " " << photon.dir[2] << std::endl;
     }
     

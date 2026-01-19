@@ -4,19 +4,11 @@
 #include "owl/include/owl/common/math/vec.h"
 #include "owl/include/owl/common/math/random.h"
 #include <vector>
-#include "../world.cuh"
-
-struct Photon
-{
-    owl::vec3f pos;
-    owl::vec3f dir;
-    int power;
-    owl::vec3f color;
-};
+#include "../../common/data/world.cuh"
 
 struct PhotonMapperRGD
 {
-    Photon *photons;
+    EmittedPhoton *photons;
     int *photonsCount;
     OptixTraversableHandle world;
     int maxDepth;
@@ -28,15 +20,6 @@ struct PointLightRGD: public PhotonMapperRGD
     owl::vec3f position;
     owl::vec3f color;
     float intensity;
-};
-
-enum RayEvent
-{
-    MISS = 0,
-    ABSORBED = 1,
-    SCATTER_DIFFUSE = 2,
-    SCATTER_SPECULAR = 4,
-    SCATTER_REFRACT = 8,
 };
 
 struct PhotonMapperPRD
@@ -52,32 +35,6 @@ struct PhotonMapperPRD
     } scattered;
     bool debug;
 };
-
-//struct Material {
-//    owl::vec3f albedo;
-//    float diffuse;
-//    float specular;
-//    float transmission;
-//    float refraction_idx;
-//};
-
-/* variables for the triangle mesh geometry */
-struct TrianglesGeomData
-{
-    Material *material;
-    owl::vec3i *index;
-    owl::vec3f *vertex;
-    owl::vec3f *normal;
-};
-
-/* The vectors need to be (trivially) transformed into regular arrays
-   before being passed into OptiX */
-//struct Mesh {
-//    std::string name;
-//    std::vector<owl::vec3f> vertices;
-//    std::vector<owl::vec3i> indices;
-//    std::shared_ptr<Material> material;
-//};
 
 enum LightType {
     POINT_LIGHT,

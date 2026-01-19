@@ -130,6 +130,11 @@ static __device__ __inline__ int parent_node(const int p) {
 template<int K, typename P, typename ResultType>
 __device__ void get_closest_k_points_in_range(const float *query_pos, const P *tree_buf, const size_t N,
                                               const float query_range, ResultType *result) {
+    if (N == 0) {
+        printf("WARNING! No photons in tree buffer. Aborting query...\n");
+        return;
+    }
+
     int curr = 0;
     int prev = -1;
     float max_search_radius = (query_range == INFTY) ? INFTY : query_range * query_range;
