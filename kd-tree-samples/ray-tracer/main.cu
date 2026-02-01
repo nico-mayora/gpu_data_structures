@@ -16,17 +16,16 @@ int main()
                                           world->photon_map,
                                           world->num_photons,
                                           PhotonFileFormat::TEXT);
+    PhotonFileManager::loadKdTreeFromFile("caustic-photons.txt",
+                                      world->caustic_map,
+                                      world->num_caustic,
+                                      PhotonFileFormat::TEXT);
 
-    const int parallelThreads = world->cam->image.resolution.x *
-                            world->cam->image.resolution.y;
+    const int parallelThreads = world->cam->image.resolution.x * world->cam->image.resolution.y;
 
     const size_t heap_size = parallelThreads * K_PHOTONS;
     cudaMalloc(reinterpret_cast<void**>(&world->heap_indices), sizeof(size_t) * heap_size);
     cudaMalloc(reinterpret_cast<void**>(&world->heap_distances), sizeof(float) * heap_size);
-
-
-    auto lf = world->cam->lookFrom;
-    std::cout << "cam: " << lf.x << " " << lf.y << " " << lf.z << '\n';
 
     Viewer viewer(world);
     viewer.enableFlyMode();

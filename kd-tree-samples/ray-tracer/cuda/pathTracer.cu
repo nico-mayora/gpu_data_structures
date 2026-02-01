@@ -3,7 +3,8 @@
 #include "../../common/kdtree/queries.cuh"
 #include <optix_device.h>
 
-#define K_PHOTONS 64
+#define K_GLOBAL_PHOTONS 64
+#define K_CAUSTIC_PHOTONS 128
 #define SECONDARY_RAYS 8
 #define PI float(3.141592653)
 
@@ -45,6 +46,7 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
         colour_acum += direct_illumination_fact;
 
         owl::vec3f diffuse_contrib = 0.f;
+        // "Reach out" into the scene and perform gathers, this gives us global lighting with less local variance.
 #pragma unroll
         for (uint32_t j = 0; j < SECONDARY_RAYS; ++j) {
             owl::vec3f rand_offset = owl::vec3f { prd.random(), prd.random(), prd.random() } * 2.f - 1.f;
@@ -74,17 +76,17 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
 
             const float query_pos[] = {sprd.hitPoint.x, sprd.hitPoint.y, sprd.hitPoint.z};
 
-            size_t *point_indices = self.heap_indices + threadID * K_PHOTONS;
-            float *point_distances = self.heap_distances + threadID * K_PHOTONS;
+            size_t *point_indices = self.heap_indices + threadID * K_GLOBAL_PHOTONS;
+            float *point_distances = self.heap_distances + threadID * K_GLOBAL_PHOTONS;
 #pragma unroll
-            for (int k = 0; k < K_PHOTONS; k++) {
+            for (int k = 0; k < K_GLOBAL_PHOTONS; k++) {
                 point_indices[k] = 0;
                 point_distances[k] = INFTY;
             }
 
-            HeapQueryResult<K_PHOTONS> photon_result {point_indices, point_distances};
+            HeapQueryResult<K_GLOBAL_PHOTONS> photon_result {point_indices, point_distances};
 
-            knn<K_PHOTONS, Photon, HeapQueryResult<K_PHOTONS>>(
+            knn<K_GLOBAL_PHOTONS, Photon, HeapQueryResult<K_GLOBAL_PHOTONS>>(
                 query_pos,
                 self.photon_map,
                 self.num_photons,
@@ -92,33 +94,39 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
             );
 
             owl::vec3f photon_illumination = 0.f;
+            const float radius = owl::sqrt(point_distances[0]);
 #pragma unroll
-            for (int p = 0; p < K_PHOTONS; p++) {
+            for (int p = 0; p < K_GLOBAL_PHOTONS; p++) {
                 if (point_distances[p] == INFTY) break;
 
                 const Photon &photon = self.photon_map[point_indices[p]];
-                owl::vec3f diff = into_vec3f(photon.coords) - sprd.hitPoint;
-                float distance = length(diff);
-                float radius = owl::sqrt(point_distances[0]);
-
-                // cone filter
-                float cone_weight = max(0.f, 1.f - distance / radius);
-                cone_weight *= 3.f;
-                owl::vec3f wi = -into_vec3f(photon.dir);
-
-                // lambert
-                float cosTheta = max(0.f, dot(sprd.normalAtHp, wi));
-                if (cosTheta <= 0.0f) continue;
-
-                owl::vec3f brdf = sprd.hpMaterial.albedo / static_cast<float>(M_PI);
-                owl::vec3f contribution = into_vec3f(photon.colour) * brdf * cosTheta * cone_weight;
-                photon_illumination += contribution;
+                photon_illumination += calculate_photon_contrib(photon, sprd, radius);
             }
 
             photon_illumination = photon_illumination / (PI * point_distances[0]);
             diffuse_contrib += photon_illumination;
         }
-        colour_acum += 0.000005f * diffuse_contrib * prd.hpMaterial.albedo;
+
+        // Perform caustic gather
+        size_t *point_indices = self.heap_indices + threadID * K_CAUSTIC_PHOTONS;
+        float *point_distances = self.heap_distances + threadID * K_CAUSTIC_PHOTONS;
+#pragma unroll
+        for (int k = 0; k < K_CAUSTIC_PHOTONS; k++) {
+            point_indices[k] = 0;
+            point_distances[k] = INFTY;
+        }
+
+        owl::vec3f caustic_term = 0.f;
+        const float radius = owl::sqrt(point_distances[0]);
+#pragma unroll
+        for (int p = 0; p < K_CAUSTIC_PHOTONS; p++) {
+            if (point_distances[p] == INFTY) break;
+
+            const Photon &photon = self.photon_map[point_indices[p]];
+            caustic_term += calculate_photon_contrib(photon, prd, radius);
+        }
+
+        colour_acum += 0.000005f * diffuse_contrib * prd.hpMaterial.albedo + caustic_term;
     }
 
     return colour_acum;

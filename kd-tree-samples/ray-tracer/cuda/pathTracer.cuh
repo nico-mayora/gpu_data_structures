@@ -23,6 +23,9 @@ struct RayGenData {
 
     Photon *photon_map;
     int num_photons;
+    Photon *caustic_map;
+    int num_caustic;
+
     size_t *heap_indices;
     float *heap_distances;
 

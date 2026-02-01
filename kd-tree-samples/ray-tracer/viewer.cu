@@ -90,6 +90,8 @@ Viewer::Viewer(const World *world) {
         { "num_diffuse_scattered", OWL_INT, OWL_OFFSETOF(RayGenData,num_diffuse_scattered)},
         { "photon_map", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,photon_map)},
         { "num_photons", OWL_INT, OWL_OFFSETOF(RayGenData,num_photons)},
+        { "caustic_map", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,caustic_map)},
+        { "num_caustic", OWL_INT, OWL_OFFSETOF(RayGenData,num_caustic)},
         { "resolution", OWL_INT2, OWL_OFFSETOF(RayGenData,resolution)},
         { "world",         OWL_GROUP,  OWL_OFFSETOF(RayGenData,world)},
         { "camera.pos",    OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.pos)},
@@ -120,6 +122,8 @@ Viewer::Viewer(const World *world) {
     owlRayGenSet1i(rayGen, "num_diffuse_scattered", world->cam->image.num_diffuse_scattered);
     owlRayGenSetPointer(rayGen, "photon_map", world->photon_map);
     owlRayGenSet1i(rayGen, "num_photons", world->num_photons);
+    owlRayGenSetPointer(rayGen, "caustic_map", world->caustic_map);
+    owlRayGenSet1i(rayGen, "num_caustic", world->num_caustic);
     owlRayGenSet1i(rayGen, "depth", world->cam->image.depth);
     owlRayGenSet2i(rayGen, "resolution", reinterpret_cast<const owl2i&>(world->cam->image.resolution));
     owlRayGenSetPointer(rayGen, "heap_indices", world->heap_indices);

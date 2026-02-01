@@ -116,7 +116,7 @@ owl::vec3f reflect_or_refract_ray(const Material& material,
                                   const owl::vec3f& normal,
                                   Random& rand)
 {
-    float coef;
+    float coef = 0.f;
     if (material.matType == CONDUCTOR) {
         coef = material.specular;
         return reflect(ray_dir, normal);
@@ -142,9 +142,30 @@ owl::vec3f reflect_or_refract_ray(const Material& material,
 
         return refracted;
     }
+    return 0.;
 }
 
 inline __device__
 owl::vec3f into_vec3f(const float *arr) {
     return owl::vec3f(arr[0], arr[1], arr[2]);
+}
+
+inline __device__
+owl::vec3f calculate_photon_contrib(const Photon& photon, const PerRayData& prd, const float radius) {
+    const owl::vec3f diff = into_vec3f(photon.coords) - prd.hitPoint;
+    const float distance = length(diff);
+
+    // lambert
+    const owl::vec3f wi = -into_vec3f(photon.dir);
+    const float cosTheta = max(0.f, dot(prd.normalAtHp, wi));
+    if (cosTheta <= 0.0f) {
+        return 0.f;
+    }
+
+    // cone filter
+    float cone_weight = max(0.f, 1.f - distance / radius);
+    cone_weight *= 3.f;
+
+    const owl::vec3f brdf = prd.hpMaterial.albedo / static_cast<float>(M_PI);
+    return into_vec3f(photon.colour) * brdf * cosTheta * cone_weight;
 }
