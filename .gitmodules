@@ -7,3 +7,6 @@
 [submodule "kd-tree-samples/common/externals/tinyxml2"]
 	path = kd-tree-samples/common/externals/tinyxml2
 	url = https://github.com/leethomason/tinyxml2.git
+[submodule "kd-tree-samples/common/externals/glfw"]
+	path = kd-tree-samples/common/externals/glfw
+	url = https://github.com/glfw/glfw
