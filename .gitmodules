@@ -12,4 +12,4 @@
 	url = https://github.com/glfw/glfw
 [submodule "kd-tree-samples/common/externals/owl"]
 	path = kd-tree-samples/common/externals/owl
-	url = https://github.com/owl-project/owl.git
+	url = https://github.com/NVIDIA/OWL.git
