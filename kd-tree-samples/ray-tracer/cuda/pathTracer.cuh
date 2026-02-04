@@ -1,6 +1,6 @@
 #pragma once
 #include "owl/APIHandle.h"
-#include "include/owl/common/math/random.h"
+#include "owl/include/owl/common/math/random.h"
 #include "../../common/data/world.cuh"
 
 enum RayTypes {

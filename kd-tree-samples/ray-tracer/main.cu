@@ -4,7 +4,8 @@
 #include "../common/data/loader/mitsuba3.cuh"
 #include "../common/data/photon/photon-file-manager.cuh"
 
-#define K_PHOTONS 64
+// This needs to be the largest number of K-photons between K_GLOBAL and K_CAUSTIC
+#define K_PHOTONS 5
 
 int main()
 {

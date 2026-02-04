@@ -58,7 +58,6 @@ include_directories(
 add_subdirectory(${glfw_dir})
 
 add_subdirectory(${owl_dir} EXCLUDE_FROM_ALL)
-add_subdirectory(${owl_dir}/samples/common/owlViewer)
 
 set(tinyxml2_dir ${PROJECT_SOURCE_DIR}/common/externals/tinyxml2)
 add_subdirectory(${tinyxml2_dir} EXCLUDE_FROM_ALL)

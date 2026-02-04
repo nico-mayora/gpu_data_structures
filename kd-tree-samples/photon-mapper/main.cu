@@ -174,7 +174,7 @@ int main(int ac, char **av)
   program.world = loader->load();
 
   auto photons_filename = "cornell-box-photons.txt";
-  program.castedDiffusePhotons = 3'000'000;
+  program.castedDiffusePhotons = 100'000;
   program.castedCausticsPhotons = 100;
   program.maxDepth = 10;
 

@@ -3,9 +3,9 @@
 #include "../../common/kdtree/queries.cuh"
 #include <optix_device.h>
 
-#define K_GLOBAL_PHOTONS 64
-#define K_CAUSTIC_PHOTONS 128
-#define SECONDARY_RAYS 8
+#define K_GLOBAL_PHOTONS 5
+#define K_CAUSTIC_PHOTONS 5
+#define SECONDARY_RAYS 1
 #define PI float(3.141592653)
 
 inline __device__

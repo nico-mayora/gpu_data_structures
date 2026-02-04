@@ -2,10 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$/.." vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/../rtrt_photon-mapping/externals/glfw" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/../rtrt_photon-mapping/externals/owl" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/../rtrt_photon-mapping/externals/stb" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/../rtrt_photon-mapping/externals/tinyobjloader" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/../rtrt_photon-mapping/externals/tinyxml2" vcs="Git" />
   </component>
 </project>
