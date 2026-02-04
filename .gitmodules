@@ -1,45 +1,15 @@
-[submodule "rtrt_photon-mapping/externals/glfw"]
-	path = rtrt_photon-mapping/externals/glfw
+[submodule "kd-tree-samples/common/externals/stb"]
+	path = kd-tree-samples/common/externals/stb
+	url = https://github.com/nothings/stb.git
+[submodule "kd-tree-samples/common/externals/tinyobjloader"]
+	path = kd-tree-samples/common/externals/tinyobjloader
+	url = https://github.com/tinyobjloader/tinyobjloader.git
+[submodule "kd-tree-samples/common/externals/tinyxml2"]
+	path = kd-tree-samples/common/externals/tinyxml2
+	url = https://github.com/leethomason/tinyxml2.git
+[submodule "kd-tree-samples/common/externals/glfw"]
+	path = kd-tree-samples/common/externals/glfw
 	url = https://github.com/glfw/glfw
-[submodule "rtrt_photon-mapping/externals/owl"]
-	path = rtrt_photon-mapping/externals/owl
-	url = https://github.com/owl-project/owl/
-[submodule "rtrt_photon-mapping/externals/stb"]
-	path = rtrt_photon-mapping/externals/stb
-	url = https://github.com/nothings/stb
-[submodule "rtrt_photon-mapping/externals/tinyxml2"]
-	path = rtrt_photon-mapping/externals/tinyxml2
-	url = https://github.com/leethomason/tinyxml2
-[submodule "rtrt_photon-mapping/externals/tinyobjloader"]
-	path = rtrt_photon-mapping/externals/tinyobjloader
-	url = https://github.com/tinyobjloader/tinyobjloader
-[submodule "ray-tracer/externals/glfw"]
-	path = ray-tracer/externals/glfw
-	url = https://github.com/glfw/glfw
-[submodule "ray-tracer/externals/owl"]
-	path = ray-tracer/externals/owl
-	url = https://github.com/owl-project/owl/
-[submodule "ray-tracer/externals/stb"]
-	path = ray-tracer/externals/stb
-	url = https://github.com/nothings/stb
-[submodule "ray-tracer/externals/tinyxml2"]
-	path = ray-tracer/externals/tinyxml2
-	url = https://github.com/leethomason/tinyxml2
-[submodule "ray-tracer/externals/tinyobjloader"]
-	path = ray-tracer/externals/tinyobjloader
-	url = https://github.com/tinyobjloader/tinyobjloader
-[submodule "photon-emitter/externals/tinyxml2"]
-	path = photon-emitter/externals/tinyxml2
-	url = git@github.com:leethomason/tinyxml2.git
-[submodule "photon-emitter/externals/tinyobjloader"]
-	path = photon-emitter/externals/tinyobjloader
-	url = git@github.com:tinyobjloader/tinyobjloader.git
-[submodule "photon-emitter/externals/stb"]
-	path = photon-emitter/externals/stb
-	url = git@github.com:nothings/stb.git
-[submodule "photon-emitter/externals/owl"]
-	path = photon-emitter/externals/owl
-	url = git@github.com:owl-project/owl.git
-[submodule "photon-emitter/externals/glfw"]
-	path = photon-emitter/externals/glfw
-	url = git@github.com:glfw/glfw.git
+[submodule "kd-tree-samples/common/externals/owl"]
+	path = kd-tree-samples/common/externals/owl
+	url = https://github.com/owl-project/owl.git
