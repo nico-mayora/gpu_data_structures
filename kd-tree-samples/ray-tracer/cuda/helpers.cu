@@ -101,7 +101,7 @@ owl::vec3f calculate_refracted(const Material& material,
     }
 
     owl::vec3f r_out_perp = etai_over_etat * (ray_dir + cos_theta * outward_normal);
-    owl::vec3f r_out_parallel = - owl::common::polymorphic::rsqrt(fabsf(1.0f - dot(r_out_perp, r_out_perp)))
+    owl::vec3f r_out_parallel = -sqrtf(fabsf(1.0f - dot(r_out_perp, r_out_perp)))
                                 * outward_normal;
     return r_out_perp + r_out_parallel;
 }
