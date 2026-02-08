@@ -96,8 +96,8 @@ owl::vec3f calculate_refracted(const Material& material,
     float sin_theta = sqrtf(1.0f - cos_theta * cos_theta);
 
     if (etai_over_etat * sin_theta > 1.0f) {
-        // Total internal reflection
-        return owl::vec3f(0.0f);
+        // Total internal reflection - reflect using correct normal
+        return reflect(ray_dir, outward_normal);
     }
 
     owl::vec3f r_out_perp = etai_over_etat * (ray_dir + cos_theta * outward_normal);
