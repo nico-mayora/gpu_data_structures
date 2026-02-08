@@ -13,11 +13,11 @@ int main()
     // TODO: pass scene name as argv
     const auto loader = new Mitsuba3Loader("cornell-box");
     const auto world = loader->load();
-    PhotonFileManager::loadKdTreeFromFile("cornell-box-photons.txt",
+    PhotonFileManager::loadKdTreeFromFile("normal_photons.txt",
                                           world->photon_map,
                                           world->num_photons,
                                           PhotonFileFormat::TEXT);
-    PhotonFileManager::loadKdTreeFromFile("caustic-photons.txt",
+    PhotonFileManager::loadKdTreeFromFile("caustic_photons.txt",
                                       world->caustic_map,
                                       world->num_caustic,
                                       PhotonFileFormat::TEXT);
