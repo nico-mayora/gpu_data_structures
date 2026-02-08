@@ -79,23 +79,19 @@ inline __device__
 owl::vec3f calculate_refracted(const Material& material,
                                const owl::vec3f& ray_dir,
                                const owl::vec3f& normal,
-                               Random rand) {
+                               Random& rand) {
     float cos_i = dot(-ray_dir, normal);
     float etai_over_etat;
     owl::vec3f outward_normal;
 
-    // Determine if we're entering or exiting the material
     if (cos_i > 0.0f) {
-        // Entering material (air -> glass)
         etai_over_etat = 1.0f / material.ior;
         outward_normal = normal;
     } else {
-        // Exiting material (glass -> air)
         etai_over_etat = material.ior;
         outward_normal = -normal;
     }
 
-    // Check for total internal reflection using discriminant
     float cos_theta = fminf(dot(-ray_dir, outward_normal), 1.0f);
     float sin_theta = sqrtf(1.0f - cos_theta * cos_theta);
 
@@ -126,21 +122,15 @@ owl::vec3f reflect_or_refract_ray(const Material& material,
         float cos_theta = dot(-ray_dir, normal);
         float fresnel = calculate_fresnel(material.ior, cos_theta);
 
-        if (rand() < fresnel) { // Reflect
+        if (rand() < fresnel) {
             coef = fresnel;
-            return reflect(ray_dir, normal);
+            // Use correct normal for reflection
+            owl::vec3f outward_normal = (cos_theta > 0.0f) ? normal : -normal;
+            return reflect(ray_dir, outward_normal);
         }
 
-        // Refract
         coef = 1.0f - fresnel;
-        owl::vec3f refracted = calculate_refracted(material, ray_dir, normal, rand);
-
-        if (length(refracted) == 0.0f) { // Total Internal Reflection
-            coef = 1.0f;
-            return reflect(ray_dir, normal);
-        }
-
-        return refracted;
+        return calculate_refracted(material, ray_dir, normal, rand);
     }
     return 0.;
 }
