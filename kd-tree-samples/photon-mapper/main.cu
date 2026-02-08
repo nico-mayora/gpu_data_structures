@@ -120,15 +120,16 @@ void runPointLightRayGen(Program &program, const PointLight* light, bool caustic
   owlRayGenSet3f(program.rayGen,"color",reinterpret_cast<const owl3f&>(light->power));
   owlRayGenSet1f(program.rayGen,"intensity",1);
 
+  int initialPhotons;
   if (causticsMode) {
     owlRayGenSetBuffer(program.rayGen,"photons",program.causticsPhotonsBuffer);
     owlRayGenSetBuffer(program.rayGen,"photonsCount",program.causticsPhotonsCount);
+    initialPhotons = program.causticsPhotonsPerWatt * (light->power.x + light->power.y + light->power.z);
   } else {
     owlRayGenSetBuffer(program.rayGen,"photons",program.photonsBuffer);
     owlRayGenSetBuffer(program.rayGen,"photonsCount",program.photonsCount);
+    initialPhotons = program.photonsPerWatt * (light->power.x + light->power.y + light->power.z);
   }
-
-  const int initialPhotons = program.photonsPerWatt * (light->power.x + light->power.y + light->power.z);
 
   owlBuildSBT(program.owlContext);
   owlRayGenLaunch2D(program.rayGen,initialPhotons,1);
@@ -138,6 +139,10 @@ void initPhotonBuffers(Program &program) {
   program.photonsBuffer = owlHostPinnedBufferCreate(program.owlContext, OWL_USER_TYPE(EmittedPhoton), program.castedDiffusePhotons * program.maxDepth);
   program.photonsCount = owlHostPinnedBufferCreate(program.owlContext, OWL_INT, 1);
   owlBufferClear(program.photonsCount);
+
+  program.causticsPhotonsBuffer = owlHostPinnedBufferCreate(program.owlContext, OWL_USER_TYPE(EmittedPhoton), program.castedCausticsPhotons * program.maxDepth);
+  program.causticsPhotonsCount = owlHostPinnedBufferCreate(program.owlContext, OWL_INT, 1);
+  owlBufferClear(program.causticsPhotonsCount);
 }
 
 void computePhotonsPerWatt(Program &program) {
@@ -145,6 +150,7 @@ void computePhotonsPerWatt(Program &program) {
   auto totalWatts = light->power.x + light->power.y + light->power.z;
 
   program.photonsPerWatt = program.castedDiffusePhotons / totalWatts;
+  program.causticsPhotonsPerWatt = program.castedCausticsPhotons / totalWatts;
 }
 
 void runNormal(Program &program, const std::string &output_filename) {
@@ -152,10 +158,24 @@ void runNormal(Program &program, const std::string &output_filename) {
 
   runPointLightRayGen(program, program.world->scene_light, false);
 
-  LOG("done with launch, writing photons ...")
+  LOG("done with launch, writing normal photons ...")
   auto *fb = static_cast<const EmittedPhoton*>(owlBufferGetPointer(program.photonsBuffer, 0));
   auto count = *(int*)owlBufferGetPointer(program.photonsCount, 0);
 
+  LOG("normal photon count: " << count)
+  PhotonFileManager::savePhotonsToFile(fb, count, output_filename);
+}
+
+void runCaustics(Program &program, const std::string &output_filename) {
+  LOG("launching caustic photons ...")
+
+  runPointLightRayGen(program, program.world->scene_light, true);
+
+  LOG("done with launch, writing caustic photons ...")
+  auto *fb = static_cast<const EmittedPhoton*>(owlBufferGetPointer(program.causticsPhotonsBuffer, 0));
+  auto count = *(int*)owlBufferGetPointer(program.causticsPhotonsCount, 0);
+
+  LOG("caustic photon count: " << count)
   PhotonFileManager::savePhotonsToFile(fb, count, output_filename);
 }
 
@@ -173,9 +193,10 @@ int main(int ac, char **av)
   const auto loader = new Mitsuba3Loader("cornell-box");
   program.world = loader->load();
 
-  auto photons_filename = "cornell-box-photons.txt";
+  auto normal_photons_filename = "normal_photons.txt";
+  auto caustic_photons_filename = "caustic_photons.txt";
   program.castedDiffusePhotons = 100'000;
-  program.castedCausticsPhotons = 100;
+  program.castedCausticsPhotons = 100'000;
   program.maxDepth = 10;
 
   LOG_OK("Loaded world.")
@@ -193,9 +214,8 @@ int main(int ac, char **av)
   owlBuildPrograms(program.owlContext);
   owlBuildPipeline(program.owlContext);
 
-  LOG("launching ...")
-
-  runNormal(program, photons_filename);
+  runNormal(program, normal_photons_filename);
+  runCaustics(program, caustic_photons_filename);
 
   LOG("destroying devicegroup ...");
   owlContextDestroy(program.owlContext);
