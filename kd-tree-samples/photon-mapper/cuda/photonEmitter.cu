@@ -1,6 +1,8 @@
 #include "./photonEmitter.cuh"
 #include "./helpers.cu"
 #include "owl/common/math/vec.h"
+#include "../../common/helpers.cuh"
+
 #define PHOTON_ATTENUATION_FACTOR 150
 #define ATTENUATE_PHOTONS false
 
@@ -111,8 +113,10 @@ inline __device__ void scatterDiffuse(PhotonMapperPRD &prd, const TrianglesGeomD
   const vec3f rayDir = optixGetWorldRayDirection();
   const vec3f rayOrg = optixGetWorldRayOrigin();
   const vec3f hitPoint = rayOrg + optixGetRayTmax() * rayDir;
+  const auto [u, v] = optixGetTriangleBarycentrics();
+  const int primID = optixGetPrimitiveIndex();
 
-  const vec3f normal = getPrimitiveNormal(self);
+  const vec3f normal = get_normal_at_hp(self, u, v, primID);
 
   prd.event = SCATTER_DIFFUSE;
   prd.scattered.origin = hitPoint;
@@ -124,8 +128,10 @@ inline __device__ void scatterSpecular(PhotonMapperPRD &prd, const TrianglesGeom
   const vec3f rayDir = optixGetWorldRayDirection();
   const vec3f rayOrg = optixGetWorldRayOrigin();
   const vec3f hitPoint = rayOrg + optixGetRayTmax() * rayDir;
+  const auto [u, v] = optixGetTriangleBarycentrics();
+  const int primID = optixGetPrimitiveIndex();
 
-  const vec3f normal = getPrimitiveNormal(self);
+  const vec3f normal = get_normal_at_hp(self, u, v, primID);
 
   prd.event = SCATTER_SPECULAR;
   prd.scattered.origin = hitPoint;
@@ -137,8 +143,10 @@ inline __device__ void scatterRefract(PhotonMapperPRD &prd, const TrianglesGeomD
   const vec3f rayDir = optixGetWorldRayDirection();
   const vec3f rayOrg = optixGetWorldRayOrigin();
   const vec3f hitPoint = rayOrg + optixGetRayTmax() * rayDir;
+  const auto [u, v] = optixGetTriangleBarycentrics();
+  const int primID = optixGetPrimitiveIndex();
 
-  const vec3f normal = getPrimitiveNormal(self);
+  const vec3f normal = get_normal_at_hp(self, u, v, primID);
 
   prd.event = SCATTER_REFRACT;
   prd.scattered.origin = hitPoint;
@@ -191,7 +199,11 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
         scatterSpecular(prd, self);
         break;
       case DIELECTRIC: {
-        auto event = reflect_or_refract_ray(self.material->ior,  optixGetWorldRayDirection(), getPrimitiveNormal(self), prd.random);
+        const auto [u, v] = optixGetTriangleBarycentrics();
+        const int primID = optixGetPrimitiveIndex();
+
+        const vec3f Ng = get_normal_at_hp(self, u, v, primID);
+        auto event = reflect_or_refract_ray(self.material->ior,  optixGetWorldRayDirection(), Ng, prd.random);
         if (event == SCATTER_SPECULAR)
           scatterSpecular(prd, self);
         else

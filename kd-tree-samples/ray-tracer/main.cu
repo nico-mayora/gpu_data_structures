@@ -5,13 +5,13 @@
 #include "../common/data/photon/photon-file-manager.cuh"
 
 // This needs to be the largest number of K-photons between K_GLOBAL and K_CAUSTIC
-#define K_PHOTONS 5
+#define K_PHOTONS 500
 
 int main()
 {
     std::cout << "start!\n";
     // TODO: pass scene name as argv
-    const auto loader = new Mitsuba3Loader("cornell-box");
+    const auto loader = new Mitsuba3Loader("water-caustic");
     const auto world = loader->load();
     PhotonFileManager::loadKdTreeFromFile("normal_photons.txt",
                                           world->photon_map,

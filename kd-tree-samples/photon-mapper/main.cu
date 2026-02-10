@@ -87,19 +87,19 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
     owlGeomSetBuffer(trianglesGeom,"normal", normal_buffer);
     owlGeomSetBuffer(trianglesGeom,"material", materialBuffer);
 
-    std::cout << "All info about mesh: " << "\n";
-    std::cout << " #vertices: " << vertices.size() << "\n";
-    std::cout << " #triangles: " << indices.size() << "\n";
-    std::cout << " #normals: " << mesh->normals.size() << "\n";
-    for (int i = 0; i < mesh->normals.size(); i++) {
-      std::cout << "normal[" << i << "]: " << mesh->normals[i].x << " "
-                << mesh->normals[i].y << " "
-                << mesh->normals[i].z << "\n";
-    }
-    std::cout << " #material: " << material->albedo.x << " "
-              << material->albedo.y << " "
-              << material->albedo.z << "\n";
-    std::cout << "---------------------------------------\n";
+    // std::cout << "All info about mesh: " << "\n";
+    // std::cout << " #vertices: " << vertices.size() << "\n";
+    // std::cout << " #triangles: " << indices.size() << "\n";
+    // std::cout << " #normals: " << mesh->normals.size() << "\n";
+    // for (int i = 0; i < mesh->normals.size(); i++) {
+    //   std::cout << "normal[" << i << "]: " << mesh->normals[i].x << " "
+    //             << mesh->normals[i].y << " "
+    //             << mesh->normals[i].z << "\n";
+    // }
+    // std::cout << " #material: " << material->albedo.x << " "
+    //           << material->albedo.y << " "
+    //           << material->albedo.z << "\n";
+    // std::cout << "---------------------------------------\n";
 
     data.geometry.push_back(trianglesGeom);
   }
@@ -190,13 +190,13 @@ int main(int ac, char **av)
 
   LOG("Loading Config file...")
 
-  const auto loader = new Mitsuba3Loader("cornell-box");
+  const auto loader = new Mitsuba3Loader("water-caustic");
   program.world = loader->load();
 
   auto normal_photons_filename = "normal_photons.txt";
   auto caustic_photons_filename = "caustic_photons.txt";
   program.castedDiffusePhotons = 100'000;
-  program.castedCausticsPhotons = 100'000;
+  program.castedCausticsPhotons = 1'000'000;
   program.maxDepth = 10;
 
   LOG_OK("Loaded world.")

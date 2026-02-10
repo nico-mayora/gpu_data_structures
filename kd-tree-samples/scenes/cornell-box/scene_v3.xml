@@ -1,9 +1,9 @@
 <scene version="3.0.0">
 	<default name="integrator" value="path" />
-	<default name="spp" value="512" />
+	<default name="spp" value="4" />
 	<default name="resx" value="800" />
 	<default name="resy" value="800" />
-	<default name="max_depth" value="100" />
+	<default name="max_depth" value="24" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>
@@ -24,6 +24,9 @@
 			<rfilter type="tent" />
 		</film>
 	</sensor>
+
+
+
 	<bsdf type="twosided" id="LeftWallBSDF">
 		<bsdf type="diffuse">
 			<rgb name="reflectance" value="0.63, 0.065, 0.05" />

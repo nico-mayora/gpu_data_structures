@@ -50,19 +50,23 @@ set(photonEmitter_sources
 
 add_executable(photonEmitter ${photonEmitter_sources})
 
+set(tinyobjloader_dir ${PROJECT_SOURCE_DIR}/common/externals/tinyobjloader)
+
 set(owl_dir ${PROJECT_SOURCE_DIR}/common/externals/owl)
 include_directories(
         ${glfw_dir}/include
         ${owl_dir}/samples/common # For OWLViewer
+        ${tinyobjloader_dir}
 )
 add_subdirectory(${glfw_dir})
+add_subdirectory(${tinyobjloader_dir})
 
 add_subdirectory(${owl_dir} EXCLUDE_FROM_ALL)
 
 set(tinyxml2_dir ${PROJECT_SOURCE_DIR}/common/externals/tinyxml2)
 add_subdirectory(${tinyxml2_dir} EXCLUDE_FROM_ALL)
 
-target_link_libraries(pathTracer PRIVATE pathTracer_ptx owl::owl owl_viewer tinyxml2::tinyxml2)
-target_link_libraries(photonEmitter PRIVATE photonEmitter_ptx owl::owl tinyxml2::tinyxml2)
+target_link_libraries(pathTracer PRIVATE pathTracer_ptx owl::owl owl_viewer tinyxml2::tinyxml2 tinyobjloader)
+target_link_libraries(photonEmitter PRIVATE photonEmitter_ptx owl::owl tinyxml2::tinyxml2 tinyobjloader)
 
 # FIXME: If owl is not found, copy the .dll/.so into the executable folder.

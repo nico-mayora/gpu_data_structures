@@ -4,7 +4,9 @@
 #include "owl/common/math/vec.h"
 #include "owl/include/owl/common/math/random.h"
 #include "pt-math.cuh"
-//#include "cuda/pathTracer.cuh"
+
+#include "tiny_obj_loader.h"
+#define TINYOBJLOADER_IMPLEMENTATION
 
 struct Mesh {
     std::vector<owl::vec3i> indices;
@@ -44,6 +46,97 @@ struct Mesh {
             owl::vec3f v2 = mesh->vertices.at(tri.y) - mesh->vertices.at(tri.x);
             auto normal = normalize(cross(v1, v2));
             mesh->normals.emplace_back(normal);
+        }
+
+        return mesh;
+    }
+
+    static Mesh *loadObj(std::string obj_path, bool faceted) {
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string warn, err;
+
+        if (!LoadObj(&attrib, &shapes, &materials, &warn, &err, obj_path.c_str())) {
+            throw std::runtime_error("Failed to load OBJ: " + warn + err);
+        }
+
+        auto mesh = new Mesh();
+        mesh->faceted = faceted;
+
+        if (faceted) {
+            // Copy all unique vertices
+            for (size_t i = 0; i < attrib.vertices.size() / 3; i++) {
+                mesh->vertices.push_back(owl::vec3f(
+                    attrib.vertices[3 * i + 0],
+                    attrib.vertices[3 * i + 1],
+                    attrib.vertices[3 * i + 2]
+                ));
+            }
+
+            for (const auto &shape : shapes) {
+                size_t indexOffset = 0;
+                for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+                    int fv = shape.mesh.num_face_vertices[f];
+                    assert(fv == 3);
+
+                    tinyobj::index_t i0 = shape.mesh.indices[indexOffset + 0];
+                    tinyobj::index_t i1 = shape.mesh.indices[indexOffset + 1];
+                    tinyobj::index_t i2 = shape.mesh.indices[indexOffset + 2];
+
+                    owl::vec3i tri(i0.vertex_index, i1.vertex_index, i2.vertex_index);
+                    mesh->indices.push_back(tri);
+
+                    owl::vec3f v0 = mesh->vertices[tri.x];
+                    owl::vec3f v1 = mesh->vertices[tri.y];
+                    owl::vec3f v2 = mesh->vertices[tri.z];
+                    owl::vec3f normal = owl::normalize(owl::cross(v1 - v0, v2 - v0));
+                    mesh->normals.push_back(normal); // One normal per face
+
+                    indexOffset += fv;
+                }
+            }
+        } else {
+            // Shared vertices with smooth (vertex) normals
+            // Copy all vertices
+            for (size_t i = 0; i < attrib.vertices.size() / 3; i++) {
+                mesh->vertices.push_back(owl::vec3f(
+                    attrib.vertices[3 * i + 0],
+                    attrib.vertices[3 * i + 1],
+                    attrib.vertices[3 * i + 2]
+                ));
+            }
+
+            // Collect indices
+            for (const auto &shape : shapes) {
+                size_t indexOffset = 0;
+                for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+                    int fv = shape.mesh.num_face_vertices[f];
+                    assert(fv == 3 && "Only triangular faces supported");
+
+                    tinyobj::index_t i0 = shape.mesh.indices[indexOffset + 0];
+                    tinyobj::index_t i1 = shape.mesh.indices[indexOffset + 1];
+                    tinyobj::index_t i2 = shape.mesh.indices[indexOffset + 2];
+
+                    mesh->indices.push_back(owl::vec3i(i0.vertex_index, i1.vertex_index, i2.vertex_index));
+                    indexOffset += fv;
+                }
+            }
+
+            // Compute vertex normals by averaging adjacent face normals
+            mesh->normals.resize(mesh->vertices.size(), owl::vec3f(0.f));
+            for (const auto &tri : mesh->indices) {
+                owl::vec3f v0 = mesh->vertices[tri.x];
+                owl::vec3f v1 = mesh->vertices[tri.y];
+                owl::vec3f v2 = mesh->vertices[tri.z];
+                owl::vec3f n = owl::cross(v1 - v0, v2 - v0);
+                mesh->normals[tri.x] = mesh->normals[tri.x] + n;
+                mesh->normals[tri.y] = mesh->normals[tri.y] + n;
+                mesh->normals[tri.z] = mesh->normals[tri.z] + n;
+            }
+            for (auto &n : mesh->normals) {
+                n = normalize(n);
+            }
         }
 
         return mesh;
@@ -162,7 +255,7 @@ struct TrianglesGeomData {
     owl::vec3f *vertex;
     owl::vec3i *index;
     owl::vec3f *normal;
-    bool faceted; // TODO: Make array
+    bool faceted;
 };
 
 typedef owl::LCG<> Random;

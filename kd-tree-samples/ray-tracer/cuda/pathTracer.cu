@@ -1,12 +1,16 @@
 #include "pathTracer.cuh"
 #include "helpers.cu"
 #include "../../common/kdtree/queries.cuh"
+#include "../../common/helpers.cuh"
 #include <optix_device.h>
 
-#define K_GLOBAL_PHOTONS 1
-#define K_CAUSTIC_PHOTONS 1
-#define SECONDARY_RAYS 1
+#define K_GLOBAL_PHOTONS 8
+#define K_CAUSTIC_PHOTONS 96
+#define GLOBAL_FACT .0000005f
+#define CAUSTIC_FACT .001f
+#define SECONDARY_RAYS 2
 #define PI float(3.141592653)
+
 
 inline __device__
 owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, int threadID) {
@@ -137,7 +141,7 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
             caustic_term += calculate_photon_contrib(photon, prd, radius);
         }
 
-        colour_acum += 0.0005f * diffuse_contrib * prd.hpMaterial.albedo + caustic_term;
+        colour_acum += GLOBAL_FACT * diffuse_contrib * prd.hpMaterial.albedo + CAUSTIC_FACT * caustic_term;
         break;
     }
 
@@ -198,7 +202,8 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
     const TrianglesGeomData &self = owl::getProgramData<TrianglesGeomData>();
 
     const int primID = optixGetPrimitiveIndex();
-    const owl::vec3f Ng = normalize(self.normal[primID]);
+    const auto [u, v] = optixGetTriangleBarycentrics();
+    const owl::vec3f Ng = get_normal_at_hp(self, u, v, primID);
     const owl::vec3f rayDir = optixGetWorldRayDirection();
     const owl::vec3f tMax = optixGetRayTmax();
     const owl::vec3f rayOrg = optixGetWorldRayOrigin();
