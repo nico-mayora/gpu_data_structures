@@ -1,12 +1,16 @@
 #include "pathTracer.cuh"
 #include "helpers.cu"
 #include "../../common/kdtree/queries.cuh"
+#include "../../common/helpers.cuh"
 #include <optix_device.h>
 
-#define K_GLOBAL_PHOTONS 5
-#define K_CAUSTIC_PHOTONS 5
-#define SECONDARY_RAYS 1
+#define K_GLOBAL_PHOTONS 8
+#define K_CAUSTIC_PHOTONS 96
+#define GLOBAL_FACT .0000005f
+#define CAUSTIC_FACT .001f
+#define SECONDARY_RAYS 2
 #define PI float(3.141592653)
+
 
 inline __device__
 owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, int threadID) {
@@ -116,17 +120,29 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
             point_distances[k] = INFTY;
         }
 
+        HeapQueryResult<K_CAUSTIC_PHOTONS> caustic_photon_result { point_indices, point_distances };
+
+        const float query_point[] = { prd.hitPoint[0], prd.hitPoint[1], prd.hitPoint[2] };
+
+        knn<K_CAUSTIC_PHOTONS, Photon, HeapQueryResult<K_CAUSTIC_PHOTONS>>(
+            query_point,
+            self.caustic_map,
+            self.num_caustic,
+            &caustic_photon_result
+        );
+
         owl::vec3f caustic_term = 0.f;
         const float radius = owl::sqrt(point_distances[0]);
 #pragma unroll
         for (int p = 0; p < K_CAUSTIC_PHOTONS; p++) {
             if (point_distances[p] == INFTY) break;
 
-            const Photon &photon = self.photon_map[point_indices[p]];
+            const Photon &photon = self.caustic_map[point_indices[p]];
             caustic_term += calculate_photon_contrib(photon, prd, radius);
         }
 
-        colour_acum += 0.000005f * diffuse_contrib * prd.hpMaterial.albedo + caustic_term;
+        colour_acum += GLOBAL_FACT * diffuse_contrib * prd.hpMaterial.albedo + CAUSTIC_FACT * caustic_term;
+        break;
     }
 
     return colour_acum;
@@ -186,7 +202,8 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
     const TrianglesGeomData &self = owl::getProgramData<TrianglesGeomData>();
 
     const int primID = optixGetPrimitiveIndex();
-    const owl::vec3f Ng = normalize(self.normal[primID]);
+    const auto [u, v] = optixGetTriangleBarycentrics();
+    const owl::vec3f Ng = get_normal_at_hp(self, u, v, primID);
     const owl::vec3f rayDir = optixGetWorldRayDirection();
     const owl::vec3f tMax = optixGetRayTmax();
     const owl::vec3f rayOrg = optixGetWorldRayOrigin();
@@ -221,7 +238,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
 
 
     prd.hitPoint = rayOrg + tMax * rayDir;
-    prd.normalAtHp = /*(dot(Ng, rayDir) > 0.f) ? -Ng :*/ Ng;
+    prd.normalAtHp = (dot(Ng, rayDir) > 0.f) ? -Ng : Ng;
 }
 
 OPTIX_MISS_PROGRAM(shadow)()

@@ -75,6 +75,19 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
         mesh = Mesh::makeBaseRectangle();
     } else if (type == "cube") {
         mesh = Mesh::makeBaseCube();
+    } else if (type == "obj") {
+        std::string obj_file_path = sceneDir + "\\";
+        if (const auto file_name_elem = shape->FirstChildElement("string");
+            std::string(file_name_elem->Attribute("name")) == "filename") {
+            obj_file_path += std::string(file_name_elem->Attribute("value"));
+        }
+
+        bool faceted = false;
+        if (const auto faceted_elem = shape->FirstChildElement("boolean");
+            faceted_elem && std::string(faceted_elem->Attribute("name")) == "face_normals") {
+            faceted = std::string(faceted_elem->Attribute("value")) == "true";
+        }
+        mesh = Mesh::loadObj(obj_file_path, faceted);
     } else {
         std::cerr << "ERROR: Unknown shape type: " << type << std::endl;
         std::abort();
