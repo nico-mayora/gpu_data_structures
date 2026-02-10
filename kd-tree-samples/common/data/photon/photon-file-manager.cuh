@@ -15,16 +15,26 @@ public:
                                   const std::string& filename,
                                   PhotonFileFormat format = PhotonFileFormat::TEXT);
     static bool savePhotonsToFile(const std::vector<EmittedPhoton>& photons,
-                                  const std::string& filename, 
+                                  const std::string& filename,
                                   PhotonFileFormat format = PhotonFileFormat::TEXT);
-    
-    static std::vector<Photon> loadPhotonsFromFile(const std::string& filename, 
+
+    static bool savePhotonsToFile(const Photon* photons, int count,
+                                  const std::string& filename,
+                                  PhotonFileFormat format = PhotonFileFormat::TEXT);
+    static bool savePhotonsToFile(const std::vector<Photon>& photons,
+                                  const std::string& filename,
+                                  PhotonFileFormat format = PhotonFileFormat::TEXT);
+
+    static std::vector<Photon> loadPhotonsFromFile(const std::string& filename,
                                                    PhotonFileFormat format = PhotonFileFormat::TEXT);
     static bool loadKdTreeFromFile(const std::string&, Photon*&, int&, PhotonFileFormat);
 private:
     static bool saveBinary(const std::vector<EmittedPhoton>& photons, const std::string& filename);
     static bool saveText(const std::vector<EmittedPhoton>& photons, const std::string& filename);
-    
+
+    static bool saveBinary(const std::vector<Photon>& photons, const std::string& filename);
+    static bool saveText(const std::vector<Photon>& photons, const std::string& filename);
+
     static std::vector<Photon> loadBinary(const std::string& filename);
     static std::vector<Photon> loadText(const std::string& filename);
 };

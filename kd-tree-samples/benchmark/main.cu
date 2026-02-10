@@ -1,18 +1,22 @@
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <cmath>
+#include <vector>
 #include <cuda_runtime.h>
 #include "../common/kdtree/builder.cuh"
+#include "../common/data/photon/photon-file-manager.cuh"
 #include "generators/cube.cuh"
 #include "kernels/knn_local.cuh"
 #include "kernels/knn_global.cuh"
 #include "kernels/knn_shared.cuh"
 
 // Cube Generator Params
-#define SIDE_LENGTH  10.0f
-#define SIDE_DENSITY 100
+#define SIDE_LENGTH  40.0f
+#define SIDE_DENSITY 40
 
 // Query Params
-#define K            500
+#define K            5000
 #define NUM_QUERIES  1000000
 #define THREADS_PER_BLOCK 256
 
@@ -182,14 +186,136 @@ static void run_benchmark(Generator generator, MemoryStrategy strategy) {
     printf("\n");
 }
 
+static void hsv_to_rgb(float h, float s, float v, float &r, float &g, float &b) {
+    float c = v * s;
+    float x = c * (1.0f - fabsf(fmodf(h / 60.0f, 2.0f) - 1.0f));
+    float m = v - c;
+    if      (h < 60)  { r = c; g = x; b = 0; }
+    else if (h < 120) { r = x; g = c; b = 0; }
+    else if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = x; g = 0; b = c; }
+    else               { r = c; g = 0; b = x; }
+    r += m; g += m; b += m;
+}
+
+// Maps normalized distance t in [0,1] (0 = center, 1 = far corner) to a color.
+// Warm golden-yellow at center → cool violet at edges, all bright for black backgrounds.
+static void distance_to_color(float t, float &r, float &g, float &b) {
+    float hue = 50.0f + t * 230.0f;   // 50° (yellow) → 280° (violet)
+    float sat = 0.85f + 0.15f * t;    // slightly desaturated at center for a warm glow
+    float val = 1.0f - 0.15f * t;     // slightly dimmer at edges, still bright
+    hsv_to_rgb(hue, sat, val, r, g, b);
+}
+
+static void save_points_and_knn(Generator generator) {
+    const size_t total_points = (size_t)SIDE_DENSITY * SIDE_DENSITY * SIDE_DENSITY;
+
+    printf("--- Saving cube photons and KNN results ---\n");
+
+    // Generate cube points
+    auto *h_points = new Point<3>[total_points];
+    generate_points(generator, h_points, SIDE_DENSITY, SIDE_LENGTH);
+
+    // Max distance from origin to a cube corner, used to normalize the gradient
+    const float half = SIDE_LENGTH / 2.0f;
+    const float max_dist = sqrtf(3.0f * half * half);
+
+    // Convert Point<3> to Photon for saving, with distance-based color gradient
+    std::vector<Photon> photons(total_points);
+    for (size_t i = 0; i < total_points; i++) {
+        memset(&photons[i], 0, sizeof(Photon));
+        photons[i].coords[0] = h_points[i].coords[0];
+        photons[i].coords[1] = h_points[i].coords[1];
+        photons[i].coords[2] = h_points[i].coords[2];
+
+        float dx = h_points[i].coords[0];
+        float dy = h_points[i].coords[1];
+        float dz = h_points[i].coords[2];
+        float t = sqrtf(dx*dx + dy*dy + dz*dz) / max_dist;
+        distance_to_color(t, photons[i].colour[0], photons[i].colour[1], photons[i].colour[2]);
+    }
+
+    // Save all cube points
+    PhotonFileManager::savePhotonsToFile(photons, "cube_photons.txt");
+
+    // Upload and build KD-tree on GPU
+    Point<3> *d_points = nullptr;
+    cudaMalloc(&d_points, sizeof(Point<3>) * total_points);
+    cudaMemcpy(d_points, h_points, sizeof(Point<3>) * total_points, cudaMemcpyHostToDevice);
+    build_kd_tree<Point<3>>(d_points, total_points);
+
+    // Single KNN query at the center of the cube (0, 0, 0)
+    float h_query[3] = {0.0f, 0.0f, 0.0f};
+    float *d_query = nullptr;
+    cudaMalloc(&d_query, sizeof(float) * 3);
+    cudaMemcpy(d_query, h_query, sizeof(float) * 3, cudaMemcpyHostToDevice);
+
+    size_t *d_indices = nullptr;
+    float  *d_distances = nullptr;
+    cudaMalloc(&d_indices,   sizeof(size_t) * K);
+    cudaMalloc(&d_distances, sizeof(float)  * K);
+
+    uint32_t *d_validation = nullptr;
+    cudaMalloc(&d_validation, 3 * sizeof(uint32_t));
+    cudaMemset(d_validation, 0, 3 * sizeof(uint32_t));
+
+    knn_query_global<K><<<1, 1>>>(
+        d_points, total_points, d_query,
+        d_indices, d_distances,
+        1, d_validation
+    );
+    cudaDeviceSynchronize();
+
+    // Copy back the KNN result indices
+    auto *h_indices = new size_t[K];
+    cudaMemcpy(h_indices, d_indices, sizeof(size_t) * K, cudaMemcpyDeviceToHost);
+
+    // Copy back the tree-ordered points (build_kd_tree rearranges them)
+    cudaMemcpy(h_points, d_points, sizeof(Point<3>) * total_points, cudaMemcpyDeviceToHost);
+
+    // Convert KNN result points to Photon for saving, with distance-based color gradient
+    std::vector<Photon> knn_photons(K);
+    for (int i = 0; i < K; i++) {
+        memset(&knn_photons[i], 0, sizeof(Photon));
+        size_t idx = h_indices[i];
+        knn_photons[i].coords[0] = h_points[idx].coords[0];
+        knn_photons[i].coords[1] = h_points[idx].coords[1];
+        knn_photons[i].coords[2] = h_points[idx].coords[2];
+
+        float dx = h_points[idx].coords[0];
+        float dy = h_points[idx].coords[1];
+        float dz = h_points[idx].coords[2];
+        float t = sqrtf(dx*dx + dy*dy + dz*dz) / max_dist;
+        distance_to_color(t, knn_photons[i].colour[0], knn_photons[i].colour[1], knn_photons[i].colour[2]);
+    }
+
+    PhotonFileManager::savePhotonsToFile(knn_photons, "knn_results.txt");
+
+    printf("  Saved %zu cube photons to cube_photons.txt\n", total_points);
+    printf("  Saved %d KNN results (query at origin) to knn_results.txt\n", K);
+
+    // Cleanup
+    cudaFree(d_points);
+    cudaFree(d_query);
+    cudaFree(d_indices);
+    cudaFree(d_distances);
+    cudaFree(d_validation);
+    delete[] h_points;
+    delete[] h_indices;
+
+    printf("\n");
+}
+
 int main() {
     printf("=== KD-Tree Benchmark ===\n");
     printf("  Side length: %.1f   Side density: %d\n\n", (double)SIDE_LENGTH, SIDE_DENSITY);
 
-    run_benchmark(CUBE, LOCAL);
-    run_benchmark(CUBE, GLOBAL);
-    run_benchmark(CUBE, SHARED);
+    // run_benchmark(CUBE, LOCAL);
+    // run_benchmark(CUBE, GLOBAL);
+    // run_benchmark(CUBE, SHARED);
 
+    save_points_and_knn(CUBE);
 
     printf("=== Benchmark Complete ===\n");
     return 0;

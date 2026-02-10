@@ -79,19 +79,81 @@ bool PhotonFileManager::saveText(const std::vector<EmittedPhoton>& photons, cons
         std::cerr << "Error: Cannot open file for writing: " << filename << std::endl;
         return false;
     }
-    
-    file << "# PHOTON_MAP_V1" << std::endl;
-    file << "# PhotonCount: " << photons.size() << std::endl;
-    file << "# Format: x y z r g b power_r power_g power_b dir_x dir_y dir_z" << std::endl;
-    
-    // Write photon data
+
+    // Format: pos.x pos.y pos.z dir.x dir.y dir.z color.x color.y color.z
     for (const auto& photon : photons) {
         file << photon.pos[0] << " " << photon.pos[1] << " " << photon.pos[2] << " "
-             << photon.color[0] << " " << photon.color[1] << " " << photon.color[2] << " "
-             << photon.power << " " << photon.power << " " << photon.power << " "
-             << photon.dir[0] << " " << photon.dir[1] << " " << photon.dir[2] << std::endl;
+             << photon.dir[0] << " " << photon.dir[1] << " " << photon.dir[2] << " "
+             << photon.color[0] << " " << photon.color[1] << " " << photon.color[2] << "\n";
     }
-    
+
+    file.close();
+    std::cout << "Successfully saved " << photons.size() << " photons to text file: " << filename << std::endl;
+    return true;
+}
+
+bool PhotonFileManager::savePhotonsToFile(const Photon* photons, int count,
+                                          const std::string& filename,
+                                          PhotonFileFormat format) {
+    if (count <= 0 || photons == nullptr) {
+        std::cerr << "Warning: No photons to save." << std::endl;
+        return false;
+    }
+
+    std::cout << "Saving " << count << " photons to: " << filename << std::endl;
+
+    std::vector<Photon> photonVec(photons, photons + count);
+
+    switch (format) {
+        case PhotonFileFormat::BINARY:
+            return saveBinary(photonVec, filename);
+        case PhotonFileFormat::TEXT:
+            return saveText(photonVec, filename);
+        default:
+            std::cerr << "Error: Unknown photon file format." << std::endl;
+            return false;
+    }
+}
+
+bool PhotonFileManager::savePhotonsToFile(const std::vector<Photon>& photons,
+                                          const std::string& filename,
+                                          PhotonFileFormat format) {
+    if (photons.empty()) {
+        std::cerr << "Warning: No photons to save." << std::endl;
+        return false;
+    }
+
+    std::cout << "Saving " << photons.size() << " photons to: " << filename << std::endl;
+
+    switch (format) {
+        case PhotonFileFormat::BINARY:
+            return saveBinary(photons, filename);
+        case PhotonFileFormat::TEXT:
+            return saveText(photons, filename);
+        default:
+            std::cerr << "Error: Unknown photon file format." << std::endl;
+            return false;
+    }
+}
+
+bool PhotonFileManager::saveBinary(const std::vector<Photon>& photons, const std::string& filename) {
+    throw std::runtime_error("Binary format save not implemented yet");
+}
+
+bool PhotonFileManager::saveText(const std::vector<Photon>& photons, const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error: Cannot open file for writing: " << filename << std::endl;
+        return false;
+    }
+
+    // Format: pos.x pos.y pos.z dir.x dir.y dir.z color.x color.y color.z
+    for (const auto& photon : photons) {
+        file << photon.coords[0] << " " << photon.coords[1] << " " << photon.coords[2] << " "
+             << photon.dir[0] << " " << photon.dir[1] << " " << photon.dir[2] << " "
+             << photon.colour[0] << " " << photon.colour[1] << " " << photon.colour[2] << "\n";
+    }
+
     file.close();
     std::cout << "Successfully saved " << photons.size() << " photons to text file: " << filename << std::endl;
     return true;
@@ -108,24 +170,18 @@ std::vector<Photon> PhotonFileManager::loadText(const std::string& filename) {
         std::cerr << "Error: Cannot open file for reading: " << filename << std::endl;
         return {};
     }
-    
+
     std::vector<Photon> photons;
-    std::string line;
-    
-    while (std::getline(file, line)) {
-        if (line.empty() || line[0] == '#') continue; // Skip header/comments
-        
-        std::istringstream iss(line);
-        Photon photon;
-        
-        if (iss >> photon.coords[0] >> photon.coords[1] >> photon.coords[2] >>
-                  photon.colour[0] >> photon.colour[1] >> photon.colour[2] >>
-                  photon.power[0] >> photon.power[1] >> photon.power[2] >>
-                  photon.dir[0] >> photon.dir[1] >> photon.dir[2]) {
-            photons.push_back(photon);
-        }
+    Photon photon;
+
+    // Format: pos.x pos.y pos.z dir.x dir.y dir.z color.x color.y color.z
+    while (file >> photon.coords[0] >> photon.coords[1] >> photon.coords[2]
+                >> photon.dir[0] >> photon.dir[1] >> photon.dir[2]
+                >> photon.colour[0] >> photon.colour[1] >> photon.colour[2]) {
+        photon.power[0] = photon.power[1] = photon.power[2] = 0.f;
+        photons.push_back(photon);
     }
-    
+
     file.close();
     std::cout << "Successfully loaded " << photons.size() << " photons from text file: " << filename << std::endl;
     return photons;
