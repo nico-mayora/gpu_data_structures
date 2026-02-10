@@ -53,9 +53,6 @@ inline __device__ void shootPhoton(const PhotonMapperRGD &self, Ray &ray, Photon
 
 inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray, PhotonMapperPRD &prd) {
   // Caustic mode: Only save diffuse bounces that occur AFTER at least one caustic bounce.
-
-  bool hadCausticBounce = false;
-
   for (int i = 0; i < self.maxDepth; i++) {
     owl::traceRay(self.world, ray, prd);
 
@@ -64,17 +61,15 @@ inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray
     }
 
     if (prd.event == SCATTER_SPECULAR || prd.event == SCATTER_REFRACT) {
-      hadCausticBounce = true;
       updateScatteredRay(ray, prd);
       continue;
     }
 
     if (prd.event == SCATTER_DIFFUSE) {
-      if (i > 0 && hadCausticBounce) {
+      if (i > 0) {
         savePhoton(self, prd);
       }
-      updateScatteredRay(ray, prd);
-      continue;
+      break;
     }
 
     if (prd.event == ABSORBED) {
