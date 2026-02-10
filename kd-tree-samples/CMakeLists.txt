@@ -65,4 +65,6 @@ add_subdirectory(${tinyxml2_dir} EXCLUDE_FROM_ALL)
 target_link_libraries(pathTracer PRIVATE pathTracer_ptx owl::owl owl_viewer tinyxml2::tinyxml2)
 target_link_libraries(photonEmitter PRIVATE photonEmitter_ptx owl::owl tinyxml2::tinyxml2)
 
+add_executable(kdtree_benchmark benchmark/main.cu)
+
 # FIXME: If owl is not found, copy the .dll/.so into the executable folder.
