@@ -141,7 +141,7 @@ owl::vec3f into_vec3f(const float *arr) {
 }
 
 inline __device__
-owl::vec3f calculate_photon_contrib(const Photon& photon, const PerRayData& prd, const float radius) {
+owl::vec3f calculate_photon_contrib(const Photon& photon, const PerRayData& prd, const float radiusSqr) {
     const owl::vec3f diff = into_vec3f(photon.coords) - prd.hitPoint;
     const float distance = length(diff);
 
@@ -153,9 +153,12 @@ owl::vec3f calculate_photon_contrib(const Photon& photon, const PerRayData& prd,
     }
 
     // cone filter
-    float cone_weight = max(0.f, 1.f - distance / radius);
-    cone_weight *= 3.f;
+    constexpr float k = 1.f;
+    constexpr float pwr = 1;
+    const float quot = (1.f - 2.f / ((2.f+pwr) * k)) * M_PI * radiusSqr;
+    float cone_weight = max(0.f, 1.f - (distance / sqrtf(radiusSqr)) / k);
+    //cone_weight *= 3.f;
 
     const owl::vec3f brdf = prd.hpMaterial.albedo / static_cast<float>(M_PI);
-    return into_vec3f(photon.colour) * brdf * cosTheta * cone_weight;
+    return into_vec3f(photon.colour) * brdf * cosTheta * cone_weight / quot;
 }

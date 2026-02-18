@@ -4,11 +4,11 @@
 #include "../../common/helpers.cuh"
 #include <optix_device.h>
 
-#define K_GLOBAL_PHOTONS 8
+#define K_GLOBAL_PHOTONS 3
 #define K_CAUSTIC_PHOTONS 96
-#define GLOBAL_FACT .0000005f
-#define CAUSTIC_FACT .001f
-#define SECONDARY_RAYS 2
+#define GLOBAL_FACT .008f
+#define CAUSTIC_FACT .0002f
+#define SECONDARY_RAYS 0
 #define PI float(3.141592653)
 
 
@@ -46,7 +46,7 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
             continue;
         }
 
-        auto direct_illumination_fact = calculateDirectIllumination(self, prd);
+        auto direct_illumination_fact = 0.f; //calculateDirectIllumination(self, prd);
         colour_acum += direct_illumination_fact;
 
         owl::vec3f diffuse_contrib = 0.f;

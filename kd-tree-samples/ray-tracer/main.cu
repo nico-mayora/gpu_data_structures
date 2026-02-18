@@ -5,7 +5,7 @@
 #include "../common/data/photon/photon-file-manager.cuh"
 
 // This needs to be the largest number of K-photons between K_GLOBAL and K_CAUSTIC
-#define K_PHOTONS 500
+#define K_PHOTONS 720
 
 int main()
 {
