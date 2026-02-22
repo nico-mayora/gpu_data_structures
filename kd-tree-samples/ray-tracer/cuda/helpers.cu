@@ -3,7 +3,7 @@
 #include "../../common/kdtree/constants.cuh"
 
 inline __device__
-float norm_squared(owl::vec3f v) {
+float norm_squared(const owl::vec3f &v) {
     return dot(v, v);
 }
 
@@ -18,12 +18,12 @@ owl::vec3f random_in_unit_sphere(Random rand) {
 }
 
 inline __device__
-owl::vec3f calculateDirectIllumination(const RayGenData &self, PerRayData &prd) {
+owl::vec3f calculateDirectIllumination(const RayGenData &self, const PerRayData &prd) {
     auto light = self.scene_light;
     auto shadow_ray_org = prd.hitPoint;
     auto light_dir = light->position - shadow_ray_org;
+    auto distance_to_light = sqrt(norm_squared(light_dir));
     light_dir = normalize(light_dir);
-    auto distance_to_light = owl::common::polymorphic::rsqrt(norm_squared(light_dir));
 
     auto light_dot_norm = dot(light_dir, prd.normalAtHp);
     if (light_dot_norm < 0.f) return 0.f;
@@ -141,7 +141,7 @@ owl::vec3f into_vec3f(const float *arr) {
 }
 
 inline __device__
-owl::vec3f calculate_photon_contrib(const Photon& photon, const PerRayData& prd, const float radiusSqr) {
+owl::vec3f calculate_photon_contrib(const Photon& photon, const PerRayData& prd, const float radiusSqr, const uint32_t total_photons) {
     const owl::vec3f diff = into_vec3f(photon.coords) - prd.hitPoint;
     const float distance = length(diff);
 
@@ -154,11 +154,30 @@ owl::vec3f calculate_photon_contrib(const Photon& photon, const PerRayData& prd,
 
     // cone filter
     constexpr float k = 1.f;
-    constexpr float pwr = 1;
-    const float quot = (1.f - 2.f / ((2.f+pwr) * k)) * M_PI * radiusSqr;
+    constexpr float pwr = 2; // TODO: USE?
+    const float quot = (1.f - 2.f / (3.f * k)) * M_PI * radiusSqr;
     float cone_weight = max(0.f, 1.f - (distance / sqrtf(radiusSqr)) / k);
-    //cone_weight *= 3.f;
 
     const owl::vec3f brdf = prd.hpMaterial.albedo / static_cast<float>(M_PI);
-    return into_vec3f(photon.colour) * brdf * cosTheta * cone_weight / quot;
+    const owl::vec3f normalised_photon_colour = into_vec3f(photon.colour) / total_photons;
+    return normalised_photon_colour * brdf * cosTheta * cone_weight / quot;
+}
+
+constexpr __device__
+float hable(const float x) {
+    constexpr float A = 0.15f, B = 0.50f, C = 0.10f;
+    constexpr float D = 0.20f, E = 0.02f, F = 0.30f;
+    return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
+}
+
+inline __device__
+owl::vec3f filter_colour(owl::vec3f colour) {
+    constexpr float exposure = 0.09f;
+    constexpr float W = 11.2f;
+    constexpr float inv_white = 1.0f / hable(W);
+
+    colour *= exposure;
+    colour = owl::vec3f(hable(colour.x), hable(colour.y), hable(colour.z)) * inv_white;
+    colour = owl::vec3f(sqrtf(colour.x), sqrtf(colour.y), sqrtf(colour.z));
+    return colour;
 }
