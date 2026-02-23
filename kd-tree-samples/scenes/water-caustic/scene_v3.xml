@@ -14,7 +14,7 @@
 		</transform>
 		<sampler type="independent">
 			<integer name="sample_count" value="$spp" />
-			<integer name="diffuse_scattered" value="36" />
+			<integer name="diffuse_scattered" value="4" />
 		</sampler>
 		<film type="hdrfilm">
 			<integer name="width" value="$resx" />

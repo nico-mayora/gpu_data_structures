@@ -4,13 +4,9 @@
 #include "../../common/helpers.cuh"
 #include <optix_device.h>
 
-#define K_GLOBAL_PHOTONS 8
-#define K_CAUSTIC_PHOTONS 96
-#define GLOBAL_FACT .0000005f
-#define CAUSTIC_FACT .001f
-#define SECONDARY_RAYS 2
+#define K_GLOBAL_PHOTONS 32
+#define K_CAUSTIC_PHOTONS 128
 #define PI float(3.141592653)
-
 
 inline __device__
 owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, int threadID) {
@@ -52,7 +48,7 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
         owl::vec3f diffuse_contrib = 0.f;
         // "Reach out" into the scene and perform gathers, this gives us global lighting with less local variance.
 #pragma unroll
-        for (uint32_t j = 0; j < SECONDARY_RAYS; ++j) {
+        for (uint32_t j = 0; j < self.num_diffuse_scattered; ++j) {
             owl::vec3f rand_offset = owl::vec3f { prd.random(), prd.random(), prd.random() } * 2.f - 1.f;
             owl::vec3f diffuse_vector_dir = normalize(prd.normalAtHp + rand_offset);
 
@@ -104,7 +100,7 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
                 if (point_distances[p] == INFTY) break;
 
                 const Photon &photon = self.photon_map[point_indices[p]];
-                photon_illumination += calculate_photon_contrib(photon, sprd, radius);
+                photon_illumination += calculate_photon_contrib(photon, sprd, radius, self.num_photons);
             }
 
             photon_illumination = photon_illumination / (PI * point_distances[0]);
@@ -138,14 +134,14 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
             if (point_distances[p] == INFTY) break;
 
             const Photon &photon = self.caustic_map[point_indices[p]];
-            caustic_term += calculate_photon_contrib(photon, prd, radius);
+            caustic_term += calculate_photon_contrib(photon, prd, radius, self.num_photons);
         }
 
-        colour_acum += GLOBAL_FACT * diffuse_contrib * prd.hpMaterial.albedo + CAUSTIC_FACT * caustic_term;
+        colour_acum += diffuse_contrib * prd.hpMaterial.albedo + caustic_term;
         break;
     }
 
-    return colour_acum;
+    return filter_colour(colour_acum);
 }
 
 OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
