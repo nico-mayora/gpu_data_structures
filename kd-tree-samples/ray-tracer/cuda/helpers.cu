@@ -140,27 +140,38 @@ owl::vec3f into_vec3f(const float *arr) {
     return owl::vec3f(arr[0], arr[1], arr[2]);
 }
 
-inline __device__
-owl::vec3f calculate_photon_contrib(const Photon& photon, const PerRayData& prd, const float radiusSqr, const uint32_t total_photons) {
-    const owl::vec3f diff = into_vec3f(photon.coords) - prd.hitPoint;
-    const float distance = length(diff);
+#define LINEAR
 
-    // lambert
+inline __device__
+owl::vec3f calculate_photon_contrib(
+    const Photon& photon, 
+    const PerRayData& prd, 
+    const float inv_radius,
+    const float inv_k,
+    const float inv_normalization) 
+{
+    const owl::vec3f diff = into_vec3f(photon.coords) - prd.hitPoint;
+    const float distance = length(diff); 
+
     const owl::vec3f wi = -into_vec3f(photon.dir);
     const float cosTheta = max(0.f, dot(prd.normalAtHp, wi));
-    if (cosTheta <= 0.0f) {
-        return 0.f;
-    }
+    
+    if (cosTheta <= EPS) return 0.f;
 
-    // cone filter
-    constexpr float k = 1.f;
-    constexpr float pwr = 2; // TODO: USE?
-    const float quot = (1.f - 2.f / (3.f * k)) * M_PI * radiusSqr;
-    float cone_weight = max(0.f, 1.f - (distance / sqrtf(radiusSqr)) / k);
+    const float ratio = distance * inv_radius;
+    float p_term;
 
-    const owl::vec3f brdf = prd.hpMaterial.albedo / static_cast<float>(M_PI);
-    const owl::vec3f normalised_photon_colour = into_vec3f(photon.colour) / total_photons;
-    return normalised_photon_colour * brdf * cosTheta * cone_weight / quot;
+#if defined(CUBIC)
+    p_term = cbrtf(ratio);
+#elif defined(QUADRATIC)
+    p_term = sqrtf(ratio);
+#else
+    p_term = ratio;
+#endif
+
+    const float cone_weight = max(0.f, 1.0f - (p_term * inv_k)); 
+
+    return into_vec3f(photon.colour) * prd.hpMaterial.albedo * (cosTheta * cone_weight * inv_normalization);
 }
 
 constexpr __device__
@@ -172,7 +183,7 @@ float hable(const float x) {
 
 inline __device__
 owl::vec3f filter_colour(owl::vec3f colour) {
-    constexpr float exposure = 0.09f;
+    constexpr float exposure = 0.09f; // MIGHT NEED TO ADJUST!!!
     constexpr float W = 11.2f;
     constexpr float inv_white = 1.0f / hable(W);
 

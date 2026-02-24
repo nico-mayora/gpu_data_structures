@@ -93,14 +93,30 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
                 &photon_result
             );
 
+            const float radiusSqr = owl::sqrt(point_distances[0]);
+            const float inv_radius = 1.f / sqrtf(radiusSqr);
+            const float k_filter = 1.f;
+            const float inv_k = 1.f / k_filter;
+            float p_val;
+
+#if defined(CUBIC)
+            p_val = 1.0f / 3.0f;
+#elif defined(QUADRATIC)
+            p_val = 0.5f;
+#else
+            p_val = 1.0f;
+#endif
+
+            const float norm_factor = M_PIf * radiusSqr * (1.0f - 2.0f / (k_filter * (p_val + 2.0f)));
+            const float inv_normalization = 1.0f / norm_factor;
+
             owl::vec3f photon_illumination = 0.f;
-            const float radius = owl::sqrt(point_distances[0]);
 #pragma unroll
             for (int p = 0; p < K_GLOBAL_PHOTONS; p++) {
                 if (point_distances[p] == INFTY) break;
 
                 const Photon &photon = self.photon_map[point_indices[p]];
-                photon_illumination += calculate_photon_contrib(photon, sprd, radius, self.num_photons);
+                photon_illumination += calculate_photon_contrib(p, prd, inv_radius, inv_k, inv_normalization);
             }
 
             photon_illumination = photon_illumination / (PI * point_distances[0]);
@@ -141,7 +157,7 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
         break;
     }
 
-    return filter_colour(colour_acum);
+    return colour_acum;
 }
 
 OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
@@ -174,6 +190,7 @@ OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
     }
 
     colour *= 1.f / self.pixel_samples;
+    colour = filter_colour(colour);
 
     const int fbOfs = pixelID.x+self.resolution.x*pixelID.y;
     self.fbPtr[fbOfs] = owl::make_rgba(colour);
