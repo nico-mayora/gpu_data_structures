@@ -107,7 +107,7 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
             p_val = 1.0f;
 #endif
 
-            const float norm_factor = M_PIf * radiusSqr * (1.0f - 2.0f / (k_filter * (p_val + 2.0f)));
+            const float norm_factor = M_PI * radiusSqr * (1.0f - 2.0f / (k_filter * (p_val + 2.0f)));
             const float inv_normalization = 1.0f / norm_factor;
 
             owl::vec3f photon_illumination = 0.f;
@@ -116,10 +116,9 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
                 if (point_distances[p] == INFTY) break;
 
                 const Photon &photon = self.photon_map[point_indices[p]];
-                photon_illumination += calculate_photon_contrib(p, prd, inv_radius, inv_k, inv_normalization);
+                photon_illumination += calculate_photon_contrib(photon, prd, inv_radius, inv_k, inv_normalization);
             }
 
-            photon_illumination = photon_illumination / (PI * point_distances[0]);
             diffuse_contrib += photon_illumination;
         }
 
@@ -143,14 +142,30 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
             &caustic_photon_result
         );
 
+        const float radiusSqr = owl::sqrt(point_distances[0]);
+        const float inv_radius = 1.f / sqrtf(radiusSqr);
+        const float k_filter = 1.f;
+        const float inv_k = 1.f / k_filter;
+        float p_val;
+
+#if defined(CUBIC)
+        p_val = 1.0f / 3.0f;
+#elif defined(QUADRATIC)
+        p_val = 0.5f;
+#else // defined(LINEAR) (default)
+        p_val = 1.0f;
+#endif
+
+        const float norm_factor = M_PI * radiusSqr * (1.0f - 2.0f / (k_filter * (p_val + 2.0f)));
+        const float inv_normalization = 1.0f / norm_factor;
+
         owl::vec3f caustic_term = 0.f;
-        const float radius = owl::sqrt(point_distances[0]);
 #pragma unroll
         for (int p = 0; p < K_CAUSTIC_PHOTONS; p++) {
             if (point_distances[p] == INFTY) break;
 
             const Photon &photon = self.caustic_map[point_indices[p]];
-            caustic_term += calculate_photon_contrib(photon, prd, radius, self.num_photons);
+            caustic_term += calculate_photon_contrib(photon, prd, inv_radius, inv_k, inv_normalization);
         }
 
         colour_acum += diffuse_contrib * prd.hpMaterial.albedo + caustic_term;

@@ -21,6 +21,7 @@ void setupPointLightRayGenProgram(Program &program) {
   OWLVarDecl rayGenVars[] = {
           { "photons",OWL_BUFPTR,OWL_OFFSETOF(PointLightRGD,photons)},
           { "photonsCount",OWL_BUFPTR,OWL_OFFSETOF(PointLightRGD,photonsCount)},
+          { "totalPhotons",OWL_INT,OWL_OFFSETOF(PointLightRGD,totalPhotons)},
           { "maxDepth",OWL_INT,OWL_OFFSETOF(PointLightRGD, maxDepth)},
           {"causticsMode", OWL_BOOL, OWL_OFFSETOF(PointLightRGD, causticsMode)},
           { "world",OWL_GROUP,OWL_OFFSETOF(PointLightRGD,world)},
@@ -124,10 +125,12 @@ void runPointLightRayGen(Program &program, const PointLight* light, bool caustic
   if (causticsMode) {
     owlRayGenSetBuffer(program.rayGen,"photons",program.causticsPhotonsBuffer);
     owlRayGenSetBuffer(program.rayGen,"photonsCount",program.causticsPhotonsCount);
+    owlRayGenSet1i(program.rayGen, "totalPhotons", program.castedCausticsPhotons);
     initialPhotons = program.causticsPhotonsPerWatt * (light->power.x + light->power.y + light->power.z);
   } else {
     owlRayGenSetBuffer(program.rayGen,"photons",program.photonsBuffer);
     owlRayGenSetBuffer(program.rayGen,"photonsCount",program.photonsCount);
+    owlRayGenSet1i(program.rayGen, "totalPhotons", program.castedDiffusePhotons);
     initialPhotons = program.photonsPerWatt * (light->power.x + light->power.y + light->power.z);
   }
 
@@ -196,7 +199,7 @@ int main(int ac, char **av)
   auto normal_photons_filename = "normal_photons.txt";
   auto caustic_photons_filename = "caustic_photons.txt";
   program.castedDiffusePhotons = 10'000;
-  program.castedCausticsPhotons = 10'000'000;
+  program.castedCausticsPhotons = 20'000'000;
   program.maxDepth = 10;
 
   LOG_OK("Loaded world.")

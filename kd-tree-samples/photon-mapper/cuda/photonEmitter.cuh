@@ -10,6 +10,7 @@ struct PhotonMapperRGD
 {
     EmittedPhoton *photons;
     int *photonsCount;
+    int totalPhotons;
     OptixTraversableHandle world;
     int maxDepth;
     bool causticsMode;
@@ -75,7 +76,6 @@ struct Program {
     OWLModule owlModule;
     OWLRayGen rayGen;
 
-//    std::unique_ptr<World> world;
     World* world;
     GeometryData geometryData;
 

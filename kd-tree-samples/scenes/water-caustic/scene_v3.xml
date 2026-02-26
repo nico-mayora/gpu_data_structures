@@ -1,9 +1,9 @@
 <scene version="3.0.0">
 	<default name="integrator" value="path" />
-	<default name="spp" value="4" />
+	<default name="spp" value="8" />
 	<default name="resx" value="800" />
 	<default name="resy" value="800" />
-	<default name="max_depth" value="8" />
+	<default name="max_depth" value="10" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>
@@ -112,7 +112,7 @@
 		<ref id="TallBox" />
 	</shape>
 	<emitter type="point" id="Light">
-		<rgb name="intensity" value="1, 1, 1"/>
+		<rgb name="intensity" value="100, 100, 100"/>
 		<point name="position" x="0" y="1.8" z="0.75"/>
 	</emitter>
 	<shape type="obj" >
