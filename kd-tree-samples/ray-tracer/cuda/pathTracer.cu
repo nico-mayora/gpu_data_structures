@@ -76,15 +76,8 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
 
             const float query_pos[] = {sprd.hitPoint.x, sprd.hitPoint.y, sprd.hitPoint.z};
 
-            size_t *point_indices = self.heap_indices + threadID * K_GLOBAL_PHOTONS;
-            float *point_distances = self.heap_distances + threadID * K_GLOBAL_PHOTONS;
-#pragma unroll
-            for (int k = 0; k < K_GLOBAL_PHOTONS; k++) {
-                point_indices[k] = 0;
-                point_distances[k] = INFTY;
-            }
-
-            HeapQueryResult<K_GLOBAL_PHOTONS> photon_result {point_indices, point_distances};
+            HeapQueryResult<K_GLOBAL_PHOTONS> photon_result;
+            photon_result.initialize(self.heapPhotonAddr + threadID * K_GLOBAL_PHOTONS);
 
             knn<K_GLOBAL_PHOTONS, Photon, HeapQueryResult<K_GLOBAL_PHOTONS>>(
                 query_pos,
@@ -93,7 +86,7 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
                 &photon_result
             );
 
-            const float radiusSqr = owl::sqrt(point_distances[0]);
+            const float radiusSqr = photon_result.getQueryRadiusSqr();
             const float inv_radius = 1.f / sqrtf(radiusSqr);
             const float k_filter = 1.f;
             const float inv_k = 1.f / k_filter;
@@ -113,27 +106,20 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
             owl::vec3f photon_illumination = 0.f;
 #pragma unroll
             for (int p = 0; p < K_GLOBAL_PHOTONS; p++) {
-                if (point_distances[p] == INFTY) break;
+                if (photon_result.getDistance(p) == INFTY) break;
 
-                const Photon &photon = self.photon_map[point_indices[p]];
+                const Photon &photon = self.photon_map[photon_result.getIndex(p)];
                 photon_illumination += calculate_photon_contrib(photon, prd, inv_radius, inv_k, inv_normalization);
             }
 
             diffuse_contrib += photon_illumination;
         }
 
+        const float query_point[] = { prd.hitPoint.x, prd.hitPoint.y, prd.hitPoint.z };
+
         // Perform caustic gather
-        size_t *point_indices = self.heap_indices + threadID * K_CAUSTIC_PHOTONS;
-        float *point_distances = self.heap_distances + threadID * K_CAUSTIC_PHOTONS;
-#pragma unroll
-        for (int k = 0; k < K_CAUSTIC_PHOTONS; k++) {
-            point_indices[k] = 0;
-            point_distances[k] = INFTY;
-        }
-
-        HeapQueryResult<K_CAUSTIC_PHOTONS> caustic_photon_result { point_indices, point_distances };
-
-        const float query_point[] = { prd.hitPoint[0], prd.hitPoint[1], prd.hitPoint[2] };
+        HeapQueryResult<K_CAUSTIC_PHOTONS> caustic_photon_result;
+        caustic_photon_result.initialize(self.heapPhotonAddr + threadID * K_CAUSTIC_PHOTONS);
 
         knn<K_CAUSTIC_PHOTONS, Photon, HeapQueryResult<K_CAUSTIC_PHOTONS>>(
             query_point,
@@ -142,7 +128,7 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
             &caustic_photon_result
         );
 
-        const float radiusSqr = owl::sqrt(point_distances[0]);
+        const float radiusSqr = caustic_photon_result.getQueryRadiusSqr();
         const float inv_radius = 1.f / sqrtf(radiusSqr);
         const float k_filter = 1.f;
         const float inv_k = 1.f / k_filter;
@@ -162,9 +148,9 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
         owl::vec3f caustic_term = 0.f;
 #pragma unroll
         for (int p = 0; p < K_CAUSTIC_PHOTONS; p++) {
-            if (point_distances[p] == INFTY) break;
+            if (caustic_photon_result.getDistance(p) == INFTY) break;
 
-            const Photon &photon = self.caustic_map[point_indices[p]];
+            const Photon &photon = self.caustic_map[caustic_photon_result.getIndex(p)];
             caustic_term += calculate_photon_contrib(photon, prd, inv_radius, inv_k, inv_normalization);
         }
 

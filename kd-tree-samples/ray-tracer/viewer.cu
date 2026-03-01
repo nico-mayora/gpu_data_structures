@@ -99,8 +99,7 @@ Viewer::Viewer(const World *world) {
         { "camera.dir_dv", OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.dir_dv)},
         { "camera.dir_du", OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.dir_du)},
         { "scene_light", OWL_BUFPTR, OWL_OFFSETOF(RayGenData,scene_light)},
-        { "heap_indices", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,heap_indices)},
-        { "heap_distances", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,heap_distances)},
+        { "heapPhotonAddr", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,heapPhotonAddr)},
         { /* sentinel to mark end of list */ },
     };
 
@@ -126,8 +125,7 @@ Viewer::Viewer(const World *world) {
     owlRayGenSet1i(rayGen, "num_caustic", world->num_caustic);
     owlRayGenSet1i(rayGen, "depth", world->cam->image.depth);
     owlRayGenSet2i(rayGen, "resolution", reinterpret_cast<const owl2i&>(world->cam->image.resolution));
-    owlRayGenSetPointer(rayGen, "heap_indices", world->heap_indices);
-    owlRayGenSetPointer(rayGen, "heap_distances", world->heap_distances);
+    owlRayGenSetPointer(rayGen, "heapPhotonAddr", world->heapPhotonAddr);
     setWindowSize(world->cam->image.resolution);
 
     owlBuildPrograms(context);
@@ -141,8 +139,14 @@ void Viewer::render()
         owlBuildSBT(context);
         sbtDirty = false;
     }
-    std::cout << "Launching...\n";
-    owlRayGenLaunch2D(rayGen,fbSize.x,fbSize.y);
+
+    const auto start = std::chrono::high_resolution_clock::now();
+    owlRayGenLaunch2D(rayGen, fbSize.x, fbSize.y);
+    cudaDeviceSynchronize();
+    const auto end = std::chrono::high_resolution_clock::now();
+
+    const float ms = std::chrono::duration<float, std::milli>(end - start).count();
+    printf("Last frame took %.2f ms. Drawing next frame...\n", ms);
 }
 
 void Viewer::resize(const owl::vec2i &newSize)

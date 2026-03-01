@@ -140,7 +140,7 @@ owl::vec3f into_vec3f(const float *arr) {
     return owl::vec3f(arr[0], arr[1], arr[2]);
 }
 
-#define CUBIC
+#define LINEAR
 
 inline __device__
 owl::vec3f calculate_photon_contrib(
@@ -183,7 +183,7 @@ float hable(const float x) {
 
 inline __device__
 owl::vec3f filter_colour(owl::vec3f colour) {
-    constexpr float exposure = 0.5f; // MIGHT NEED TO ADJUST!!!
+    constexpr float exposure = 0.5f;
     constexpr float W = 11.2f;
     constexpr float inv_white = 1.0f / hable(W);
 

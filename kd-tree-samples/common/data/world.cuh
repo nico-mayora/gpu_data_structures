@@ -242,8 +242,7 @@ struct World {
     Photon *caustic_map;
     int num_caustic;
 
-    size_t *heap_indices;
-    float *heap_distances;
+    uint64_t *heapPhotonAddr;
 
     Camera *cam;
 };
