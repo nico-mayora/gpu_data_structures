@@ -71,4 +71,12 @@ target_link_libraries(photonEmitter PRIVATE photonEmitter_ptx owl::owl tinyxml2:
 
 add_executable(kdtree_benchmark benchmark/main.cu)
 
+# cudaKDTree (Ingo Wald) — requires CMAKE_CUDA_ARCHITECTURES
+if (NOT CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES native)
+endif()
+set(cudaKDTree_dir ${PROJECT_SOURCE_DIR}/common/externals/cudaKDTree)
+add_subdirectory(${cudaKDTree_dir} EXCLUDE_FROM_ALL)
+target_link_libraries(kdtree_benchmark cudaKDTree)
+
 # FIXME: If owl is not found, copy the .dll/.so into the executable folder.
