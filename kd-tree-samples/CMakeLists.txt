@@ -9,13 +9,20 @@ set(glfw_dir ${PROJECT_SOURCE_DIR}/common/externals/glfw)
 set(OptiX_ROOT_DIR $ENV{OptiX_INSTALL_DIR})
 set(CMAKE_PREFIX_PATH $ENV{OptiX_INSTALL_DIR})
 
+# cudaKDTree (Ingo Wald) — requires CMAKE_CUDA_ARCHITECTURES
+if (NOT CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES native)
+endif()
+set(cudaKDTree_dir ${PROJECT_SOURCE_DIR}/common/externals/cudaKDTree)
+add_subdirectory(${cudaKDTree_dir} EXCLUDE_FROM_ALL)
+
 # Path Tracer
 
 embed_ptx(
         OUTPUT_TARGET
             pathTracer_ptx
         PTX_LINK_LIBRARIES
-            owl::owl
+            owl::owl cudaKDTree
         SOURCES
             ray-tracer/cuda/pathTracer.cu
 )
@@ -66,17 +73,10 @@ add_subdirectory(${owl_dir} EXCLUDE_FROM_ALL)
 set(tinyxml2_dir ${PROJECT_SOURCE_DIR}/common/externals/tinyxml2)
 add_subdirectory(${tinyxml2_dir} EXCLUDE_FROM_ALL)
 
-target_link_libraries(pathTracer PRIVATE pathTracer_ptx owl::owl owl_viewer tinyxml2::tinyxml2 tinyobjloader)
+target_link_libraries(pathTracer PRIVATE pathTracer_ptx owl::owl owl_viewer tinyxml2::tinyxml2 tinyobjloader cudaKDTree)
 target_link_libraries(photonEmitter PRIVATE photonEmitter_ptx owl::owl tinyxml2::tinyxml2 tinyobjloader)
 
 add_executable(kdtree_benchmark benchmark/main.cu)
-
-# cudaKDTree (Ingo Wald) — requires CMAKE_CUDA_ARCHITECTURES
-if (NOT CMAKE_CUDA_ARCHITECTURES)
-    set(CMAKE_CUDA_ARCHITECTURES native)
-endif()
-set(cudaKDTree_dir ${PROJECT_SOURCE_DIR}/common/externals/cudaKDTree)
-add_subdirectory(${cudaKDTree_dir} EXCLUDE_FROM_ALL)
 target_link_libraries(kdtree_benchmark cudaKDTree)
 
 # FIXME: If owl is not found, copy the .dll/.so into the executable folder.

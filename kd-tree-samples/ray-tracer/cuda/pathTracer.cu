@@ -1,15 +1,15 @@
 #include "pathTracer.cuh"
 #include "helpers.cu"
-#include "../../common/kdtree/queries.cuh"
 #include "../../common/helpers.cuh"
+#include <cukd/knn.h>
 #include <optix_device.h>
 
 #define K_GLOBAL_PHOTONS 32
-#define K_CAUSTIC_PHOTONS 128
+#define K_CAUSTIC_PHOTONS 256
 #define PI float(3.141592653)
 
 inline __device__
-owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, int threadID) {
+owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
     owl::vec3f colour_acum = 0.f;
 
     for (int32_t i = 0; i < self.depth; ++i) {
@@ -74,19 +74,13 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
                 q0, q1
             );
 
-            const float query_pos[] = {sprd.hitPoint.x, sprd.hitPoint.y, sprd.hitPoint.z};
+            float3 qp_global = make_float3(sprd.hitPoint.x, sprd.hitPoint.y, sprd.hitPoint.z);
 
-            HeapQueryResult<K_GLOBAL_PHOTONS> photon_result;
-            photon_result.initialize(self.heapPhotonAddr + threadID * K_GLOBAL_PHOTONS);
+            cukd::HeapCandidateList<K_GLOBAL_PHOTONS> photon_result(1e30f);
+            cukd::stackBased::knn(photon_result, qp_global,
+                                  self.photon_positions, self.num_photons);
 
-            knn<K_GLOBAL_PHOTONS, Photon, HeapQueryResult<K_GLOBAL_PHOTONS>>(
-                query_pos,
-                self.photon_map,
-                self.num_photons,
-                &photon_result
-            );
-
-            const float radiusSqr = photon_result.getQueryRadiusSqr();
+            const float radiusSqr = photon_result.maxRadius2();
             const float inv_radius = 1.f / sqrtf(radiusSqr);
             const float k_filter = 1.f;
             const float inv_k = 1.f / k_filter;
@@ -106,29 +100,24 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
             owl::vec3f photon_illumination = 0.f;
 #pragma unroll
             for (int p = 0; p < K_GLOBAL_PHOTONS; p++) {
-                if (photon_result.getDistance(p) == INFTY) break;
+                const int photonID = photon_result.get_pointID(p);
+                if (photonID < 0) continue;
 
-                const Photon &photon = self.photon_map[photon_result.getIndex(p)];
+                const Photon &photon = self.photon_map[photonID];
                 photon_illumination += calculate_photon_contrib(photon, prd, inv_radius, inv_k, inv_normalization);
             }
 
             diffuse_contrib += photon_illumination;
         }
 
-        const float query_point[] = { prd.hitPoint.x, prd.hitPoint.y, prd.hitPoint.z };
-
         // Perform caustic gather
-        HeapQueryResult<K_CAUSTIC_PHOTONS> caustic_photon_result;
-        caustic_photon_result.initialize(self.heapPhotonAddr + threadID * K_CAUSTIC_PHOTONS);
+        float3 qp_caustic = make_float3(prd.hitPoint.x, prd.hitPoint.y, prd.hitPoint.z);
 
-        knn<K_CAUSTIC_PHOTONS, Photon, HeapQueryResult<K_CAUSTIC_PHOTONS>>(
-            query_point,
-            self.caustic_map,
-            self.num_caustic,
-            &caustic_photon_result
-        );
+        cukd::HeapCandidateList<K_CAUSTIC_PHOTONS> caustic_photon_result(1e30f);
+        cukd::stackBased::knn(caustic_photon_result, qp_caustic,
+                              self.caustic_positions, self.num_caustic);
 
-        const float radiusSqr = caustic_photon_result.getQueryRadiusSqr();
+        const float radiusSqr = caustic_photon_result.maxRadius2();
         const float inv_radius = 1.f / sqrtf(radiusSqr);
         const float k_filter = 1.f;
         const float inv_k = 1.f / k_filter;
@@ -148,9 +137,10 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
         owl::vec3f caustic_term = 0.f;
 #pragma unroll
         for (int p = 0; p < K_CAUSTIC_PHOTONS; p++) {
-            if (caustic_photon_result.getDistance(p) == INFTY) break;
+            const int photonID = caustic_photon_result.get_pointID(p);
+            if (photonID < 0) continue;
 
-            const Photon &photon = self.caustic_map[caustic_photon_result.getIndex(p)];
+            const Photon &photon = self.caustic_map[photonID];
             caustic_term += calculate_photon_contrib(photon, prd, inv_radius, inv_k, inv_normalization);
         }
 
@@ -164,8 +154,6 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd, in
 OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
     const RayGenData &self = owl::getProgramData<RayGenData>();
     const owl::vec2i pixelID = owl::getLaunchIndex();
-
-    const int threadID = pixelID.x + self.resolution.x * pixelID.y;
 
     PerRayData prd;
     prd.random.init(pixelID.x,pixelID.y);
@@ -187,7 +175,7 @@ OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
         ray.origin = origin;
         ray.direction = direction;
 
-        colour += trace_path(self, ray, prd, threadID);
+        colour += trace_path(self, ray, prd);
     }
 
     colour *= 1.f / self.pixel_samples;

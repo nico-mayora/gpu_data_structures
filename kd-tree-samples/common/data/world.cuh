@@ -238,11 +238,11 @@ struct World {
     PointLight *scene_light;
 
     Photon *photon_map;
+    float3 *photon_positions;
     int num_photons;
     Photon *caustic_map;
+    float3 *caustic_positions;
     int num_caustic;
-
-    uint64_t *heapPhotonAddr;
 
     Camera *cam;
 };

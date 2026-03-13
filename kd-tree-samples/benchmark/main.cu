@@ -16,7 +16,7 @@
 // Query Params
 #define NUM_QUERIES       1000000
 #define THREADS_PER_BLOCK 256
-#define NUM_RUNS          1
+#define NUM_RUNS          5
 
 // K values to benchmark (rows of the table)
 static const int K_VALUES[] = { 8, 16, 32, 64, 128, 256, 512, 1024 };
@@ -42,23 +42,25 @@ static void generate_random_queries(float *out, int n, float length) {
         out[i] = ((float)rand() / RAND_MAX) * length - half;
 }
 
-// --------------- kernel launch + timing (our tree) ---------------
+// --------------- kernel launch + timing ---------------
 
 template<int K_VAL>
 static bool launch_and_time(
     MemoryStrategy strategy,
     const Point<3> *d_points, size_t num_points,
+    const float3 *d_cukd_tree,
     const float *d_queries, int num_queries,
     float *out_ms)
 {
     const int blocks = (num_queries + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
-    uint32_t *d_validation = nullptr;
-    cudaMalloc(&d_validation, 3 * sizeof(uint32_t));
-    cudaMemset(d_validation, 0, 3 * sizeof(uint32_t));
+    uint32_t *d_validation   = nullptr;
+    uint64_t *d_result_data  = nullptr;
 
-    size_t *d_result_indices   = nullptr;
-    float  *d_result_distances = nullptr;
+    if (strategy != CUKD) {
+        cudaMalloc(&d_validation, 3 * sizeof(uint32_t));
+        cudaMemset(d_validation, 0, 3 * sizeof(uint32_t));
+    }
 
     cudaEvent_t t0, t1;
     cudaEventCreate(&t0);
@@ -72,20 +74,23 @@ static bool launch_and_time(
                 d_points, num_points, d_queries, num_queries, d_validation);
             break;
         case GLOBAL:
-            cudaMalloc(&d_result_indices,   sizeof(size_t) * num_queries * K_VAL);
-            cudaMalloc(&d_result_distances, sizeof(float)  * num_queries * K_VAL);
+            cudaMalloc(&d_result_data, sizeof(uint64_t) * num_queries * K_VAL);
             knn_query_global<K_VAL><<<blocks, THREADS_PER_BLOCK>>>(
                 d_points, num_points, d_queries,
-                d_result_indices, d_result_distances,
+                d_result_data,
                 num_queries, d_validation);
             break;
         case SHARED: {
             const size_t smem_bytes = THREADS_PER_BLOCK * K_VAL
-                * (sizeof(size_t) + sizeof(float));
+                * sizeof(uint64_t);
             knn_query_shared<K_VAL><<<blocks, THREADS_PER_BLOCK, smem_bytes>>>(
                 d_points, num_points, d_queries, num_queries, d_validation);
             break;
         }
+        case CUKD:
+            knn_query_cukd<K_VAL><<<blocks, THREADS_PER_BLOCK>>>(
+                d_cukd_tree, (int)num_points, d_queries, num_queries);
+            break;
         default: break;
     }
 
@@ -93,9 +98,8 @@ static bool launch_and_time(
     if (err != cudaSuccess) {
         cudaEventDestroy(t0);
         cudaEventDestroy(t1);
-        if (d_result_indices)   cudaFree(d_result_indices);
-        if (d_result_distances) cudaFree(d_result_distances);
-        cudaFree(d_validation);
+        if (d_result_data) cudaFree(d_result_data);
+        if (d_validation)  cudaFree(d_validation);
         return false;
     }
 
@@ -105,48 +109,8 @@ static bool launch_and_time(
 
     cudaEventDestroy(t0);
     cudaEventDestroy(t1);
-    if (d_result_indices)   cudaFree(d_result_indices);
-    if (d_result_distances) cudaFree(d_result_distances);
-    cudaFree(d_validation);
-    return true;
-}
-
-// --------------- kernel launch + timing (cudaKDTree) ---------------
-
-static bool launch_and_time_cukd(
-    int k,
-    const float3 *d_cukd_tree, int num_points,
-    const float *d_queries, int num_queries,
-    float *out_ms)
-{
-    const int blocks = (num_queries + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-
-    uint64_t *d_candidate_mem = nullptr;
-    cudaMalloc(&d_candidate_mem, sizeof(uint64_t) * num_queries * k);
-
-    cudaEvent_t t0, t1;
-    cudaEventCreate(&t0);
-    cudaEventCreate(&t1);
-
-    cudaEventRecord(t0);
-    knn_query_cukd<<<blocks, THREADS_PER_BLOCK>>>(
-        d_cukd_tree, num_points, d_queries, num_queries, d_candidate_mem, k);
-
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        cudaEventDestroy(t0);
-        cudaEventDestroy(t1);
-        cudaFree(d_candidate_mem);
-        return false;
-    }
-
-    cudaEventRecord(t1);
-    cudaEventSynchronize(t1);
-    cudaEventElapsedTime(out_ms, t0, t1);
-
-    cudaEventDestroy(t0);
-    cudaEventDestroy(t1);
-    cudaFree(d_candidate_mem);
+    if (d_result_data) cudaFree(d_result_data);
+    if (d_validation)  cudaFree(d_validation);
     return true;
 }
 
@@ -159,16 +123,11 @@ static bool dispatch_launch(
     const float *d_queries, int num_queries,
     float *out_ms)
 {
-    // CUKD uses FlexHeapCandidateList (runtime k), no template dispatch needed.
-    if (strategy == CUKD)
-        return launch_and_time_cukd(
-            k, d_cukd_tree, (int)num_points, d_queries, num_queries, out_ms);
-
-    // Our kernels require compile-time K template parameter.
     #define DISPATCH_K(K_VAL)                                                       \
         case K_VAL:                                                                 \
             return launch_and_time<K_VAL>(                                          \
-                strategy, d_points, num_points, d_queries, num_queries, out_ms);
+                strategy, d_points, num_points, d_cukd_tree,                        \
+                d_queries, num_queries, out_ms);
 
     switch (k) {
         DISPATCH_K(8)
