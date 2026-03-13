@@ -24,9 +24,6 @@
 			<rfilter type="tent" />
 		</film>
 	</sensor>
-
-
-
 	<bsdf type="twosided" id="LeftWallBSDF">
 		<bsdf type="diffuse">
 			<rgb name="reflectance" value="0.63, 0.065, 0.05" />

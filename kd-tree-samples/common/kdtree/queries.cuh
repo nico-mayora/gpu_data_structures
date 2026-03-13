@@ -2,27 +2,60 @@
 #include "constants.cuh"
 
 template<int K>
-struct FixedQueryResult {
-    size_t *pointIndices;
-    float *pointDistances; // distance squared
+struct BaseQueryResult {
+    // First 32 bits => photon idx
+    // Last 32 bits => photon distance squared
+    uint64_t *photonData;
     size_t foundPoints = 0; /* <= K */
 
+    __device__ void initialize(uint64_t *dataBufAddr) {
+        this->photonData = dataBufAddr;
+        const uint64_t defaultValue = packData(0, INFTY);
+#pragma unroll
+        for (int i = 0; i < K; i++) {
+            photonData[i] = defaultValue;
+        }
+    }
+
+    __device__ float getDistance(const size_t pos) const {
+        const uint32_t lo = static_cast<uint32_t>(photonData[pos]);
+        return __uint_as_float(lo);
+    }
+
+    __device__ float getQueryRadiusSqr() const {
+        return getDistance(0);
+    }
+
+    __device__ size_t getIndex(const size_t pos) const {
+        return photonData[pos] >> 32;
+    }
+
+    __device__ bool isFull() const {
+        return this->foundPoints == K;
+    }
+
+    static __device__ uint64_t packData(const uint32_t idx, const float dist) {
+        return (static_cast<uint64_t>(idx) << 32) | __float_as_uint(dist);
+    }
+};
+
+template<int K>
+struct FixedQueryResult : BaseQueryResult<K> {
     // Returns max distance for points to be considered.
     __device__ float addNode(float dist, size_t node_id) {
-        foundPoints = (foundPoints < K) ? foundPoints + 1 : K;
+        this->foundPoints = (this->foundPoints < K) ? this->foundPoints + 1 : K;
+        uint64_t packed_data = this->packData(node_id, dist);
 #pragma unroll
         for (int i = 0; i < K; ++i) {
-            if (dist < this->pointDistances[i]) {
-                const auto old_dist = pointDistances[i];
-                const auto old_idx = pointIndices[i];
-                this->pointDistances[i] = dist;
-                this->pointIndices[i] = node_id;
-                dist = old_dist;
-                node_id = old_idx;
+            const float current_dist = __uint_as_float(static_cast<uint32_t>(packed_data));
+            if (current_dist < this->getDistance(i)) {
+                const uint64_t tmp_data = this->photonData[i];
+                this->photonData[i] = packed_data;
+                packed_data = tmp_data;
             }
         }
 
-        return (foundPoints < K) ? 0.f : pointDistances[K - 1];
+        return (this->foundPoints < K) ? 0.f : this->getDistance(K - 1);
     }
 };
 
@@ -30,95 +63,65 @@ struct FixedQueryResult {
 // to an already full heap, we remove heap[0], insert the new candidate, and let it percolate down.
 // Trade-off: Results distance to query point not in ascending order.
 template<int K>
-struct HeapQueryResult {
-    size_t *pointIndices;
-    float *pointDistances; // distance squared
-    size_t foundPoints = 0; /* <= K */
-
-    __device__ void percolateUp(size_t idx) {
+struct HeapQueryResult : BaseQueryResult<K>{
+    __device__ void percolateUp(size_t idx) const {
         while (idx > 0) {
             const size_t parent = (idx - 1) / 2;
-            if (pointDistances[idx] <= pointDistances[parent]) break; // Node at correct position.
+            if (this->getDistance(idx) <= this->getDistance(parent)) break; // Node at correct position.
 
             // Swap idx with parent
-            const size_t tmpIdx = pointIndices[idx];
-            const float tmpDist = pointDistances[idx];
-            pointIndices[idx] = pointIndices[parent];
-            pointDistances[idx] = pointDistances[parent];
-            pointIndices[parent] = tmpIdx;
-            pointDistances[parent] = tmpDist;
+            const uint64_t tmpData = this->photonData[idx];
+            this->photonData[idx] = this->photonData[parent];
+            this->photonData[parent] = tmpData;
 
             idx = parent;
         }
     }
 
-    __device__ void percolateDown(size_t idx) {
+    __device__ void percolateDown(size_t idx) const {
         for (;;) {
             size_t largest = idx;
             const size_t left = 2 * idx + 1;
             const size_t right = 2 * idx + 2;
 
-            if (left < foundPoints && pointDistances[left] > pointDistances[largest]) {
+            if (left < this->foundPoints && this->getDistance(left) > this->getDistance(largest)) {
                 largest = left;
             }
-            if (right < foundPoints && pointDistances[right] > pointDistances[largest]) {
+            if (right < this->foundPoints && this->getDistance(right) > this->getDistance(largest)) {
                 largest = right;
             }
 
             if (largest == idx) break;
 
             // Swap idx with the largest child
-            const size_t tmpIdx = pointIndices[idx];
-            const float tmpDist = pointDistances[idx];
-            pointIndices[idx] = pointIndices[largest];
-            pointDistances[idx] = pointDistances[largest];
-            pointIndices[largest] = tmpIdx;
-            pointDistances[largest] = tmpDist;
+            const uint64_t tmpData = this->photonData[idx];
+            this->photonData[idx] = this->photonData[largest];
+            this->photonData[largest] = tmpData;
 
             idx = largest;
         }
     }
 
-    __device__ bool isFull() const {
-        return foundPoints == K;
-    }
-
     // Returns max distance for points to be considered.
-    __device__ float addNode(float dist, size_t node_id) {
+    __device__ float addNode(const float dist, const size_t node_id) {
         // If heap is full and furthest point is still closer, discard it.
-        if (isFull() && pointDistances[0] < dist) return pointDistances[0];
-
-        if (isFull()) {
+        if (this->isFull() && this->getQueryRadiusSqr() < dist) return this->getQueryRadiusSqr();
+        if (this->isFull()) {
             // Replace root and percolate down
-            pointDistances[0] = dist;
-            pointIndices[0] = node_id;
+            this->photonData[0] = this->packData(node_id, dist);
             percolateDown(0);
         } else {
             // Add to the end and percolate up
-            pointDistances[foundPoints] = dist;
-            pointIndices[foundPoints] = node_id;
-            percolateUp(foundPoints);
-            foundPoints++;
+            this->photonData[this->foundPoints] = this->packData(node_id, dist);
+            percolateUp(this->foundPoints);
+            ++this->foundPoints;
         }
 
-        return pointDistances[0];
+        return this->getQueryRadiusSqr();
     }
 };
 
-struct FcpResult {
-    int32_t closestPointIndex = -1;
-    float distance = INFTY;
-
-    __device__ float addNode(float dist, size_t node_id) {
-        if (distance > dist) {
-            distance = dist;
-            closestPointIndex = node_id;
-        }
-
-        return distance;
-
-    }
-};
+typedef FixedQueryResult<1> FcpResult;
 
 static __device__ __inline__ int parent_node(const int p) {
     return (p + 1) / 2 - 1;

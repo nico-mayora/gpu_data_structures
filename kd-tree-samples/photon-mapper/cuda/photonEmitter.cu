@@ -14,7 +14,7 @@ inline __device__ void savePhoton(const PhotonMapperRGD &self, PhotonMapperPRD &
   int photonIndex = atomicAdd(self.photonsCount, 1);
 
   auto photon = &self.photons[photonIndex];
-  photon->color = prd.color;
+  photon->color = prd.color / static_cast<float>(self.totalPhotons);
   photon->pos = prd.scattered.origin;
   photon->dir = prd.direction;
 }

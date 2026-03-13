@@ -9,7 +9,7 @@
 
 int main()
 {
-    std::cout << "start!\n";
+    std::cout << "Start!\n";
     // TODO: pass scene name as argv
     const auto loader = new Mitsuba3Loader("water-caustic");
     const auto world = loader->load();
@@ -25,8 +25,7 @@ int main()
     const int parallelThreads = world->cam->image.resolution.x * world->cam->image.resolution.y;
 
     const size_t heap_size = parallelThreads * K_PHOTONS;
-    cudaMalloc(reinterpret_cast<void**>(&world->heap_indices), sizeof(size_t) * heap_size);
-    cudaMalloc(reinterpret_cast<void**>(&world->heap_distances), sizeof(float) * heap_size);
+    cudaMalloc(reinterpret_cast<void**>(&world->heapPhotonAddr), sizeof(uint64_t) * heap_size);
 
     Viewer viewer(world);
     viewer.enableFlyMode();

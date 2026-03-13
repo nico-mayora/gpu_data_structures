@@ -183,7 +183,7 @@ float hable(const float x) {
 
 inline __device__
 owl::vec3f filter_colour(owl::vec3f colour) {
-    constexpr float exposure = 0.09f; // MIGHT NEED TO ADJUST!!!
+    constexpr float exposure = 0.5f;
     constexpr float W = 11.2f;
     constexpr float inv_white = 1.0f / hable(W);
 
