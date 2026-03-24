@@ -2,7 +2,7 @@
 #include "cukd/knn.h"
 
 // KNN query using Ingo Wald's cudaKDTree library (stack-based traversal).
-// Uses HeapCandidateList with compile-time K, matching the photon-mapping project pattern.
+// Uses FlexHeapCandidateList with runtime K
 template<int K_VAL>
 __global__ void knn_query_cukd(
     const float3   *tree,
@@ -19,6 +19,7 @@ __global__ void knn_query_cukd(
         query_positions[tid * 3 + 2]
     );
 
-    cukd::HeapCandidateList<K_VAL> closest(1e30f);
-    cukd::stackBased::knn(closest, qp, tree, num_points);
+    uint64_t storage[K_VAL];
+    cukd::FlexHeapCandidateList closest(storage, K_VAL, 1e30f);
+    cukd::stackFree::knn(closest, qp, tree, num_points);
 }
