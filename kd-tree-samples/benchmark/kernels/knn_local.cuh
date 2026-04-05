@@ -3,7 +3,7 @@
 #include "../../common/kdtree/data.cuh"
 #include "validation.cuh"
 
-// Each thread declares its own indices/distances arrays as local variables.
+// Each thread declares its own data array as local variables.
 // These live in registers or spill to local memory.
 template<int K_VAL>
 __global__ void knn_query_local(
@@ -22,16 +22,13 @@ __global__ void knn_query_local(
         query_positions[tid * 3 + 2]
     };
 
-    size_t my_indices[K_VAL];
-    float  my_distances[K_VAL];
-
-    for (int k = 0; k < K_VAL; k++) {
-        my_indices[k]   = 0;
-        my_distances[k] = INFTY;
-    }
-
-    HeapQueryResult<K_VAL> result{my_indices, my_distances};
+    uint64_t my_data[K_VAL];
+    HeapQueryResult<K_VAL> result{};
+    result.initialize(my_data);
     knn<K_VAL, Point<3>, HeapQueryResult<K_VAL>>(qp, tree, num_points, &result);
 
+    size_t my_indices[K_VAL];
+    for (int k = 0; k < K_VAL; k++)
+        my_indices[k] = result.getIndex(k);
     validate_knn<K_VAL>(tree, num_points, qp, my_indices, validation, tid);
 }

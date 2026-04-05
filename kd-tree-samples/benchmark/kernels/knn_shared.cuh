@@ -3,7 +3,7 @@
 #include "../../common/kdtree/data.cuh"
 #include "validation.cuh"
 
-// Indices/distances live in shared memory, partitioned per-thread within each block.
+// Packed data lives in shared memory, partitioned per-thread within each block.
 template<int K_VAL>
 __global__ void knn_query_shared(
     const Point<3> *tree,
@@ -14,8 +14,7 @@ __global__ void knn_query_shared(
 {
     extern __shared__ char smem[];
 
-    size_t *block_indices   = reinterpret_cast<size_t *>(smem);
-    float  *block_distances = reinterpret_cast<float *>(block_indices + blockDim.x * K_VAL);
+    uint64_t *block_data = reinterpret_cast<uint64_t *>(smem);
 
     const int tid = threadIdx.x + blockIdx.x * blockDim.x;
     if (tid >= num_queries) return;
@@ -26,16 +25,13 @@ __global__ void knn_query_shared(
         query_positions[tid * 3 + 2]
     };
 
-    size_t *my_indices   = block_indices   + threadIdx.x * K_VAL;
-    float  *my_distances = block_distances + threadIdx.x * K_VAL;
-
-    for (int k = 0; k < K_VAL; k++) {
-        my_indices[k]   = 0;
-        my_distances[k] = INFTY;
-    }
-
-    HeapQueryResult<K_VAL> result{my_indices, my_distances};
+    uint64_t *my_data = block_data + threadIdx.x * K_VAL;
+    HeapQueryResult<K_VAL> result{};
+    result.initialize(my_data);
     knn<K_VAL, Point<3>, HeapQueryResult<K_VAL>>(qp, tree, num_points, &result);
 
+    size_t my_indices[K_VAL];
+    for (int k = 0; k < K_VAL; k++)
+        my_indices[k] = result.getIndex(k);
     validate_knn<K_VAL>(tree, num_points, qp, my_indices, validation, tid);
 }
