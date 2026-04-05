@@ -27,27 +27,30 @@ inline __device__ void updateScatteredRay(Ray &ray, PhotonMapperPRD &prd) {
 }
 
 inline __device__ void shootPhoton(const PhotonMapperRGD &self, Ray &ray, PhotonMapperPRD &prd) {
-  // Normal mode: only save photons from purely diffuse paths.
+  bool skipNextSave = true;
 
   for (int i = 0; i < self.maxDepth; i++) {
     owl::traceRay(self.world, ray, prd);
-
-    if (prd.event == SCATTER_SPECULAR || prd.event == SCATTER_REFRACT) {
-      break;
-    }
 
     if (prd.event == MISS) {
       break;
     }
 
+    if (prd.event == SCATTER_SPECULAR || prd.event == SCATTER_REFRACT) {
+      skipNextSave = true;
+      updateScatteredRay(ray, prd);
+      continue;
+    }
+
     if (prd.event == SCATTER_DIFFUSE) {
-      if (i > 0) savePhoton(self, prd);
+      if (!skipNextSave) savePhoton(self, prd);
+      skipNextSave = false;
       updateScatteredRay(ray, prd);
       continue;
     }
 
     if (prd.event == ABSORBED) {
-      if (i > 0) savePhoton(self, prd);
+      if (!skipNextSave) savePhoton(self, prd);
       break;
     }
   }
