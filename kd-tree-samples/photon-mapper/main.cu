@@ -199,7 +199,7 @@ int main(int ac, char **av)
   auto normal_photons_filename = "normal_photons.txt";
   auto caustic_photons_filename = "caustic_photons.txt";
   program.castedDiffusePhotons = 10'000;
-  program.castedCausticsPhotons = 15'000'000;
+  program.castedCausticsPhotons = 20'000'000;
   program.maxDepth = 10;
 
   LOG_OK("Loaded world.")
