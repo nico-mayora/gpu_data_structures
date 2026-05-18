@@ -100,6 +100,7 @@ Viewer::Viewer(const World *world) {
         { "camera.dir_du", OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.dir_du)},
         { "scene_light", OWL_BUFPTR, OWL_OFFSETOF(RayGenData,scene_light)},
         { "heapPhotonAddr", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,heapPhotonAddr)},
+        { "heapCausticAddr", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,heapCausticAddr)},
         { /* sentinel to mark end of list */ },
     };
 
@@ -126,6 +127,7 @@ Viewer::Viewer(const World *world) {
     owlRayGenSet1i(rayGen, "depth", world->cam->image.depth);
     owlRayGenSet2i(rayGen, "resolution", reinterpret_cast<const owl2i&>(world->cam->image.resolution));
     owlRayGenSetPointer(rayGen, "heapPhotonAddr", world->heapPhotonAddr);
+    owlRayGenSetPointer(rayGen, "heapCausticAddr", world->heapCausticAddr);
     setWindowSize(world->cam->image.resolution);
 
     owlBuildPrograms(context);

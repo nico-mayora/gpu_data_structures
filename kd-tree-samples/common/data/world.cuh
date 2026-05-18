@@ -243,6 +243,7 @@ struct World {
     int num_caustic;
 
     uint64_t *heapPhotonAddr;
+    uint64_t *heapCausticAddr;
 
     Camera *cam;
 };

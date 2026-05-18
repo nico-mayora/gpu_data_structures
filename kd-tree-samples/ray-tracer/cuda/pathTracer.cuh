@@ -3,6 +3,9 @@
 #include "owl/include/owl/common/math/random.h"
 #include "../../common/data/world.cuh"
 
+constexpr int K_GLOBAL_PHOTONS = 32;
+constexpr int K_CAUSTIC_PHOTONS = 128;
+
 enum RayTypes {
     PRIMARY,
     SHADOW,
@@ -27,6 +30,7 @@ struct RayGenData {
     int num_caustic;
 
     uint64_t *heapPhotonAddr;
+    uint64_t *heapCausticAddr;
 
     struct {
         owl::vec3f pos;

@@ -193,13 +193,13 @@ int main(int ac, char **av)
 
   LOG("Loading Config file...")
 
-  const auto loader = new Mitsuba3Loader("water-caustic");
+  const auto loader = new Mitsuba3Loader("cornell-box");
   program.world = loader->load();
 
   auto normal_photons_filename = "normal_photons.txt";
   auto caustic_photons_filename = "caustic_photons.txt";
-  program.castedDiffusePhotons = 10'000;
-  program.castedCausticsPhotons = 15'000'000;
+  program.castedDiffusePhotons = 10'000'000;
+  program.castedCausticsPhotons = 15'000;
   program.maxDepth = 10;
 
   LOG_OK("Loaded world.")
