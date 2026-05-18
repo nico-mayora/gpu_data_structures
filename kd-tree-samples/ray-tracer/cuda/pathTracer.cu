@@ -32,7 +32,7 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
     result.initialize(heap);
     // Traverse the coords-only array (12 bytes/node) — full photons (48 bytes)
     // are only loaded for the K survivors below.
-    knn<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, &result);
+    get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, 0.01,&result);
 
     const float radiusSqr = result.getQueryRadiusSqr();
     const float inv_radius = 1.f / sqrtf(radiusSqr);
@@ -120,7 +120,8 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
         const owl::vec3f caustic_term = gather_photons<K_CAUSTIC_PHOTONS>(
             prd.hitPoint, self.caustic_map, self.caustic_coords, self.num_caustic, prd);
 
-        colour_acum += diffuse_contrib * prd.hpMaterial->albedo + caustic_term;
+        const float inv_N = 1.f / float(self.num_diffuse_scattered);
+        colour_acum += diffuse_contrib * inv_N * prd.hpMaterial->albedo + caustic_term;
         break;
     }
 

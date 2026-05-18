@@ -182,13 +182,7 @@ owl::vec3f calculate_photon_contrib(
     p_term = ratio;
 #endif
 
-    const float cone_weight = max(0.f, 1.0f - (p_term * inv_k)); 
-
-    // Multiply by 4: combines two missing factors —
-    //   ×4π for total emitted power of an isotropic point light (the photon-mapper
-    //         saves photon.color = intensity/N, but each photon should carry
-    //         total_power/N = 4π·intensity/N).
-    //   ÷π   for the Lambertian BRDF (albedo/π, not albedo).
+    const float cone_weight = max(0.f, 1.0f - (p_term * inv_k));
     return into_vec3f(photon.colour) * prd.hpMaterial->albedo * (4.f * cosTheta * cone_weight * inv_normalization);
 }
 
@@ -201,7 +195,7 @@ float hable(const float x) {
 
 inline __device__
 owl::vec3f filter_colour(owl::vec3f colour) {
-    constexpr float exposure = 0.5f;
+    constexpr float exposure = 0.7f;
     constexpr float W = 11.2f;
     constexpr float inv_white = 1.0f / hable(W);
 
