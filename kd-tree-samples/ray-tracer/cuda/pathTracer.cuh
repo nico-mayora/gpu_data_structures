@@ -4,7 +4,7 @@
 #include "../../common/data/world.cuh"
 
 constexpr int K_GLOBAL_PHOTONS = 32;
-constexpr int K_CAUSTIC_PHOTONS = 128;
+constexpr int K_CAUSTIC_PHOTONS = 64;
 
 enum RayTypes {
     PRIMARY,
@@ -25,12 +25,11 @@ struct RayGenData {
     int num_diffuse_scattered;
 
     Photon *photon_map;
+    PhotonCoord *photon_coords;
     int num_photons;
     Photon *caustic_map;
+    PhotonCoord *caustic_coords;
     int num_caustic;
-
-    uint64_t *heapPhotonAddr;
-    uint64_t *heapCausticAddr;
 
     struct {
         owl::vec3f pos;
@@ -45,9 +44,8 @@ struct RayGenData {
 struct PerRayData {
     Random random;
     RayEvent event;
-    owl::vec3f colour;
 
-    Material hpMaterial;
+    const Material *hpMaterial;
     owl::vec3f hitPoint;
     owl::vec3f normalAtHp;
 };

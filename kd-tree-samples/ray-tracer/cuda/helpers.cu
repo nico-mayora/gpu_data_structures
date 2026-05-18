@@ -8,13 +8,30 @@ float norm_squared(const owl::vec3f &v) {
 }
 
 inline __device__
-owl::vec3f random_in_unit_sphere(Random rand) {
-    owl::vec3f v;
-    do {
-        v = {rand()*2-1, rand()*2-1, rand()*2-1};
-    } while (norm_squared(v) > 1.f);
+owl::vec3f cosine_weighted_hemisphere(const owl::vec3f &normal, Random &rand) {
+    const float r1 = rand();
+    const float r2 = rand();
+    const float sqrt_r1 = sqrtf(r1);
+    const float phi = 2.f * float(M_PI) * r2;
 
-    return v;
+    // Local-space hemisphere direction (z-up), distribution proportional to cos(θ).
+    const float lx = sqrt_r1 * cosf(phi);
+    const float ly = sqrt_r1 * sinf(phi);
+    const float lz = sqrtf(1.f - r1);
+
+    // Frisvad's branchless orthonormal basis around `normal`.
+    owl::vec3f b1, b2;
+    if (normal.z < -0.9999999f) {
+        b1 = owl::vec3f(0.f, -1.f, 0.f);
+        b2 = owl::vec3f(-1.f, 0.f, 0.f);
+    } else {
+        const float a = 1.f / (1.f + normal.z);
+        const float b = -normal.x * normal.y * a;
+        b1 = owl::vec3f(1.f - normal.x * normal.x * a, b, -normal.x);
+        b2 = owl::vec3f(b, 1.f - normal.y * normal.y * a, -normal.y);
+    }
+
+    return b1 * lx + b2 * ly + normal * lz;
 }
 
 inline __device__
@@ -48,7 +65,7 @@ owl::vec3f calculateDirectIllumination(const RayGenData &self, const PerRayData 
         u0, u1
     );
 
-    owl::vec3f diffuse_brdf = prd.hpMaterial.albedo * PI_INV;
+    owl::vec3f diffuse_brdf = prd.hpMaterial->albedo * PI_INV;
 
     return light_visibility
       * light_dot_norm
@@ -112,9 +129,7 @@ owl::vec3f reflect_or_refract_ray(const Material& material,
                                   const owl::vec3f& normal,
                                   Random& rand)
 {
-    float coef = 0.f;
     if (material.matType == CONDUCTOR) {
-        coef = material.specular;
         return reflect(ray_dir, normal);
     }
 
@@ -123,13 +138,11 @@ owl::vec3f reflect_or_refract_ray(const Material& material,
         float fresnel = calculate_fresnel(material.ior, cos_theta);
 
         if (rand() < fresnel) {
-            coef = fresnel;
             // Use correct normal for reflection
             owl::vec3f outward_normal = (cos_theta > 0.0f) ? normal : -normal;
             return reflect(ray_dir, outward_normal);
         }
 
-        coef = 1.0f - fresnel;
         return calculate_refracted(material, ray_dir, normal, rand);
     }
     return 0.;
@@ -171,7 +184,12 @@ owl::vec3f calculate_photon_contrib(
 
     const float cone_weight = max(0.f, 1.0f - (p_term * inv_k)); 
 
-    return into_vec3f(photon.colour) * prd.hpMaterial.albedo * (cosTheta * cone_weight * inv_normalization);
+    // Multiply by 4: combines two missing factors —
+    //   ×4π for total emitted power of an isotropic point light (the photon-mapper
+    //         saves photon.color = intensity/N, but each photon should carry
+    //         total_power/N = 4π·intensity/N).
+    //   ÷π   for the Lambertian BRDF (albedo/π, not albedo).
+    return into_vec3f(photon.colour) * prd.hpMaterial->albedo * (4.f * cosTheta * cone_weight * inv_normalization);
 }
 
 constexpr __device__

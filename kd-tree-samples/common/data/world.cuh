@@ -233,17 +233,36 @@ struct Photon {
     static constexpr int dimension = DIM;
 };
 
+// Parallel "coords-only" view of a photon for kd-tree traversal.
+// The traversal only needs xyz (12 bytes) per node; reading the full 48-byte
+// Photon wastes ~75% of memory bandwidth on the hot path.
+struct PhotonCoord {
+    static constexpr int DIM = 3;
+    float coords[DIM];
+
+    __device__ __inline__ float dist2(const float *x) const {
+        float acum = 0.f;
+#pragma unroll
+        for (int i = 0; i < DIM; ++i) {
+            const float diff = coords[i] - x[i];
+            acum += diff * diff;
+        }
+        return acum;
+    }
+
+    static constexpr int dimension = DIM;
+};
+
 struct World {
     std::vector<Model*> models;
     PointLight *scene_light;
 
     Photon *photon_map;
+    PhotonCoord *photon_coords;
     int num_photons;
     Photon *caustic_map;
+    PhotonCoord *caustic_coords;
     int num_caustic;
-
-    uint64_t *heapPhotonAddr;
-    uint64_t *heapCausticAddr;
 
     Camera *cam;
 };

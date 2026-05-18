@@ -5,7 +5,20 @@
 #include <filesystem>
 #include <stdexcept>
 
+#include <thrust/execution_policy.h>
+#include <thrust/transform.h>
+
 #include "../../kdtree/builder.cuh"
+
+struct ExtractCoords {
+    __device__ PhotonCoord operator()(const Photon &p) const {
+        PhotonCoord c;
+        c.coords[0] = p.coords[0];
+        c.coords[1] = p.coords[1];
+        c.coords[2] = p.coords[2];
+        return c;
+    }
+};
 
 bool PhotonFileManager::savePhotonsToFile(const EmittedPhoton* photons, int count,
                                           const std::string& filename,
@@ -133,6 +146,7 @@ std::vector<Photon> PhotonFileManager::loadText(const std::string& filename) {
 
 bool PhotonFileManager::loadKdTreeFromFile(const std::string &filename,
                                            Photon *&photon_ptr,
+                                           PhotonCoord *&coord_ptr,
                                            int &photon_count,
                                            PhotonFileFormat format) {
     try {
@@ -143,6 +157,12 @@ bool PhotonFileManager::loadKdTreeFromFile(const std::string &filename,
         cudaMemcpy(photon_ptr, loadedPhotons.data(), sizeof(Photon) * photon_count, cudaMemcpyHostToDevice);
 
         build_kd_tree<Photon>(photon_ptr, photon_count);
+
+        // Extract the coords-only parallel array. The kd-tree traversal hits these
+        // per node — 12 bytes vs 48 bytes is ~4× less bandwidth on the hot path.
+        cudaMalloc(reinterpret_cast<void**>(&coord_ptr), sizeof(PhotonCoord) * photon_count);
+        thrust::transform(thrust::device, photon_ptr, photon_ptr + photon_count,
+                          coord_ptr, ExtractCoords());
     } catch (const std::exception& e) {
         std::cerr << "Error loading KD-Tree from file: " << e.what() << std::endl;
         return false;

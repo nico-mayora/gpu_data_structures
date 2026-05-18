@@ -20,7 +20,7 @@ public:
     
     static std::vector<Photon> loadPhotonsFromFile(const std::string& filename, 
                                                    PhotonFileFormat format = PhotonFileFormat::TEXT);
-    static bool loadKdTreeFromFile(const std::string&, Photon*&, int&, PhotonFileFormat);
+    static bool loadKdTreeFromFile(const std::string&, Photon*&, PhotonCoord*&, int&, PhotonFileFormat);
 private:
     static bool saveBinary(const std::vector<EmittedPhoton>& photons, const std::string& filename);
     static bool saveText(const std::vector<EmittedPhoton>& photons, const std::string& filename);
