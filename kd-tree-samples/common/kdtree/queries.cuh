@@ -3,8 +3,9 @@
 
 template<int K>
 struct BaseQueryResult {
-    // First 32 bits => photon idx
-    // Last 32 bits => photon distance squared
+    // First 32 bits => photon distance squared
+    // Last 32 bits => photon idx
+    // Distance in the high bits so that uint64_t comparison preserves distance ordering.
     uint64_t *photonData;
     size_t foundPoints = 0; /* <= K */
 
@@ -18,8 +19,7 @@ struct BaseQueryResult {
     }
 
     __device__ float getDistance(const size_t pos) const {
-        const uint32_t lo = static_cast<uint32_t>(photonData[pos]);
-        return __uint_as_float(lo);
+        return __uint_as_float(static_cast<uint32_t>(photonData[pos] >> 32));
     }
 
     __device__ float getQueryRadiusSqr() const {
@@ -27,7 +27,7 @@ struct BaseQueryResult {
     }
 
     __device__ size_t getIndex(const size_t pos) const {
-        return photonData[pos] >> 32;
+        return static_cast<uint32_t>(photonData[pos]);
     }
 
     __device__ bool isFull() const {
@@ -35,7 +35,7 @@ struct BaseQueryResult {
     }
 
     static __device__ uint64_t packData(const uint32_t idx, const float dist) {
-        return (static_cast<uint64_t>(idx) << 32) | __float_as_uint(dist);
+        return (static_cast<uint64_t>(__float_as_uint(dist)) << 32) | idx;
     }
 };
 
@@ -47,8 +47,7 @@ struct FixedQueryResult : BaseQueryResult<K> {
         uint64_t packed_data = this->packData(node_id, dist);
 #pragma unroll
         for (int i = 0; i < K; ++i) {
-            const float current_dist = __uint_as_float(static_cast<uint32_t>(packed_data));
-            if (current_dist < this->getDistance(i)) {
+            if (packed_data < this->photonData[i]) {
                 const uint64_t tmp_data = this->photonData[i];
                 this->photonData[i] = packed_data;
                 packed_data = tmp_data;
@@ -65,41 +64,44 @@ struct FixedQueryResult : BaseQueryResult<K> {
 template<int K>
 struct HeapQueryResult : BaseQueryResult<K>{
     __device__ void percolateUp(size_t idx) const {
+        const uint64_t movingData = this->photonData[idx];
+
         while (idx > 0) {
             const size_t parent = (idx - 1) / 2;
-            if (this->getDistance(idx) <= this->getDistance(parent)) break; // Node at correct position.
+            if (movingData <= this->photonData[parent]) break; // Node at correct position.
 
-            // Swap idx with parent
-            const uint64_t tmpData = this->photonData[idx];
+            // Shift parent down into the hole
             this->photonData[idx] = this->photonData[parent];
-            this->photonData[parent] = tmpData;
-
             idx = parent;
         }
+        this->photonData[idx] = movingData;
     }
 
     __device__ void percolateDown(size_t idx) const {
+        const uint64_t movingData = this->photonData[idx];
+
         for (;;) {
             size_t largest = idx;
+            uint64_t largestData = movingData;
             const size_t left = 2 * idx + 1;
             const size_t right = 2 * idx + 2;
 
-            if (left < this->foundPoints && this->getDistance(left) > this->getDistance(largest)) {
+            if (left < this->foundPoints && this->photonData[left] > largestData) {
                 largest = left;
+                largestData = this->photonData[left];
             }
-            if (right < this->foundPoints && this->getDistance(right) > this->getDistance(largest)) {
+            if (right < this->foundPoints && this->photonData[right] > largestData) {
                 largest = right;
             }
 
             if (largest == idx) break;
 
-            // Swap idx with the largest child
-            const uint64_t tmpData = this->photonData[idx];
+            // Shift the largest child up into the hole
             this->photonData[idx] = this->photonData[largest];
-            this->photonData[largest] = tmpData;
 
             idx = largest;
         }
+        this->photonData[idx] = movingData;
     }
 
     // Returns max distance for points to be considered.

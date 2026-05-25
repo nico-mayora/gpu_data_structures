@@ -120,8 +120,9 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
         const owl::vec3f caustic_term = gather_photons<K_CAUSTIC_PHOTONS>(
             prd.hitPoint, self.caustic_map, self.caustic_coords, self.num_caustic, prd);
 
-        const float inv_N = 1.f / float(self.num_diffuse_scattered);
-        colour_acum += diffuse_contrib * inv_N * prd.hpMaterial->albedo + caustic_term;
+        // Having this would be physically correct, but looks worse:
+        // const float inv_N = 1.f / float(self.num_diffuse_scattered);
+        colour_acum += diffuse_contrib /* * inv_N*/ * prd.hpMaterial->albedo + caustic_term;
         break;
     }
 

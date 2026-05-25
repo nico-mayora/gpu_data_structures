@@ -4,7 +4,7 @@
 #include "../../common/data/world.cuh"
 
 constexpr int K_GLOBAL_PHOTONS = 24;
-constexpr int K_CAUSTIC_PHOTONS = 48;
+constexpr int K_CAUSTIC_PHOTONS = 128;
 
 enum RayTypes {
     PRIMARY,
