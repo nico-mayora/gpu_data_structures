@@ -1,4 +1,5 @@
 #include "mitsuba3.cuh"
+#include "obj.cuh"
 #include "../world.cuh"
 
 Mitsuba3Loader::Mitsuba3Loader(const std::string& scene_name) {
@@ -16,92 +17,169 @@ Mitsuba3Loader::Mitsuba3Loader(const std::string& scene_name) {
 
 World *Mitsuba3Loader::load() {
     const auto root = sceneDesc.RootElement();
-    for (auto node = root->FirstChild();
-         node;
-         node = node->NextSibling()) {
-        std::string name = node->Value();
+    for (auto elem = root->FirstChildElement();
+         elem;
+         elem = elem->NextSiblingElement()) {
+        const std::string name = elem->Name();
 
         if (name == "default") {
-            memoizeDefaultValue(node->ToElement());
-            continue;
+            memoizeDefaultValue(elem);
+        } else if (name == "integrator") {
+            loadIntegrator(elem);
+        } else if (name == "sensor") {
+            loadSensor(elem);
+        } else if (name == "bsdf") {
+            loadMaterial(elem);
+        } else if (name == "shape") {
+            loadShape(elem);
+        } else if (name == "emitter") {
+            loadLight(elem);
+        } else {
+            std::cerr << "WARNING: Skipping unknown scene element <" << name << ">" << std::endl;
         }
-        if (name == "integrator") {
-            loadIntegrator(node->ToElement());
-            continue;
-        }
-        if (name == "sensor") {
-            loadSensor(node->ToElement());
-            continue;
-        }
-        if (name == "bsdf") {
-            loadMaterial(node->ToElement());
-            continue;
-        }
-        if (name == "shape") {
-            loadShape(node->ToElement());
-            continue;
-        }
-        if (name == "emitter") {
-            loadLight(node->ToElement());
-            continue;
-        }
+    }
 
-        std::cerr << "ERROR: Unknown element: " << name << std::endl;
-        std::abort();
+    // Renderer-only properties piggyback on Mitsuba's <default> block (see header).
+    if (const auto it = defaultValues.find("diffuse_scattered"); it != defaultValues.end()) {
+        world->cam->image.num_diffuse_scattered = resolveValue<int>(it->second);
+    } else {
+        std::cerr << "WARNING: scene missing <default name=\"diffuse_scattered\">; defaulting to 8" << std::endl;
+        world->cam->image.num_diffuse_scattered = 8;
     }
 
     return world;
 }
 
 void Mitsuba3Loader::loadLight(const tinyxml2::XMLElement *light) {
+    const std::string emitter_type = light->Attribute("type") ? light->Attribute("type") : "";
+    if (emitter_type != "point") {
+        std::cerr << "WARNING: top-level emitter type '" << emitter_type
+                  << "' not supported yet; skipping" << std::endl;
+        return;
+    }
+
     world->scene_light = new PointLight;
 
-    const auto intensity = light->FirstChildElement("rgb");
-    assert(std::string(intensity->Attribute("name")) == "intensity");
-    world->scene_light->power = parseVec3f(intensity->Attribute("value"));
+    const tinyxml2::XMLElement *intensity_elem = nullptr;
+    const tinyxml2::XMLElement *position_elem = nullptr;
+    for (auto child = light->FirstChildElement(); child; child = child->NextSiblingElement()) {
+        const auto name_attr = child->Attribute("name");
+        if (!name_attr) continue;
+        const std::string nm = name_attr;
+        if (nm == "intensity") intensity_elem = child;
+        else if (nm == "position") position_elem = child;
+    }
 
-    const auto position = intensity->NextSiblingElement("point");
-    assert(std::string(position->Attribute("name")) == "position");
-    const auto pos_x = resolveValue<float>(position->Attribute("x"));
-    const auto pos_y = resolveValue<float>(position->Attribute("y"));
-    const auto pos_z = resolveValue<float>(position->Attribute("z"));
-    world->scene_light->position = owl::vec3f(pos_x, pos_y, pos_z);
+    if (!intensity_elem || !position_elem) {
+        std::cerr << "ERROR: point emitter missing intensity or position" << std::endl;
+        std::abort();
+    }
+
+    world->scene_light->power = parseVec3f(intensity_elem->Attribute("value"));
+    world->scene_light->position = owl::vec3f(
+        resolveValue<float>(position_elem->Attribute("x")),
+        resolveValue<float>(position_elem->Attribute("y")),
+        resolveValue<float>(position_elem->Attribute("z"))
+    );
+}
+
+// Look up an `<{element_name} name="{prop_name}" value="..."/>` child by name attribute.
+static const tinyxml2::XMLElement *find_named_child(
+    const tinyxml2::XMLElement *parent, const char *element_name, const std::string &prop_name) {
+    for (auto e = parent->FirstChildElement(element_name); e; e = e->NextSiblingElement(element_name)) {
+        if (e->Attribute("name") && prop_name == e->Attribute("name")) return e;
+    }
+    return nullptr;
+}
+
+// Resolve the material for one submesh of an OBJ. Priority:
+//   1. XML <bsdf> whose id matches the submesh's usemtl name
+//   2. .mtl-derived material attached to the submesh
+//   3. The shape's <ref id="..."> fallback, if any
+//   4. Default Lambertian gray with a warning
+Material *Mitsuba3Loader::resolveSubmeshMaterial(
+    const ObjSubmesh &sub, const tinyxml2::XMLElement *shape) {
+    if (!sub.usemtl_name.empty()) {
+        if (const auto it = materials.find(sub.usemtl_name); it != materials.end()) {
+            return it->second;
+        }
+    }
+    if (sub.mtl_material) return sub.mtl_material;
+    if (const auto ref = shape->FirstChildElement("ref")) {
+        if (const char *id = ref->Attribute("id")) {
+            if (const auto it = materials.find(id); it != materials.end()) {
+                return it->second;
+            }
+        }
+    }
+    std::cerr << "WARNING: no material resolved for submesh '" << sub.usemtl_name
+              << "'; using default Lambertian" << std::endl;
+    auto *fallback = new Material;
+    fallback->matType = LAMBERTIAN;
+    fallback->albedo = owl::vec3f(0.8f);
+    fallback->diffuse = 1.f;
+    fallback->specular = 0.f;
+    fallback->ior = 0.f;
+    return fallback;
 }
 
 void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
     const std::string type = shape->Attribute("type");
-    Mesh *mesh;
-    if (type == "rectangle") {
-        mesh = Mesh::makeBaseRectangle();
-    } else if (type == "cube") {
-        mesh = Mesh::makeBaseCube();
-    } else if (type == "obj") {
-        std::string obj_file_path = sceneDir + "\\";
-        if (const auto file_name_elem = shape->FirstChildElement("string");
-            std::string(file_name_elem->Attribute("name")) == "filename") {
-            obj_file_path += std::string(file_name_elem->Attribute("value"));
-        }
+    const auto tf = load_transform(shape->FirstChildElement("transform"));
 
-        bool faceted = false;
-        if (const auto faceted_elem = shape->FirstChildElement("boolean");
-            faceted_elem && std::string(faceted_elem->Attribute("name")) == "face_normals") {
-            faceted = std::string(faceted_elem->Attribute("value")) == "true";
+    if (const auto emitter = shape->FirstChildElement("emitter")) {
+        const std::string emitter_type = emitter->Attribute("type") ? emitter->Attribute("type") : "";
+        if (emitter_type == "area") {
+            std::cerr << "WARNING: area emitter on shape '"
+                      << (shape->Attribute("id") ? shape->Attribute("id") : "<unnamed>")
+                      << "' skipped; area lights land in Phase 2 (shape kept, light dropped)" << std::endl;
+        } else {
+            std::cerr << "WARNING: unsupported emitter type '" << emitter_type
+                      << "' inside shape; skipping" << std::endl;
         }
-        mesh = Mesh::loadObj(obj_file_path, faceted);
-    } else {
+    }
+
+    if (type == "rectangle" || type == "cube") {
+        Mesh *mesh = (type == "rectangle") ? Mesh::makeBaseRectangle() : Mesh::makeBaseCube();
+        mesh->applyTransform(tf);
+        const std::string mat_id = shape->FirstChildElement("ref")->Attribute("id");
+        auto *model = new Model{ mesh, materials.at(mat_id) };
+        world->models.emplace_back(model);
+        return;
+    }
+
+    if (type != "obj") {
         std::cerr << "ERROR: Unknown shape type: " << type << std::endl;
         std::abort();
     }
 
-    const auto tf = load_transform(shape->FirstChildElement("transform"));
-    mesh->applyTransform(tf);
+    std::string obj_file_path = sceneDir + "\\";
+    if (const auto file_name_elem = find_named_child(shape, "string", "filename")) {
+        obj_file_path += file_name_elem->Attribute("value");
+    }
 
-    const std::string mat_id = shape->FirstChildElement("ref")->Attribute("id");
-    auto model = new Model;
-    model->mesh = mesh;
-    model->material = materials.at(mat_id);
+    bool faceted = false;
+    if (const auto faceted_elem = find_named_child(shape, "boolean", "face_normals")) {
+        faceted = std::string(faceted_elem->Attribute("value")) == "true";
+    }
 
-    world->models.emplace_back(model);
+    // Per-shape override beats scene-level default. The default lives in <default>
+    // (not a per-shape <boolean>) because Mitsuba 3.8's `obj` plugin rejects
+    // unrecognized boolean properties — defaults are inert and dual-load-safe.
+    bool load_material_files = false;
+    if (const auto it = defaultValues.find("load_material_files"); it != defaultValues.end()) {
+        load_material_files = it->second == "true";
+    }
+    if (const auto lmf_elem = find_named_child(shape, "boolean", "load_material_files")) {
+        load_material_files = std::string(lmf_elem->Attribute("value")) == "true";
+    }
+
+    auto submeshes = load_obj_submeshes(obj_file_path, faceted, load_material_files);
+    for (auto &sub : submeshes) {
+        sub.mesh->applyTransform(tf);
+        Material *material = resolveSubmeshMaterial(sub, shape);
+        world->models.emplace_back(new Model{ sub.mesh, material });
+    }
 }
 
 float Mitsuba3Loader::getDiffuseCoeff(const Material* mat, const tinyxml2::XMLElement *inner_bsdf=nullptr) {
@@ -151,32 +229,68 @@ float Mitsuba3Loader::getTransmissionCoeff(const Material* mat, const tinyxml2::
     std::abort();
 }
 
+// Returns the effective leaf BSDF element to read material properties from.
+// Mitsuba's `twosided` is a modifier that wraps a real BSDF; everything else
+// (diffuse, dielectric, conductor, roughconductor) is itself a leaf.
+static const tinyxml2::XMLElement *unwrap_twosided(const tinyxml2::XMLElement *bsdf) {
+    if (const auto type = bsdf->Attribute("type"); type && std::string(type) == "twosided") {
+        return bsdf->FirstChildElement("bsdf");
+    }
+    return bsdf;
+}
+
 void Mitsuba3Loader::loadMaterial(const tinyxml2::XMLElement *bsdf) {
-    const auto inner_bsdf = bsdf->FirstChildElement("bsdf");
+    const auto inner = unwrap_twosided(bsdf);
     auto material = new Material;
 
     std::string name = bsdf->Attribute("id");
+    const std::string type = inner->Attribute("type");
 
-    if (const std::string type = inner_bsdf->Attribute("type"); type == "diffuse") {
+    if (type == "diffuse") {
         material->matType = LAMBERTIAN;
-        const auto reflectance = inner_bsdf->FirstChildElement("rgb");
+        const auto reflectance = inner->FirstChildElement("rgb");
         assert(std::string(reflectance->Attribute("name")) == "reflectance");
         material->albedo = parseVec3f(reflectance->Attribute("value"));
-        material->diffuse = getDiffuseCoeff(material, inner_bsdf);
-        material->specular = getSpecularCoeff(material, inner_bsdf);
-        material->ior = getTransmissionCoeff(material, inner_bsdf);
+        material->diffuse = getDiffuseCoeff(material, inner);
+        material->specular = getSpecularCoeff(material, inner);
+        material->ior = getTransmissionCoeff(material, inner);
     } else if (type == "dielectric") {
         material->matType = DIELECTRIC;
         material->albedo = 1.f;
-        material->diffuse = getDiffuseCoeff(material, inner_bsdf);
-        material->specular = getSpecularCoeff(material, inner_bsdf);
-        material->ior = getTransmissionCoeff(material, inner_bsdf);
+        material->diffuse = getDiffuseCoeff(material, inner);
+        material->specular = getSpecularCoeff(material, inner);
+        material->ior = getTransmissionCoeff(material, inner);
     } else if (type == "conductor") {
         material->matType = CONDUCTOR;
         material->albedo = 1.f;
-        material->diffuse = getDiffuseCoeff(material, inner_bsdf);
-        material->ior = getTransmissionCoeff(material, inner_bsdf);
-        material->specular = getSpecularCoeff(material, inner_bsdf);
+        material->diffuse = getDiffuseCoeff(material, inner);
+        material->ior = getTransmissionCoeff(material, inner);
+        material->specular = getSpecularCoeff(material, inner);
+    } else if (type == "roughconductor") {
+        // Collapse to smooth CONDUCTOR; alpha (roughness) is dropped until a microfacet pass exists.
+        material->matType = CONDUCTOR;
+        material->albedo = 1.f;
+        material->diffuse = 0.f;
+        material->ior = 0.f;
+        material->specular = 1.f;
+        const char *alpha_str = nullptr;
+        for (auto f = inner->FirstChildElement("float"); f; f = f->NextSiblingElement("float")) {
+            if (f->Attribute("name") && std::string(f->Attribute("name")) == "alpha") {
+                alpha_str = f->Attribute("value");
+                break;
+            }
+        }
+        std::cerr << "WARNING: roughconductor '" << name << "' collapsed to smooth CONDUCTOR; "
+                  << "dropped alpha=" << (alpha_str ? alpha_str : "(unset)")
+                  << " until microfacet pass lands" << std::endl;
+    } else {
+        std::cerr << "WARNING: BSDF '" << name << "' uses unsupported type '" << type
+                  << "'; using default Lambertian" << std::endl;
+        material->matType = LAMBERTIAN;
+        material->albedo = owl::vec3f(0.8f);
+        material->diffuse = 1.f;
+        material->specular = 0.f;
+        material->ior = 0.f;
     }
 
     materials.emplace(name, material);
@@ -203,13 +317,13 @@ void Mitsuba3Loader::loadSensor(const tinyxml2::XMLElement *sensor) {
         // Handle sampler and film
         std::string elem_name = elem->Name();
         if (elem_name == "sampler") {
-            const auto child = elem->FirstChildElement("integer");
-            assert(!strcmp(child->Attribute("name"), "sample_count"));
-            world->cam->image.pixel_samples = resolveValue<int>(child->Attribute("value"));
-
-            const auto sibling = child->NextSiblingElement("integer");
-            assert(!strcmp(sibling->Attribute("name"), "diffuse_scattered"));
-            world->cam->image.num_diffuse_scattered = resolveValue<int>(sibling->Attribute("value"));
+            for (auto child = elem->FirstChildElement("integer"); child;
+                 child = child->NextSiblingElement("integer")) {
+                if (child->Attribute("name") && !strcmp(child->Attribute("name"), "sample_count")) {
+                    world->cam->image.pixel_samples = resolveValue<int>(child->Attribute("value"));
+                }
+            }
+            // diffuse_scattered is non-Mitsuba; read from <extras> after the main parse instead.
             continue;
         }
 

@@ -1,0 +1,40 @@
+<scene version="3.0.0">
+	<default name="integrator" value="path" />
+	<default name="spp" value="4" />
+	<default name="resx" value="800" />
+	<default name="resy" value="600" />
+	<default name="max_depth" value="8" />
+	<!-- Renderer-only properties below (see common/data/loader/mitsuba3.cuh). -->
+	<default name="diffuse_scattered" value="4" />
+	<default name="load_material_files" value="true" />
+	<integrator type="$integrator">
+		<integer name="max_depth" value="$max_depth" />
+	</integrator>
+	<sensor type="perspective">
+		<float name="fov" value="60" />
+		<!-- Camera at (1400, 300, 0), looking down -X along the atrium. Cam +Z → world -X; cam +Y → world +Y. -->
+		<transform name="to_world">
+			<matrix value="0 0 -1 1400  0 1 0 300  1 0 0 0  0 0 0 1" />
+		</transform>
+		<sampler type="independent">
+			<integer name="sample_count" value="$spp" />
+		</sampler>
+		<film type="hdrfilm">
+			<integer name="width" value="$resx" />
+			<integer name="height" value="$resy" />
+			<string name="file_format" value="openexr" />
+			<string name="pixel_format" value="rgb" />
+			<rfilter type="tent" />
+		</film>
+	</sensor>
+	<shape type="obj">
+		<string name="filename" value="models/sponza.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1" />
+		</transform>
+	</shape>
+	<emitter type="point" id="SunSurrogate">
+		<rgb name="intensity" value="500000, 470000, 380000" />
+		<point name="position" x="0" y="1300" z="0" />
+	</emitter>
+</scene>

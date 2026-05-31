@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <chrono>
 #include "owl/owl.h"
 #include "./cuda/photonEmitter.cuh"
 #include "../common/data/loader/mitsuba3.cuh"
@@ -193,8 +194,13 @@ int main(int ac, char **av)
 
   LOG("Loading Config file...")
 
-  const auto loader = new Mitsuba3Loader("cornell-box");
+  const std::string scene_name = (ac > 1) ? av[1] : "sponza";
+  LOG("Scene: " << scene_name)
+
+  const auto t_load_start = std::chrono::steady_clock::now();
+  const auto loader = new Mitsuba3Loader(scene_name);
   program.world = loader->load();
+  const auto t_load_end = std::chrono::steady_clock::now();
 
   auto normal_photons_filename = "normal_photons.txt";
   auto caustic_photons_filename = "caustic_photons.txt";
@@ -202,9 +208,16 @@ int main(int ac, char **av)
   program.castedCausticsPhotons = 10'000'000;
   program.maxDepth = 10;
 
-  LOG_OK("Loaded world.")
+  LOG_OK("Loaded world in "
+    << std::chrono::duration_cast<std::chrono::milliseconds>(t_load_end - t_load_start).count()
+    << " ms (" << program.world->models.size() << " models)")
 
+  const auto t_bvh_start = std::chrono::steady_clock::now();
   program.geometryData = loadGeometry(program.owlContext, program.world);
+  const auto t_bvh_end = std::chrono::steady_clock::now();
+  LOG("BVH built in "
+    << std::chrono::duration_cast<std::chrono::milliseconds>(t_bvh_end - t_bvh_start).count()
+    << " ms")
 
   owlGeomTypeSetClosestHit(program.geometryData.trianglesGeomType, 0, program.owlModule,"triangleMeshClosestHit");
   owlMissProgCreate(program.owlContext, program.owlModule, "miss", 0, nullptr, -1);

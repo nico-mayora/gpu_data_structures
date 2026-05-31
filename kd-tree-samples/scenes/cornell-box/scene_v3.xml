@@ -4,6 +4,8 @@
 	<default name="resx" value="800" />
 	<default name="resy" value="800" />
 	<default name="max_depth" value="12" />
+	<!-- Renderer-only properties below (see common/data/loader/mitsuba3.cuh). -->
+	<default name="diffuse_scattered" value="8" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>
@@ -14,12 +16,11 @@
 		</transform>
 		<sampler type="independent">
 			<integer name="sample_count" value="$spp" />
-			<integer name="diffuse_scattered" value="8" />
 		</sampler>
 		<film type="hdrfilm">
 			<integer name="width" value="$resx" />
 			<integer name="height" value="$resy" />
-			<string name="file_format" value="png" />
+			<string name="file_format" value="openexr" />
 			<string name="pixel_format" value="rgb" />
 			<rfilter type="tent" />
 		</film>
@@ -49,20 +50,13 @@
 			<rgb name="reflectance" value="0.725, 0.71, 0.68" />
 		</bsdf>
 	</bsdf>
-	<bsdf type="twosided" id="ShortBoxBSDF">
-		<bsdf type="dielectric">
-			<float name="int_ior" value="1.504"/>
-		</bsdf>
-	</bsdf>
 	<bsdf type="twosided" id="TallBoxBSDF">
 		<bsdf type="diffuse">
 			<rgb name="reflectance" value="0.725, 0.71, 0.68" />
 		</bsdf>
 	</bsdf>
 	<bsdf type="dielectric" id="GlassEggBSDF">
-		<bsdf type="dielectric">
-			<float name="int_ior" value="1.5"/>
-		</bsdf>
+		<float name="int_ior" value="1.5"/>
 	</bsdf>
 	<shape type="rectangle" id="Floor">
 		<transform name="to_world">

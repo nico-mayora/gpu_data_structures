@@ -8,7 +8,7 @@ int main()
 {
     std::cout << "Start!\n";
     // TODO: pass scene name as argv
-    const auto loader = new Mitsuba3Loader("cornell-box");
+    const auto loader = new Mitsuba3Loader("sponza");
     const auto world = loader->load();
     PhotonFileManager::loadKdTreeFromFile("normal_photons.txt",
                                           world->photon_map,

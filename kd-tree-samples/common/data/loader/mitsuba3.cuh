@@ -3,9 +3,22 @@
 #include <unordered_map>
 
 #include "tinyxml2.h"
+#include "obj.cuh"
 #include "../pt-math.cuh"
 #include "../world.cuh"
 
+/*
+ * Scene XML convention: non-Mitsuba renderer parameters are carried as
+ * <default name="X" value="Y" /> entries at the top of the scene. Mitsuba 3
+ * accepts inert/unused defaults without error (they act as template params),
+ * so the same file parses in both `mitsuba` and our loader.
+ *
+ * Loader-side, these values land in the `defaultValues` map alongside the
+ * actual template params and are looked up with resolveValue<T> as needed.
+ *
+ * Tried first: a sibling <extras> block. Mitsuba 3.8 throws on unknown
+ * top-level elements, so that approach does not survive dual-loading.
+ */
 class Mitsuba3Loader {
     const std::string scenesFolder = R"(..\scenes)";
     std::string sceneDir;
@@ -24,6 +37,7 @@ class Mitsuba3Loader {
     void loadSensor(const tinyxml2::XMLElement *sensor);
     void loadMaterial(const tinyxml2::XMLElement *bsdf);
     void loadShape(const tinyxml2::XMLElement *shape);
+    Material *resolveSubmeshMaterial(const ObjSubmesh &sub, const tinyxml2::XMLElement *shape);
 
     float getDiffuseCoeff(const Material* mat, const tinyxml2::XMLElement *bsdf);
     float getSpecularCoeff(const Material* mat, const tinyxml2::XMLElement *bsdf);

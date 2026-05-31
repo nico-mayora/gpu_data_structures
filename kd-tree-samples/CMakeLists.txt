@@ -23,6 +23,7 @@ embed_ptx(
 set(pathTracer_sources
         ray-tracer/main.cu
         common/data/loader/mitsuba3.cu
+        common/data/loader/obj.cu
         common/data/pt-math.cu
         ray-tracer/viewer.cu
         common/data/photon/photon-file-manager.cu
@@ -44,6 +45,7 @@ embed_ptx(
 set(photonEmitter_sources
         photon-mapper/main.cu
         common/data/loader/mitsuba3.cu
+        common/data/loader/obj.cu
         common/data/pt-math.cu
         common/data/photon/photon-file-manager.cu
 )
