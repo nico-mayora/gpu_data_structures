@@ -72,7 +72,23 @@ add_subdirectory(${owl_dir} EXCLUDE_FROM_ALL)
 set(tinyxml2_dir ${PROJECT_SOURCE_DIR}/common/externals/tinyxml2)
 add_subdirectory(${tinyxml2_dir} EXCLUDE_FROM_ALL)
 
-target_link_libraries(pathTracer PRIVATE pathTracer_ptx owl::owl owl_viewer tinyxml2::tinyxml2 tinyobjloader)
+# Dear ImGui (Phase 3.3 HUD overlay). Built as a static lib with the GLFW + OpenGL3
+# backends; only the viewer-based pathTracer links it. PUBLIC include dirs propagate
+# to whatever links `imgui`.
+find_package(OpenGL REQUIRED)
+set(imgui_dir ${PROJECT_SOURCE_DIR}/common/externals/imgui)
+add_library(imgui STATIC
+        ${imgui_dir}/imgui.cpp
+        ${imgui_dir}/imgui_draw.cpp
+        ${imgui_dir}/imgui_tables.cpp
+        ${imgui_dir}/imgui_widgets.cpp
+        ${imgui_dir}/backends/imgui_impl_glfw.cpp
+        ${imgui_dir}/backends/imgui_impl_opengl3.cpp
+)
+target_include_directories(imgui PUBLIC ${imgui_dir} ${imgui_dir}/backends)
+target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
+
+target_link_libraries(pathTracer PRIVATE pathTracer_ptx owl::owl owl_viewer tinyxml2::tinyxml2 tinyobjloader imgui)
 target_link_libraries(photonEmitter PRIVATE photonEmitter_ptx owl::owl tinyxml2::tinyxml2 tinyobjloader)
 
 add_executable(kdtree_benchmark benchmark/main.cu)

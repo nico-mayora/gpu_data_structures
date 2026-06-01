@@ -13,3 +13,6 @@
 [submodule "kd-tree-samples/common/externals/owl"]
 	path = kd-tree-samples/common/externals/owl
 	url = https://github.com/owl-project/owl.git
+[submodule "kd-tree-samples/common/externals/imgui"]
+	path = kd-tree-samples/common/externals/imgui
+	url = https://github.com/ocornut/imgui.git

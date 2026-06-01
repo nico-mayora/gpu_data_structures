@@ -23,7 +23,8 @@ Mesh *build_submesh(const tinyobj::attrib_t &attrib,
                     const std::vector<FaceRef> &faces,
                     bool faceted,
                     const std::string &obj_path,
-                    const std::string &usemtl_name) {
+                    const std::string &usemtl_name,
+                    bool &had_uv_seam) {
     auto *mesh = new Mesh();
     mesh->faceted = faceted;
     const bool has_uvs = !attrib.texcoords.empty();
@@ -73,13 +74,11 @@ Mesh *build_submesh(const tinyobj::attrib_t &attrib,
                 auto &slot = mesh->uvs[local];
                 if (!uv_seam_warned && (slot.x != 0.f || slot.y != 0.f) &&
                     (slot.x != uv.x || slot.y != uv.y)) {
-                    std::cerr << "WARNING: UV seam in '" << obj_path
-                              << "' (usemtl='" << usemtl_name
-                              << "', vertex " << orig
-                              << " has multiple UVs); keeping last-written. "
-                              << "Vertex deduplication per face-corner needed for clean seams."
-                              << std::endl;
+                    // Seam: a position shared across a UV discontinuity. We keep the
+                    // last-written UV (per-face-corner dedup would be needed for a clean
+                    // seam — Phase 5.1). Reported once per OBJ by the caller, not here.
                     uv_seam_warned = true;
+                    had_uv_seam = true;
                 }
                 slot = uv;
             }
@@ -199,9 +198,18 @@ std::vector<ObjSubmesh> load_obj_submeshes(
 
     std::vector<ObjSubmesh> out;
     out.reserve(bucket_order.size());
+    int submeshes_with_seams = 0;
     for (const auto &name : bucket_order) {
-        Mesh *m = build_submesh(attrib, buckets[name], faceted, obj_path, name);
+        bool had_uv_seam = false;
+        Mesh *m = build_submesh(attrib, buckets[name], faceted, obj_path, name, had_uv_seam);
+        if (had_uv_seam) submeshes_with_seams++;
         out.push_back({ m, name, /*mtl_material=*/nullptr });
+    }
+    if (submeshes_with_seams > 0) {
+        std::cerr << "WARNING: UV seams in '" << obj_path << "' ("
+                  << submeshes_with_seams << " of " << bucket_order.size()
+                  << " submeshes have positions with multiple UVs; keeping last-written). "
+                  << "Per-face-corner vertex dedup needed for clean seams (Phase 5.1)." << std::endl;
     }
 
     if (load_material_files) {

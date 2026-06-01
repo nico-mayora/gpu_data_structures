@@ -40,6 +40,5 @@ OWLTexture load_albedo_texture(OWLContext context, const std::string &path) {
 
     stbi_image_free(pixels);
     per_ctx.emplace(path, tex);
-    std::cerr << "INFO: loaded texture '" << path << "' (" << w << "x" << h << ")" << std::endl;
     return tex;
 }

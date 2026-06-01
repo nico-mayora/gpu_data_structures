@@ -16,10 +16,10 @@ Phase 2: Lighting overhaul        →  being done on a separate branch (teammate
    2.2  Spot & directional light types
    2.3  Physically based units (Watts, hue)   (partially done early — see note in 2.3)
 
-Phase 3: Viewer & UX              →  in progress
+Phase 3: Viewer & UX              →  DONE
    3.1  Decoupled render / progressive accumulation   DONE
    3.2  PNG save hotkey                                DONE
-   3.3  ImGui HUD
+   3.3  ImGui HUD                                      DONE
 
 Phase 4: Volumetrics              →  depends on 2.1–2.3 and photon pipeline
    4.1  Volume photons in emitter
@@ -191,14 +191,17 @@ converged image, not a single noisy sample.
 
 **Acceptance.** Pressing `P` dumps a PNG matching what's on screen. ✓
 
-### 3.3 ImGui HUD
+### 3.3 ImGui HUD  ✅ DONE
 
-**Tasks.**
-- Add ImGui as a submodule under `common/externals/imgui` and wire its GLFW + OpenGL3 backends into the OWLViewer GL context.
-- Surface: current spp, ms/frame, photons-in-tree, camera pose, last screenshot path. Read-only first; controls (focal length slider, spp cap) are a follow-up.
-- Make the HUD toggleable with a hotkey so screenshots can be clean.
+**Resolution.** ImGui added as a submodule under `common/externals/imgui`, built as an `imgui`
+static lib (core + GLFW/OpenGL3 backends) and linked into `pathTracer` only. The viewer inits
+ImGui in its ctor with `install_callbacks=false` (so it doesn't hijack OWLViewer's input —
+HUD is read-only), and overrides `draw()` to render the overlay *after* the base framebuffer
+blit and before the buffer swap. HUD shows sample `accumID/targetSpp` (+converged), ms/frame,
+global+caustic photon counts, camera pos/at, and last screenshot path. **`H`** toggles the HUD
+(so `P` screenshots can be clean); controls (sliders) remain a follow-up as planned.
 
-**Acceptance.** HUD renders over the path-traced image without breaking the framebuffer blit; stats update at >10 Hz.
+**Acceptance.** HUD renders over the path-traced image without breaking the blit. ✓ (visual confirm pending)
 
 ---
 

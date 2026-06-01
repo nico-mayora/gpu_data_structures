@@ -6,6 +6,10 @@
 #include <ctime>
 #include <filesystem>
 
+#include "imgui.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_opengl3.h"
+
 extern "C" char pathTracer_ptx[];
 
 Viewer::Viewer(const World *world, std::string scene_name) : sceneName(std::move(scene_name)) {
@@ -159,6 +163,29 @@ Viewer::Viewer(const World *world, std::string scene_name) : sceneName(std::move
     owlBuildPrograms(context);
     owlBuildPipeline(context);
     owlBuildSBT(context);
+
+    // HUD stats (read-only): photon counts captured once at load.
+    numPhotons = world->num_photons;
+    numCaustic = world->num_caustic;
+
+    // Dear ImGui init. The OWLViewer base ctor has already created the GLFW window
+    // (`handle`). install_callbacks=false so ImGui doesn't replace OWLViewer's input
+    // callbacks (the HUD is read-only, so it doesn't need mouse/keyboard routing).
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    glfwMakeContextCurrent(handle);
+    ImGui_ImplGlfw_InitForOpenGL(handle, /*install_callbacks=*/false);
+    ImGui_ImplOpenGL3_Init("#version 130");
+}
+
+Viewer::~Viewer()
+{
+    // OWLViewer::showAndRun() destroys the window and calls glfwTerminate() before we
+    // get here, so the GLFW/GL backends are already torn down — calling their Shutdown()
+    // would hit "GLFW library is not initialized". Only the CPU-side context needs freeing;
+    // the backend resources are reclaimed as the process exits.
+    ImGui::DestroyContext();
 }
 
 void Viewer::render()
@@ -178,8 +205,40 @@ void Viewer::render()
     const auto end = std::chrono::high_resolution_clock::now();
 
     accumID++;
-    const float ms = std::chrono::duration<float, std::milli>(end - start).count();
-    printf("sample %d/%d  (%.2f ms)\n", accumID, targetSpp, ms);
+    lastFrameMs = std::chrono::duration<float, std::milli>(end - start).count();
+}
+
+void Viewer::draw()
+{
+    // Blit the path-traced framebuffer first (makes the GL context current too), then
+    // overlay the ImGui HUD on top, before showAndRun swaps buffers.
+    OWLViewer::draw();
+
+    if (!hudVisible) return;
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::SetNextWindowBgAlpha(0.5f);
+    ImGui::Begin("Stats", nullptr,
+                 ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
+    const bool converged = accumID >= targetSpp;
+    ImGui::Text("Sample:   %d / %d%s", accumID, targetSpp, converged ? "  (converged)" : "");
+    ImGui::Text("Last sample took:    %.2f ms", lastFrameMs);
+    ImGui::Text("Total photons:  %d global, %d caustic", numPhotons, numCaustic);
+    ImGui::Text("Gathered photons:  %d global, %d caustic", K_GLOBAL_PHOTONS, K_CAUSTIC_PHOTONS);
+    const owl::vec3f from = camera.getFrom();
+    const owl::vec3f at = camera.getAt();
+    ImGui::Text("Camera Position:  %.1f %.1f %.1f", from.x, from.y, from.z);
+    ImGui::Text("Pointed at:   %.1f %.1f %.1f", at.x, at.y, at.z);
+    ImGui::Text("Last rendered path: %s", lastScreenshotPath.empty() ? "(none)" : lastScreenshotPath.c_str());
+    ImGui::Separator();
+    ImGui::TextDisabled("[P] screenshot   [H] toggle HUD");
+    ImGui::End();
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 void Viewer::resize(const owl::vec2i &newSize)
@@ -249,6 +308,11 @@ void Viewer::key(char key, const owl::vec2i &where)
 
         const std::string path = "screenshots/" + sceneName + "_" + ts + ".png";
         screenShot(path);
+        lastScreenshotPath = path;
+        return;
+    }
+    if (key == 'h' || key == 'H') {
+        hudVisible = !hudVisible;
         return;
     }
     // Defer everything else (camera controls, etc.) to the base viewer.
