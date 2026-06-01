@@ -18,6 +18,8 @@ struct MissProgData {
 
 struct RayGenData {
     uint32_t *fbPtr;
+    owl::vec3f *accumBuffer;   // linear radiance accumulated across launches (one vec3f/pixel)
+    int accumID;               // launches since last reset; 0 overwrites instead of accumulating
     owl::vec2i resolution;
     OptixTraversableHandle world;
     int depth;

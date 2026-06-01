@@ -146,12 +146,19 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
 OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
     const RayGenData &self = owl::getProgramData<RayGenData>();
     const owl::vec2i pixelID = owl::getLaunchIndex();
+    const int fbOfs = pixelID.x + self.resolution.x * pixelID.y;
+
+    // Progressive accumulation: each launch contributes SAMPLES_PER_FRAME samples and
+    // is averaged into accumBuffer. The viewer launches one of these per displayed
+    // frame, so the window stays responsive and the image refines over time. The RNG
+    // is seeded with accumID so successive launches draw different (decorrelated) samples.
+    constexpr int SAMPLES_PER_FRAME = 1;
 
     PerRayData prd;
-    prd.random.init(pixelID.x,pixelID.y);
+    prd.random.init(fbOfs, self.accumID);
     owl::vec3f colour = 0.f;
 
-    for (int sampleID=0; sampleID < self.pixel_samples; sampleID++) {
+    for (int sampleID = 0; sampleID < SAMPLES_PER_FRAME; sampleID++) {
         owl::Ray ray;
 
         const owl::vec2f pixelSample(prd.random(),prd.random());
@@ -169,12 +176,18 @@ OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
 
         colour += trace_path(self, ray, prd);
     }
+    colour *= 1.f / float(SAMPLES_PER_FRAME);   // this launch's mean radiance (linear)
 
-    colour *= 1.f / self.pixel_samples;
-    colour = filter_colour(colour);
+    // accumID == 0 starts a fresh accumulation (camera moved / resized); otherwise add on.
+    const owl::vec3f accum = (self.accumID == 0)
+                           ? colour
+                           : self.accumBuffer[fbOfs] + colour;
+    self.accumBuffer[fbOfs] = accum;
 
-    const int fbOfs = pixelID.x+self.resolution.x*pixelID.y;
-    self.fbPtr[fbOfs] = owl::make_rgba(colour);
+    // Display the running mean, tonemapped. Tonemapping happens here (not in the accum
+    // buffer) so accumulation stays in linear radiance.
+    const owl::vec3f mean = accum / float(self.accumID + 1);
+    self.fbPtr[fbOfs] = owl::make_rgba(filter_colour(mean));
 }
 
 

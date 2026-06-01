@@ -3,9 +3,12 @@
 #include "../common/data/loader/texture.cuh"
 #include "cuda/pathTracer.cuh"
 
+#include <ctime>
+#include <filesystem>
+
 extern "C" char pathTracer_ptx[];
 
-Viewer::Viewer(const World *world) {
+Viewer::Viewer(const World *world, std::string scene_name) : sceneName(std::move(scene_name)) {
     context = owlContextCreate(nullptr, 1);
     owlContextSetRayTypeCount(context, RAY_TYPES_COUNT);
     OWLModule module = owlModuleCreate(context, pathTracer_ptx);
@@ -101,6 +104,8 @@ Viewer::Viewer(const World *world) {
 
     OWLVarDecl rayGenVars[] = {
         { "fbPtr",         OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,fbPtr)},
+        { "accumBuffer", OWL_BUFPTR, OWL_OFFSETOF(RayGenData,accumBuffer)},
+        { "accumID", OWL_INT, OWL_OFFSETOF(RayGenData,accumID)},
         { "depth", OWL_INT, OWL_OFFSETOF(RayGenData,depth)},
         { "pixel_samples", OWL_INT, OWL_OFFSETOF(RayGenData,pixel_samples)},
         { "num_diffuse_scattered", OWL_INT, OWL_OFFSETOF(RayGenData,num_diffuse_scattered)},
@@ -136,6 +141,9 @@ Viewer::Viewer(const World *world) {
 
     // Set RayGen constant attributes
     owlRayGenSet1i(rayGen, "pixel_samples", world->cam->image.pixel_samples);
+    // Progressive renderer accumulates one launch per displayed frame until it reaches
+    // the scene's spp ("samples to converge"), then idles. cameraChanged() resets it.
+    targetSpp = world->cam->image.pixel_samples > 0 ? world->cam->image.pixel_samples : 1;
     owlRayGenSet1i(rayGen, "num_diffuse_scattered", world->cam->image.num_diffuse_scattered);
     owlRayGenSet1f(rayGen, "indirect_intensity", world->cam->image.indirect_intensity);
     owlRayGenSetPointer(rayGen, "photon_map", world->photon_map);
@@ -155,24 +163,39 @@ Viewer::Viewer(const World *world) {
 
 void Viewer::render()
 {
-    if (sbtDirty) {
-        owlBuildSBT(context);
-        sbtDirty = false;
-    }
+    // Converged: the accumulation has reached the target sample count, so there is
+    // nothing new to compute. fbPtr already holds the result; let the viewer re-blit it.
+    if (accumID >= targetSpp) return;
+
+    // accumID is a per-launch uniform, so the SBT must be rebuilt before each launch.
+    owlRayGenSet1i(rayGen, "accumID", accumID);
+    owlBuildSBT(context);
+    sbtDirty = false;
 
     const auto start = std::chrono::high_resolution_clock::now();
     owlRayGenLaunch2D(rayGen, fbSize.x, fbSize.y);
     cudaDeviceSynchronize();
     const auto end = std::chrono::high_resolution_clock::now();
 
+    accumID++;
     const float ms = std::chrono::duration<float, std::milli>(end - start).count();
-    printf("Last frame took %.2f ms. Drawing next frame...\n", ms);
+    printf("sample %d/%d  (%.2f ms)\n", accumID, targetSpp, ms);
 }
 
 void Viewer::resize(const owl::vec2i &newSize)
 {
-    OWLViewer::resize(newSize);
-    cameraChanged();
+    OWLViewer::resize(newSize);   // reallocates fbPointer, updates fbSize
+
+    // Match the accumulation buffer to the new framebuffer size.
+    const size_t n = static_cast<size_t>(newSize.x) * newSize.y;
+    if (!accumBuffer) {
+        accumBuffer = owlDeviceBufferCreate(context, OWL_FLOAT3, n, nullptr);
+    } else {
+        owlBufferResize(accumBuffer, n);
+    }
+    owlRayGenSetBuffer(rayGen, "accumBuffer", accumBuffer);
+
+    cameraChanged();   // updates camera vars + fbPtr/resolution and resets accumID
 }
 
 void Viewer::cameraChanged()
@@ -205,5 +228,29 @@ void Viewer::cameraChanged()
     owlRayGenSet3f    (rayGen,"camera.dir_00",reinterpret_cast<const owl3f&>(camera_d00));
     owlRayGenSet3f    (rayGen,"camera.dir_du",reinterpret_cast<const owl3f&>(camera_ddu));
     owlRayGenSet3f    (rayGen,"camera.dir_dv",reinterpret_cast<const owl3f&>(camera_ddv));
+
+    // Camera (or framebuffer) changed: restart accumulation from scratch so stale
+    // radiance from the previous viewpoint isn't blended in.
+    accumID = 0;
     sbtDirty = true;
+}
+
+void Viewer::key(char key, const owl::vec2i &where)
+{
+    // 'P' saves the current (tonemapped, accumulated) frame to screenshots/<scene>_<ts>.png.
+    // OWLViewer::screenShot reads fbPointer, which already holds exactly what's on screen.
+    if (key == 'p' || key == 'P') {
+        std::error_code ec;
+        std::filesystem::create_directories("screenshots", ec);
+
+        char ts[32];
+        const std::time_t t = std::time(nullptr);
+        std::strftime(ts, sizeof(ts), "%Y%m%d_%H%M%S", std::localtime(&t));
+
+        const std::string path = "screenshots/" + sceneName + "_" + ts + ".png";
+        screenShot(path);
+        return;
+    }
+    // Defer everything else (camera controls, etc.) to the base viewer.
+    OWLViewer::key(key, where);
 }

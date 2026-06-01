@@ -22,7 +22,7 @@ int main(int ac, char **av)
                                       world->num_caustic,
                                       PhotonFileFormat::TEXT);
 
-    Viewer viewer(world);
+    Viewer viewer(world, scene_name);
     viewer.enableFlyMode();
 
     std::cout << "Launching...\n";

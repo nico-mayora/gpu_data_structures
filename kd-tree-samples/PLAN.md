@@ -11,14 +11,14 @@ Phase 1: Scene & asset pipeline   →  DONE
    1.3  Textures                      (albedo; roughness/normal descoped)
    1.4  Camera focal length           (resolved: real issue was the FOV math, now fixed)
 
-Phase 2: Lighting overhaul        →  depends on 1.1 (light XML schema)
-   2.1  Multi-light refactor
+Phase 2: Lighting overhaul        →  being done on a separate branch (teammate)
+   2.1  Multi-light refactor                  (a WIP version is in stash@{0} on this branch)
    2.2  Spot & directional light types
    2.3  Physically based units (Watts, hue)   (partially done early — see note in 2.3)
 
-Phase 3: Viewer & UX              →  independent, can run alongside any phase
-   3.1  Decoupled render / progressive accumulation
-   3.2  PNG save hotkey
+Phase 3: Viewer & UX              →  in progress
+   3.1  Decoupled render / progressive accumulation   DONE
+   3.2  PNG save hotkey                                DONE
    3.3  ImGui HUD
 
 Phase 4: Volumetrics              →  depends on 2.1–2.3 and photon pipeline
@@ -156,7 +156,15 @@ multi-light budget split, and documenting the convention in `CLAUDE.md`.
 
 These are independent of the other phases. Do them whenever someone needs a context switch from the heavier work.
 
-### 3.1 Decouple window from render
+### 3.1 Decouple window from render  ✅ DONE
+
+**Resolution.** Took the progressive-accumulation path (no worker thread, sidestepping the
+OWLViewer single-threaded-GL risk). `RayGenData` gained a linear-radiance `accumBuffer` +
+`accumID`; the raygen does 1 sample/launch and displays the running mean (tonemapped at
+display, accumulation stays linear). `Viewer::render()` launches once per displayed frame
+and idles once `accumID` reaches the scene's `spp` (now "samples to converge");
+`cameraChanged()`/`resize()` reset accumulation. The window stays live and the image refines
+over frames.
 
 **Problem.** `Viewer::render()` blocks the GL thread, so the window freezes while OptiX runs.
 
@@ -172,16 +180,16 @@ These are independent of the other phases. Do them whenever someone needs a cont
 
 **Acceptance.** Window stays responsive at low spp; image converges smoothly as samples accumulate.
 
-### 3.2 PNG save hotkey
+### 3.2 PNG save hotkey  ✅ DONE
 
-**Trivial after 3.1's accum buffer exists.**
+**Resolution.** `Viewer::key()` override binds `P`/`p` to OWLViewer's built-in `screenShot()`,
+which reads `fbPointer` (already the tonemapped, accumulated frame on screen) and writes a PNG
+via the vendored `stb_image_write`. Saves to `screenshots/<scene>_<timestamp>.png` next to the
+binary; the scene name is threaded through the `Viewer` constructor. Non-`P` keys defer to the
+base viewer. Because the display shows the *accumulated* mean, the screenshot is the clean
+converged image, not a single noisy sample.
 
-**Tasks.**
-- Add a `key()` override in `Viewer` (OWLViewer exposes this) bound to e.g. `P`.
-- Read back the current accumulated frame, tonemap it the same way the display path does, write via `stb_image_write` (already vendored transitively).
-- Save path: `screenshots/<scene>_<timestamp>.png` next to the binary.
-
-**Acceptance.** Pressing the bound key dumps a PNG matching what's on screen.
+**Acceptance.** Pressing `P` dumps a PNG matching what's on screen. ✓
 
 ### 3.3 ImGui HUD
 
