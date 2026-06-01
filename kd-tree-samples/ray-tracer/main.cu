@@ -4,11 +4,12 @@
 #include "../common/data/loader/mitsuba3.cuh"
 #include "../common/data/photon/photon-file-manager.cuh"
 
-int main()
+int main(int ac, char **av)
 {
     std::cout << "Start!\n";
-    // TODO: pass scene name as argv
-    const auto loader = new Mitsuba3Loader("sponza");
+    const std::string scene_name = (ac > 1) ? av[1] : "sponza";
+    std::cout << "Scene: " << scene_name << "\n";
+    const auto loader = new Mitsuba3Loader(scene_name);
     const auto world = loader->load();
     PhotonFileManager::loadKdTreeFromFile("normal_photons.txt",
                                           world->photon_map,

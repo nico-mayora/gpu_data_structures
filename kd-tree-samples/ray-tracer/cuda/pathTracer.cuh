@@ -4,7 +4,7 @@
 #include "../../common/data/world.cuh"
 
 constexpr int K_GLOBAL_PHOTONS = 24;
-constexpr int K_CAUSTIC_PHOTONS = 128;
+constexpr int K_CAUSTIC_PHOTONS = 1;
 
 enum RayTypes {
     PRIMARY,
@@ -23,6 +23,7 @@ struct RayGenData {
     int depth;
     int pixel_samples;
     int num_diffuse_scattered;
+    float indirect_intensity; // artistic gain on the final-gather term (1.0 = physical)
 
     Photon *photon_map;
     PhotonCoord *photon_coords;
@@ -46,6 +47,7 @@ struct PerRayData {
     RayEvent event;
 
     const Material *hpMaterial;
+    owl::vec3f albedo;       // albedo at the hit point (texture sample or flat material albedo)
     owl::vec3f hitPoint;
     owl::vec3f normalAtHp;
 };

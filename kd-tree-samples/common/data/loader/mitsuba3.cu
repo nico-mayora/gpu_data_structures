@@ -47,6 +47,14 @@ World *Mitsuba3Loader::load() {
         world->cam->image.num_diffuse_scattered = 8;
     }
 
+    // Artistic gain on the final-gather (indirect) term. 1.0 = physically correct;
+    // raise it to exaggerate colour bleeding on scenes where it is geometrically faint.
+    if (const auto it = defaultValues.find("indirect_intensity"); it != defaultValues.end()) {
+        world->cam->image.indirect_intensity = resolveValue<float>(it->second);
+    } else {
+        world->cam->image.indirect_intensity = 1.0f;
+    }
+
     return world;
 }
 
@@ -178,7 +186,7 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
     for (auto &sub : submeshes) {
         sub.mesh->applyTransform(tf);
         Material *material = resolveSubmeshMaterial(sub, shape);
-        world->models.emplace_back(new Model{ sub.mesh, material });
+        world->models.emplace_back(new Model{ sub.mesh, material, sub.albedo_texture_path });
     }
 }
 

@@ -5,16 +5,16 @@ Breakdown of the work listed under "Current goals" in `CLAUDE.md`. The goals are
 ## Sequencing summary
 
 ```
-Phase 1: Scene & asset pipeline   →  unblocks complex scenes (Sponza)
-   1.1  Mitsuba-subset XML
+Phase 1: Scene & asset pipeline   →  DONE
+   1.1  Mitsuba-subset XML            (cornell-box; other scenes deferred to Phase 5)
    1.2  OBJ multi-material / groups
-   1.3  Textures
-   1.4  Camera focal length
+   1.3  Textures                      (albedo; roughness/normal descoped)
+   1.4  Camera focal length           (resolved: real issue was the FOV math, now fixed)
 
 Phase 2: Lighting overhaul        →  depends on 1.1 (light XML schema)
    2.1  Multi-light refactor
    2.2  Spot & directional light types
-   2.3  Physically based units (Watts, hue)
+   2.3  Physically based units (Watts, hue)   (partially done early — see note in 2.3)
 
 Phase 3: Viewer & UX              →  independent, can run alongside any phase
    3.1  Decoupled render / progressive accumulation
@@ -25,6 +25,13 @@ Phase 4: Volumetrics              →  depends on 2.1–2.3 and photon pipeline
    4.1  Volume photons in emitter
    4.2  In-scatter integration via kd-tree
    4.3  Media in scene XML
+
+Phase 5: Nice-to-haves            →  independent, low priority
+   5.1  Per-face-corner UV dedup (clean texture seams)
+   5.2  <texture type="bitmap"> XML wiring + EXR texture decode
+   5.3  Re-author veach-bidir / water-caustic + dual-parse smoke test
+   5.4  Fix kdtree_benchmark build
+   5.5  Emitter writes empty caustic file when there are no caustics
 ```
 
 ## Cross-cutting concerns to settle first
@@ -37,7 +44,12 @@ Before starting Phase 1, agree on three things — every later task touches them
 
 ---
 
-## Phase 1 — Scene & asset pipeline
+## Phase 1 — Scene & asset pipeline  ✅ DONE
+
+Sponza loads with per-submesh materials and albedo textures and renders with
+physically-based direct + photon-mapped indirect lighting. Remaining small items
+(other dual-load scenes, `<texture>` XML wiring, EXR textures, UV-seam dedup) were
+moved to Phase 5 as nice-to-haves rather than blockers.
 
 ### 1.1 Mitsuba-subset scene XML
 
@@ -80,9 +92,15 @@ Before starting Phase 1, agree on three things — every later task touches them
 
 **Acceptance.** Sponza renders with textured walls/columns; the same XML renders identically (modulo sampling noise) in Mitsuba.
 
-### 1.4 Camera focal length
+### 1.4 Camera focal length  ✅ RESOLVED (framing fixed via FOV)
 
-**Tasks.**
+**Resolution.** The actual framing bug was the camera frustum using `cos(fov)` instead
+of `tan(fov/2)` in `Viewer::cameraChanged()` (FOV behaved backwards and degenerated past
+90°). That's fixed. Explicit `focal_length` input was deemed unnecessary since FOV covers
+the framing need; if a Mitsuba scene specifies `focal_length` instead of `fov`, supporting
+it is a Phase 5 nice-to-have, not a requirement.
+
+**Original tasks (superseded):**
 - Add `focal_length` to the `Camera` struct (`common/data/world.cuh`), populated from Mitsuba's `<float name="focal_length">` *or* derived from `fov` + sensor size when only one is given.
 - Update the viewer's primary-ray generation (`ray-tracer/cuda/pathTracer.cu` raygen) and `Viewer::cameraChanged()` to use focal length.
 - Decide whether to expose a runtime keybind for changing it (out of scope here unless trivial).
@@ -116,6 +134,13 @@ Before starting Phase 1, agree on three things — every later task touches them
 **Acceptance.** A spot light produces a visible cone with proper falloff; a directional light produces parallel shadows.
 
 ### 2.3 Physically based units & spectral hue
+
+**Partially done early (Phase 1 lighting pass).** Direct illumination now uses radiant
+intensity `I` with physical `I/d²` falloff; photons carry true flux `4π·I/N` (RGB); the
+photon-density estimate and final gather are normalized so direct and indirect share units
+(verified via Cornell colour bleeding). Still TODO below: making `EmittedPhoton::power` a
+proper RGB watt quantity (it's still `int`), separating `PointLight::power` from colour,
+multi-light budget split, and documenting the convention in `CLAUDE.md`.
 
 **Tasks.**
 - Standardize all light power on Watts (`owl::vec3f` per-channel radiant flux). Today `EmittedPhoton::power` is `int` and `PointLight::power` doubles as color — separate them.
@@ -195,6 +220,50 @@ This is the largest single goal and the reason to nail Phases 1–2 first: it to
 - Extend the closest-hit / miss programs to traverse media boundaries (track current medium per ray segment).
 
 **Acceptance.** A Cornell box with a homogeneous fog volume renders god-rays from the light through the fog, matching Mitsuba within the usual tolerance.
+
+---
+
+## Phase 5 — Nice-to-haves
+
+Small, independent items that surfaced while finishing Phase 1. None block other work;
+pick them up opportunistically.
+
+### 5.1 Per-face-corner UV dedup
+
+Today `obj.cu` keeps the last-written UV per vertex, so vertices shared across a UV seam
+get one UV and texels smear along the seam (the "UV seam in ..." warnings on Sponza load).
+Split vertices per face-corner when a position has conflicting UVs so seams stay sharp.
+
+### 5.2 `<texture type="bitmap">` XML wiring + EXR textures
+
+Albedo textures currently only come from the `.mtl` `map_Kd` route. Parse Mitsuba's
+`<texture type="bitmap"><string name="filename" .../></texture>` inside a `<bsdf>` so
+textures declared in the scene XML work too. While here, add EXR decode (stb only covers
+PNG/JPG) so HDR textures load.
+
+### 5.3 Other dual-load scenes + smoke test
+
+Re-author `veach-bidir` and `water-caustic` `scene_v3.xml` to load in both our renderer and
+`mitsuba` (only `cornell-box` and `sponza` are done). Add a CI-friendly smoke test that
+parses each scene through both to catch schema drift. (Deferred from 1.1.)
+
+### 5.4 Fix `kdtree_benchmark` build
+
+The `kdtree_benchmark` target fails to compile (`float*` → `size_t` in
+`knn_local/global/shared.cuh` under C++20), which halts a full `cmake --build`. Pre-existing,
+unrelated to the renderer, but it forces building `pathTracer`/`photonEmitter` as explicit targets.
+
+### 5.5 Emitter writes empty caustic file
+
+When a scene has no caustic-generating geometry (e.g. Sponza), the caustic pass emits 0
+photons and `savePhotonsToFile` writes nothing, leaving a stale `caustic_photons.txt` from a
+previous scene. Write a valid 0-count file so the path tracer loads `num_caustic = 0` cleanly
+instead of inheriting another scene's caustics.
+
+### 5.6 Explicit `focal_length` camera input (optional)
+
+FOV already covers framing. If a Mitsuba scene specifies `<float name="focal_length">` instead
+of `fov`, derive the FOV from focal length + sensor size at load. Low priority.
 
 ---
 

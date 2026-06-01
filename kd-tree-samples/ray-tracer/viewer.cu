@@ -1,5 +1,6 @@
 #include "viewer.cuh"
 #include "../common/data/world.cuh"
+#include "../common/data/loader/texture.cuh"
 #include "cuda/pathTracer.cuh"
 
 extern "C" char pathTracer_ptx[];
@@ -14,6 +15,8 @@ Viewer::Viewer(const World *world) {
         { "vertex", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,vertex)},
         { "index",  OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,index)},
         { "normal",  OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,normal)},
+        { "texCoord", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,texCoord)},
+        { "albedoTexture", OWL_TEXTURE, OWL_OFFSETOF(TrianglesGeomData,albedoTexture)},
         { "faceted", OWL_BOOL, OWL_OFFSETOF(TrianglesGeomData, faceted)},
         { nullptr /* Sentinel to mark end-of-list */}
     };
@@ -53,6 +56,19 @@ Viewer::Viewer(const World *world) {
         owlGeomSetBuffer(triangles_geom,"normal", normal_buffer);
         owlGeomSet1b(triangles_geom, "faceted", mesh->faceted);
 
+        // UVs + albedo texture (Phase 1.3). Both stay unbound (null / 0) when absent,
+        // and the closest-hit falls back to the material's flat albedo.
+        if (!mesh->uvs.empty()) {
+            OWLBuffer uv_buffer
+                = owlDeviceBufferCreate(context, OWL_FLOAT2, mesh->uvs.size(), mesh->uvs.data());
+            owlGeomSetBuffer(triangles_geom, "texCoord", uv_buffer);
+        }
+        if (!model->albedo_texture_path.empty()) {
+            if (const OWLTexture tex = load_albedo_texture(context, model->albedo_texture_path)) {
+                owlGeomSetTexture(triangles_geom, "albedoTexture", tex);
+            }
+        }
+
         // Copy material to device memory.
         Material *mat_ptr;
         cudaMalloc(reinterpret_cast<void**>(&mat_ptr),sizeof(Material));
@@ -88,6 +104,7 @@ Viewer::Viewer(const World *world) {
         { "depth", OWL_INT, OWL_OFFSETOF(RayGenData,depth)},
         { "pixel_samples", OWL_INT, OWL_OFFSETOF(RayGenData,pixel_samples)},
         { "num_diffuse_scattered", OWL_INT, OWL_OFFSETOF(RayGenData,num_diffuse_scattered)},
+        { "indirect_intensity", OWL_FLOAT, OWL_OFFSETOF(RayGenData,indirect_intensity)},
         { "photon_map", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,photon_map)},
         { "photon_coords", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,photon_coords)},
         { "num_photons", OWL_INT, OWL_OFFSETOF(RayGenData,num_photons)},
@@ -120,6 +137,7 @@ Viewer::Viewer(const World *world) {
     // Set RayGen constant attributes
     owlRayGenSet1i(rayGen, "pixel_samples", world->cam->image.pixel_samples);
     owlRayGenSet1i(rayGen, "num_diffuse_scattered", world->cam->image.num_diffuse_scattered);
+    owlRayGenSet1f(rayGen, "indirect_intensity", world->cam->image.indirect_intensity);
     owlRayGenSetPointer(rayGen, "photon_map", world->photon_map);
     owlRayGenSetPointer(rayGen, "photon_coords", world->photon_coords);
     owlRayGenSet1i(rayGen, "num_photons", world->num_photons);
@@ -163,16 +181,20 @@ void Viewer::cameraChanged()
     const owl::vec3f lookAt = camera.getAt();
     const owl::vec3f lookUp = camera.getUp();
 
-    const float cosFovy = camera.getCosFovy();
+    // Frustum half-extent is tan(fovy/2): it grows with FOV (wider view). OWL's
+    // getCosFovy() returns cos(fovy), which shrinks as FOV grows and flips sign
+    // past 90 deg — so a larger FOV would paradoxically zoom in.
+    const float fovyRad = camera.getFovyInDegrees() * float(M_PI) / 180.f;
+    const float tanHalfFovy = tanf(0.5f * fovyRad);
     // ----------- compute variable values  ------------------
     owl::vec3f camera_pos = lookFrom;
     owl::vec3f camera_d00
       = normalize(lookAt-lookFrom);
     float aspect = fbSize.x / float(fbSize.y);
     owl::vec3f camera_ddu
-      = cosFovy * aspect * normalize(cross(camera_d00,lookUp));
+      = tanHalfFovy * aspect * normalize(cross(camera_d00,lookUp));
     owl::vec3f camera_ddv
-      = cosFovy * normalize(cross(camera_ddu,camera_d00));
+      = tanHalfFovy * normalize(cross(camera_ddu,camera_d00));
     camera_d00 -= 0.5f * camera_ddu;
     camera_d00 -= 0.5f * camera_ddv;
 

@@ -13,6 +13,9 @@ struct ObjSubmesh {
     // Populated only when load_material_files=true and the .mtl provided an entry.
     // Translation is lossy (see obj.cu); caller is expected to override via XML when needed.
     Material *mtl_material = nullptr;
+    // Absolute path to the .mtl's map_Kd albedo texture, resolved against the OBJ
+    // directory. Empty when the material has no diffuse texture. Phase 1.3.
+    std::string albedo_texture_path;
 };
 
 std::vector<ObjSubmesh> load_obj_submeshes(

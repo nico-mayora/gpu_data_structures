@@ -1,5 +1,7 @@
 #pragma once
 #include <vector>
+#include <string>
+#include <cuda_runtime.h>
 
 #include "owl/common/math/vec.h"
 #include "owl/include/owl/common/math/random.h"
@@ -82,6 +84,10 @@ struct Material {
 struct Model {
     Mesh *mesh;
     Material *material;
+    // Host-only: filesystem path to the albedo (diffuse) texture, resolved
+    // absolute. Empty = untextured (fall back to material->albedo). Consumed at
+    // geometry-upload time to create the per-geom OWL texture; never uploaded.
+    std::string albedo_texture_path;
 };
 
 struct Camera {
@@ -93,6 +99,7 @@ struct Camera {
         int depth;
         int pixel_samples;
         int num_diffuse_scattered;
+        float indirect_intensity; // artistic gain on indirect term (1.0 = physical)
         owl::vec2i resolution;
         float fov;
     } image;
@@ -181,6 +188,8 @@ struct TrianglesGeomData {
     owl::vec3f *vertex;
     owl::vec3i *index;
     owl::vec3f *normal;
+    owl::vec2f *texCoord;          // null when the mesh has no UVs
+    cudaTextureObject_t albedoTexture; // 0 when no albedo texture is bound
     bool faceted;
 };
 

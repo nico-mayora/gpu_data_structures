@@ -24,6 +24,7 @@ set(pathTracer_sources
         ray-tracer/main.cu
         common/data/loader/mitsuba3.cu
         common/data/loader/obj.cu
+        common/data/loader/texture.cu
         common/data/pt-math.cu
         ray-tracer/viewer.cu
         common/data/photon/photon-file-manager.cu
@@ -46,6 +47,7 @@ set(photonEmitter_sources
         photon-mapper/main.cu
         common/data/loader/mitsuba3.cu
         common/data/loader/obj.cu
+        common/data/loader/texture.cu
         common/data/pt-math.cu
         common/data/photon/photon-file-manager.cu
 )
@@ -55,10 +57,12 @@ add_executable(photonEmitter ${photonEmitter_sources})
 set(tinyobjloader_dir ${PROJECT_SOURCE_DIR}/common/externals/tinyobjloader)
 
 set(owl_dir ${PROJECT_SOURCE_DIR}/common/externals/owl)
+set(stb_dir ${PROJECT_SOURCE_DIR}/common/externals/stb)
 include_directories(
         ${glfw_dir}/include
         ${owl_dir}/samples/common # For OWLViewer
         ${tinyobjloader_dir}
+        ${stb_dir} # For stb_image.h (texture decode)
 )
 add_subdirectory(${glfw_dir})
 add_subdirectory(${tinyobjloader_dir})

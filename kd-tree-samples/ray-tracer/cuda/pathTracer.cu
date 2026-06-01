@@ -32,7 +32,12 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
     result.initialize(heap);
     // Traverse the coords-only array (12 bytes/node) — full photons (48 bytes)
     // are only loaded for the K survivors below.
-    get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, 0.01,&result);
+    // Unbounded (adaptive) radius: collect the true K-nearest photons and let the
+    // density estimate normalize by the actual K-th-neighbor distance. A fixed cap
+    // (e.g. 0.01) is scene-scale dependent — at Sponza's ~1000-unit scale it finds
+    // <K photons, leaving the heap radius at INFTY and zeroing the estimate. The
+    // kd-tree still self-prunes once the heap fills (see queries.cuh insert).
+    get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, INFTY, &result);
 
     const float radiusSqr = result.getQueryRadiusSqr();
     const float inv_radius = 1.f / sqrtf(radiusSqr);
@@ -109,9 +114,13 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
             );
 
             // Skip MISS: the miss program only sets `event`, leaving sprd.hpMaterial
-            // dangling. The final-gather evaluates the photon density / BRDF at the
-            // SECONDARY hit, so pass sprd (not prd) for its hitPoint/normal/material.
+            // dangling. The final-gather evaluates radiance leaving the SECONDARY hit
+            // toward the primary, so pass sprd (not prd) for its hitPoint/normal/material.
             if (sprd.event != MISS) {
+                // Design B: the global map includes the first (directly-lit) bounce,
+                // so a single gather at the secondary hit already yields its full
+                // radiance (direct + indirect) — this is the term that carries colour
+                // bleeding. Adding analytic direct here would double-count.
                 diffuse_contrib += gather_photons<K_GLOBAL_PHOTONS>(
                     sprd.hitPoint, self.photon_map, self.photon_coords, self.num_photons, sprd);
             }
@@ -120,9 +129,14 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
         const owl::vec3f caustic_term = gather_photons<K_CAUSTIC_PHOTONS>(
             prd.hitPoint, self.caustic_map, self.caustic_coords, self.num_caustic, prd);
 
-        // Having this would be physically correct, but looks worse:
-        // const float inv_N = 1.f / float(self.num_diffuse_scattered);
-        colour_acum += diffuse_contrib /* * inv_N*/ * prd.hpMaterial->albedo + caustic_term;
+        // Cosine-weighted MC of the Lambertian hemisphere integral: L_indirect =
+        // rho_x * (1/M) * sum_j L(y_j). The cos/pdf cancels to give rho_x (prd.albedo);
+        // the 1/M is the sample average over the M final-gather rays.
+        const float inv_M = (self.num_diffuse_scattered > 0)
+                          ? 1.f / float(self.num_diffuse_scattered) : 0.f;
+        // indirect_intensity is an artistic gain (1.0 = physically correct); it lets a
+        // scene exaggerate colour bleeding where it is geometrically faint (e.g. Sponza).
+        colour_acum += diffuse_contrib * inv_M * prd.albedo * self.indirect_intensity + caustic_term;
         break;
     }
 
@@ -183,6 +197,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
     const owl::vec3f rayOrg = optixGetWorldRayOrigin();
 
     prd.hpMaterial = self.material;
+    prd.albedo = get_albedo_at_hp(self, u, v, primID);
     prd.event = (self.material->matType == LAMBERTIAN) ? SCATTER_DIFFUSE : SCATTER_SPECULAR;
     prd.hitPoint = rayOrg + tMax * rayDir;
     prd.normalAtHp = (dot(Ng, rayDir) > 0.f) ? -Ng : Ng;

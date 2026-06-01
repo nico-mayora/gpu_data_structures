@@ -65,12 +65,14 @@ owl::vec3f calculateDirectIllumination(const RayGenData &self, const PerRayData 
         u0, u1
     );
 
-    owl::vec3f diffuse_brdf = prd.hpMaterial->albedo * PI_INV;
+    owl::vec3f diffuse_brdf = prd.albedo * PI_INV;
 
+    // Physical direct term: L = (rho/pi) * (I/d^2) * cos(theta) * visibility, with
+    // I = light->power (radiant intensity, W/sr). No fudge factors.
     return light_visibility
       * light_dot_norm
       * (1.f / (distance_to_light * distance_to_light))
-      * diffuse_brdf * 2.f
+      * diffuse_brdf * light->power
     ;
 }
 
@@ -168,7 +170,10 @@ owl::vec3f calculate_photon_contrib(
 
     const owl::vec3f wi = -into_vec3f(photon.dir);
     const float cosTheta = max(0.f, dot(prd.normalAtHp, wi));
-    
+
+    // Reject photons arriving from behind the surface; the basic Lambertian estimate
+    // does not weight by cos(theta) again (the photon flux already carries the
+    // incident geometry), so cosTheta is only used as a validity test here.
     if (cosTheta <= EPS) return 0.f;
 
     const float ratio = distance * inv_radius;
@@ -183,7 +188,9 @@ owl::vec3f calculate_photon_contrib(
 #endif
 
     const float cone_weight = max(0.f, 1.0f - (p_term * inv_k));
-    return into_vec3f(photon.colour) * prd.hpMaterial->albedo * (4.f * cosTheta * cone_weight * inv_normalization);
+    // L = (rho/pi) * sum_p dPhi_p * cone / (pi r^2 kf). photon.colour is the photon
+    // flux dPhi_p; prd.albedo is rho at the gather surface; inv_normalization = 1/(pi r^2 kf).
+    return into_vec3f(photon.colour) * prd.albedo * PI_INV * cone_weight * inv_normalization;
 }
 
 constexpr __device__
@@ -195,7 +202,7 @@ float hable(const float x) {
 
 inline __device__
 owl::vec3f filter_colour(owl::vec3f colour) {
-    constexpr float exposure = 0.7f;
+    constexpr float exposure = .7f;
     constexpr float W = 11.2f;
     constexpr float inv_white = 1.0f / hable(W);
 

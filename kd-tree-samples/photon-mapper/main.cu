@@ -2,9 +2,11 @@
 #include <fstream>
 #include <iomanip>
 #include <chrono>
+#include <cmath>
 #include "owl/owl.h"
 #include "./cuda/photonEmitter.cuh"
 #include "../common/data/loader/mitsuba3.cuh"
+#include "../common/data/loader/texture.cuh"
 #include "../common/data/photon/photon-file-manager.cuh"
 
 #define LOG(message)                                            \
@@ -47,6 +49,8 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
           { "index",  OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,index)},
           { "vertex", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,vertex)},
           { "normal", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,normal)},
+          { "texCoord", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,texCoord)},
+          { "albedoTexture", OWL_TEXTURE, OWL_OFFSETOF(TrianglesGeomData,albedoTexture)},
           { "material", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,material)},
           { nullptr /* Sentinel to mark end-of-list */}
   };
@@ -89,6 +93,19 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
     owlGeomSetBuffer(trianglesGeom,"normal", normal_buffer);
     owlGeomSetBuffer(trianglesGeom,"material", materialBuffer);
 
+    // UVs + albedo texture (Phase 1.3); photons must pick up textured albedo so
+    // caustic/global colours match the textured surfaces. Unbound when absent.
+    if (!mesh->uvs.empty()) {
+      OWLBuffer uv_buffer
+              = owlDeviceBufferCreate(owlContext, OWL_FLOAT2, mesh->uvs.size(), mesh->uvs.data());
+      owlGeomSetBuffer(trianglesGeom, "texCoord", uv_buffer);
+    }
+    if (!model->albedo_texture_path.empty()) {
+      if (const OWLTexture tex = load_albedo_texture(owlContext, model->albedo_texture_path)) {
+        owlGeomSetTexture(trianglesGeom, "albedoTexture", tex);
+      }
+    }
+
     // std::cout << "All info about mesh: " << "\n";
     // std::cout << " #vertices: " << vertices.size() << "\n";
     // std::cout << " #triangles: " << indices.size() << "\n";
@@ -127,12 +144,12 @@ void runPointLightRayGen(Program &program, const PointLight* light, bool caustic
     owlRayGenSetBuffer(program.rayGen,"photons",program.causticsPhotonsBuffer);
     owlRayGenSetBuffer(program.rayGen,"photonsCount",program.causticsPhotonsCount);
     owlRayGenSet1i(program.rayGen, "totalPhotons", program.castedCausticsPhotons);
-    initialPhotons = program.causticsPhotonsPerWatt * (light->power.x + light->power.y + light->power.z);
+    initialPhotons = static_cast<int>(std::lround(program.causticsPhotonsPerWatt * (light->power.x + light->power.y + light->power.z)));
   } else {
     owlRayGenSetBuffer(program.rayGen,"photons",program.photonsBuffer);
     owlRayGenSetBuffer(program.rayGen,"photonsCount",program.photonsCount);
     owlRayGenSet1i(program.rayGen, "totalPhotons", program.castedDiffusePhotons);
-    initialPhotons = program.photonsPerWatt * (light->power.x + light->power.y + light->power.z);
+    initialPhotons = static_cast<int>(std::lround(program.photonsPerWatt * (light->power.x + light->power.y + light->power.z)));
   }
 
   owlBuildSBT(program.owlContext);
@@ -204,8 +221,8 @@ int main(int ac, char **av)
 
   auto normal_photons_filename = "normal_photons.txt";
   auto caustic_photons_filename = "caustic_photons.txt";
-  program.castedDiffusePhotons = 5'000'000;
-  program.castedCausticsPhotons = 10'000'000;
+  program.castedDiffusePhotons = 750'000;
+  program.castedCausticsPhotons = 100;
   program.maxDepth = 10;
 
   LOG_OK("Loaded world in "

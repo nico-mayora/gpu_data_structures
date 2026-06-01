@@ -206,18 +206,24 @@ std::vector<ObjSubmesh> load_obj_submeshes(
 
     if (load_material_files) {
         std::unordered_map<std::string, Material *> by_name;
+        std::unordered_map<std::string, std::string> tex_by_name;
         for (const auto &mtl : mtl_materials) {
             by_name.emplace(mtl.name, translate_mtl(mtl));
             if (!mtl.diffuse_texname.empty()) {
-                std::cerr << "INFO: '" << mtl.name << "' references map_Kd='"
-                          << mtl.diffuse_texname << "'; texture support lands in Phase 1.3"
-                          << std::endl;
+                // map_Kd is relative to the .mtl (same dir as the .obj here). Build an
+                // absolute path and normalize separators so it loads on Windows.
+                std::string tex = basedir + mtl.diffuse_texname;
+                std::replace(tex.begin(), tex.end(), '\\', '/');
+                tex_by_name.emplace(mtl.name, tex);
             }
         }
         for (auto &sub : out) {
             if (sub.usemtl_name.empty()) continue;
             if (const auto it = by_name.find(sub.usemtl_name); it != by_name.end()) {
                 sub.mtl_material = it->second;
+            }
+            if (const auto it = tex_by_name.find(sub.usemtl_name); it != tex_by_name.end()) {
+                sub.albedo_texture_path = it->second;
             }
         }
     }

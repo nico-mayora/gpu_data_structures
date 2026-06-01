@@ -87,6 +87,9 @@ struct Program {
     int maxDepth;
     int castedCausticsPhotons;
     int castedDiffusePhotons;
-    int photonsPerWatt;
-    int causticsPhotonsPerWatt;
+    // Photons-per-watt must be float: casted/totalWatts truncates to 0 as an int
+    // whenever the casted count is below the total wattage (e.g. a small caustic
+    // budget against Sponza's ~675000 W), which zeroes the launch width.
+    float photonsPerWatt;
+    float causticsPhotonsPerWatt;
 };
