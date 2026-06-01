@@ -55,40 +55,85 @@ World *Mitsuba3Loader::load() {
         world->cam->image.indirect_intensity = 1.0f;
     }
 
+    // Photon-emitter budget (emitter-only; the path tracer ignores these). Keep the
+    // World defaults when the scene omits them.
+    if (const auto it = defaultValues.find("casted_diffuse_photons"); it != defaultValues.end()) {
+        world->casted_diffuse_photons = resolveValue<int>(it->second);
+    }
+    if (const auto it = defaultValues.find("casted_caustic_photons"); it != defaultValues.end()) {
+        world->casted_caustic_photons = resolveValue<int>(it->second);
+    }
+
     return world;
 }
 
 void Mitsuba3Loader::loadLight(const tinyxml2::XMLElement *light) {
     const std::string emitter_type = light->Attribute("type") ? light->Attribute("type") : "";
-    if (emitter_type != "point") {
-        std::cerr << "WARNING: top-level emitter type '" << emitter_type
-                  << "' not supported yet; skipping" << std::endl;
+
+    // Find a child by element name + `name` attribute (e.g. <float name="cutoff_angle">).
+    auto findChild = [light](const char *elem, const char *nm) -> const tinyxml2::XMLElement* {
+        for (auto c = light->FirstChildElement(elem); c; c = c->NextSiblingElement(elem))
+            if (c->Attribute("name") && std::string(nm) == c->Attribute("name")) return c;
+        return nullptr;
+    };
+
+    auto *l = new Light;
+    l->direction = owl::vec3f(0.f);
+    l->position = owl::vec3f(0.f);
+    l->cos_inner = l->cos_outer = 0.f;
+
+    if (emitter_type == "point") {
+        const auto *intensity_elem = findChild("rgb", "intensity");
+        const auto *position_elem = light->FirstChildElement("point");
+        if (!intensity_elem || !position_elem) {
+            std::cerr << "ERROR: point emitter missing intensity or position" << std::endl;
+            std::abort();
+        }
+        l->type = LIGHT_POINT;
+        l->power = parseVec3f(intensity_elem->Attribute("value"));
+        l->position = owl::vec3f(
+            resolveValue<float>(position_elem->Attribute("x")),
+            resolveValue<float>(position_elem->Attribute("y")),
+            resolveValue<float>(position_elem->Attribute("z")));
+    } else if (emitter_type == "spot") {
+        // Mitsuba spot: positioned + oriented by to_world (emits along local +Z), with
+        // intensity, cutoff_angle (outer half-angle, deg) and beam_width (inner, deg).
+        const auto *intensity_elem = findChild("rgb", "intensity");
+        const auto *transform_elem = light->FirstChildElement("transform");
+        if (!intensity_elem || !transform_elem) {
+            std::cerr << "ERROR: spot emitter missing intensity or transform" << std::endl;
+            std::abort();
+        }
+        const Mat4f tf = load_transform(transform_elem);
+        l->type = LIGHT_SPOT;
+        l->power = parseVec3f(intensity_elem->Attribute("value"));
+        l->position = owl::vec3f(tf * owl::vec4f(0, 0, 0, 1));
+        l->direction = normalize(owl::vec3f(tf * owl::vec4f(0, 0, 1, 0)));
+        const auto *cutoff = findChild("float", "cutoff_angle");
+        const auto *beam   = findChild("float", "beam_width");
+        const float cutoff_deg = cutoff ? resolveValue<float>(cutoff->Attribute("value")) : 20.f;
+        const float beam_deg   = beam   ? resolveValue<float>(beam->Attribute("value"))   : cutoff_deg * 0.75f;
+        constexpr float DEG2RAD = 0.01745329252f;
+        l->cos_outer = std::cos(cutoff_deg * DEG2RAD);
+        l->cos_inner = std::cos(beam_deg * DEG2RAD);
+    } else if (emitter_type == "directional") {
+        // Mitsuba directional: `direction` (propagation dir) + `irradiance`.
+        const auto *irr_elem = findChild("rgb", "irradiance");
+        const auto *dir_elem = findChild("vector", "direction");
+        if (!irr_elem || !dir_elem) {
+            std::cerr << "ERROR: directional emitter missing irradiance or direction" << std::endl;
+            std::abort();
+        }
+        l->type = LIGHT_DIRECTIONAL;
+        l->power = parseVec3f(irr_elem->Attribute("value"));
+        l->direction = normalize(parseVec3f(dir_elem->Attribute("value")));
+    } else {
+        std::cerr << "WARNING: emitter type '" << emitter_type
+                  << "' not supported; skipping" << std::endl;
+        delete l;
         return;
     }
-
-    world->scene_light = new PointLight;
-
-    const tinyxml2::XMLElement *intensity_elem = nullptr;
-    const tinyxml2::XMLElement *position_elem = nullptr;
-    for (auto child = light->FirstChildElement(); child; child = child->NextSiblingElement()) {
-        const auto name_attr = child->Attribute("name");
-        if (!name_attr) continue;
-        const std::string nm = name_attr;
-        if (nm == "intensity") intensity_elem = child;
-        else if (nm == "position") position_elem = child;
-    }
-
-    if (!intensity_elem || !position_elem) {
-        std::cerr << "ERROR: point emitter missing intensity or position" << std::endl;
-        std::abort();
-    }
-
-    world->scene_light->power = parseVec3f(intensity_elem->Attribute("value"));
-    world->scene_light->position = owl::vec3f(
-        resolveValue<float>(position_elem->Attribute("x")),
-        resolveValue<float>(position_elem->Attribute("y")),
-        resolveValue<float>(position_elem->Attribute("z"))
-    );
+    world->lights.push_back(l);
 }
 
 // Look up an `<{element_name} name="{prop_name}" value="..."/>` child by name attribute.

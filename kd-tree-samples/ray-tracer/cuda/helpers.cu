@@ -34,15 +34,42 @@ owl::vec3f cosine_weighted_hemisphere(const owl::vec3f &normal, Random &rand) {
     return b1 * lx + b2 * ly + normal * lz;
 }
 
+// Contribution of a single light to the outgoing radiance at the hit point.
 inline __device__
-owl::vec3f calculateDirectIllumination(const RayGenData &self, const PerRayData &prd) {
-    auto light = self.scene_light;
-    auto shadow_ray_org = prd.hitPoint;
-    auto light_dir = light->position - shadow_ray_org;
-    auto distance_to_light = sqrt(norm_squared(light_dir));
-    light_dir = normalize(light_dir);
+owl::vec3f lightContribution(const RayGenData &self, const PerRayData &prd, const Light &light) {
+    const owl::vec3f hit = prd.hitPoint;
 
-    auto light_dot_norm = dot(light_dir, prd.normalAtHp);
+    owl::vec3f light_dir;    // unit vector from the surface toward the light
+    float shadow_tmax;       // how far to trace the shadow ray
+    float attenuation;       // 1/d^2 (point/spot) or 1 (directional)
+    float spot = 1.f;        // spot cone falloff (1 for point/directional)
+
+    if (light.type == LIGHT_DIRECTIONAL) {
+        // Parallel light: arrives from -direction, no distance falloff; an occluder
+        // anywhere along the ray blocks it.
+        light_dir = -light.direction;
+        shadow_tmax = INFTY;
+        attenuation = 1.f;
+    } else {
+        owl::vec3f to_light = light.position - hit;
+        const float dist = sqrtf(norm_squared(to_light));
+        light_dir = to_light / dist;
+        shadow_tmax = dist * (1.f - EPS);
+        attenuation = 1.f / (dist * dist);
+
+        if (light.type == LIGHT_SPOT) {
+            // cos of the angle between the spot axis and the direction to this surface.
+            const float cosA = dot(-light_dir, light.direction);
+            if (cosA <= light.cos_outer) return 0.f;              // outside the cone
+            float t = (light.cos_inner > light.cos_outer)
+                    ? (cosA - light.cos_outer) / (light.cos_inner - light.cos_outer)
+                    : 1.f;
+            t = fminf(fmaxf(t, 0.f), 1.f);
+            spot = t * t * (3.f - 2.f * t);                       // smoothstep penumbra
+        }
+    }
+
+    const float light_dot_norm = dot(light_dir, prd.normalAtHp);
     if (light_dot_norm < 0.f) return 0.f;
 
     owl::vec3f light_visibility = 0.f;
@@ -50,10 +77,10 @@ owl::vec3f calculateDirectIllumination(const RayGenData &self, const PerRayData 
     owl::packPointer(&light_visibility, u0, u1);
     optixTrace(
         self.world,
-        shadow_ray_org,
+        hit,
         light_dir,
         EPS,
-        distance_to_light * (1.f - EPS),
+        shadow_tmax,
         0.f,
         OptixVisibilityMask(255),
         OPTIX_RAY_FLAG_DISABLE_ANYHIT
@@ -67,13 +94,27 @@ owl::vec3f calculateDirectIllumination(const RayGenData &self, const PerRayData 
 
     owl::vec3f diffuse_brdf = prd.albedo * PI_INV;
 
-    // Physical direct term: L = (rho/pi) * (I/d^2) * cos(theta) * visibility, with
-    // I = light->power (radiant intensity, W/sr). No fudge factors.
+    // L = (rho/pi) * power * attenuation * cos(theta) * spot * visibility. `power` is
+    // radiant intensity (point/spot, W/sr) or irradiance (directional, W/m^2); the
+    // attenuation term selects 1/d^2 vs none accordingly.
     return light_visibility
       * light_dot_norm
-      * (1.f / (distance_to_light * distance_to_light))
-      * diffuse_brdf * light->power
+      * attenuation
+      * spot
+      * diffuse_brdf * light.power
     ;
+}
+
+// Sum direct illumination over every light. Looping (rather than stochastically
+// sampling one light) is noise-free and fine for the handful of lights these scenes
+// carry; revisit if a many-light scene ever needs it.
+inline __device__
+owl::vec3f calculateDirectIllumination(const RayGenData &self, const PerRayData &prd) {
+    owl::vec3f total = 0.f;
+    for (int i = 0; i < self.num_lights; ++i) {
+        total += lightContribution(self, prd, self.lights[i]);
+    }
+    return total;
 }
 
 inline __device__

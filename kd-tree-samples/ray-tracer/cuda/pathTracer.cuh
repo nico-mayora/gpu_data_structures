@@ -4,7 +4,7 @@
 #include "../../common/data/world.cuh"
 
 constexpr int K_GLOBAL_PHOTONS = 24;
-constexpr int K_CAUSTIC_PHOTONS = 1;
+constexpr int K_CAUSTIC_PHOTONS = 16;
 
 enum RayTypes {
     PRIMARY,
@@ -41,7 +41,8 @@ struct RayGenData {
         owl::vec3f dir_du;
     } camera;
 
-    PointLight *scene_light;
+    Light *lights;
+    int num_lights;
 };
 
 struct PerRayData {

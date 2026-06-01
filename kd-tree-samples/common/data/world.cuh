@@ -106,10 +106,27 @@ struct Camera {
 };
 
 
-struct PointLight {
-    owl::vec3f position;
-    owl::vec3f power;
+enum LightType {
+    LIGHT_POINT,
+    LIGHT_SPOT,        // reserved for Phase 2.2
+    LIGHT_DIRECTIONAL, // reserved for Phase 2.2
 };
+
+// Tagged AoS light record, uploaded as an OWL_USER_TYPE buffer. POD so it copies
+// straight to the device. Only LIGHT_POINT is consumed in Phase 2.1; the spot/
+// directional fields are present so the layout is stable when 2.2 lands.
+struct Light {
+    LightType type;
+    owl::vec3f position;   // point / spot
+    owl::vec3f direction;  // spot / directional (unit)
+    owl::vec3f power;      // RGB radiant intensity (point/spot) or irradiance (directional)
+    float cos_inner;       // spot inner cone (cos), unused otherwise
+    float cos_outer;       // spot outer cone (cos), unused otherwise
+};
+
+// Back-compat alias: the photon emitter's per-launch point-light path still calls
+// this a "point light". It now carries a `Light`.
+using PointLight = Light;
 
 // TODO: Remove this, deprecated
 struct EmittedPhoton
@@ -169,7 +186,7 @@ struct PhotonCoord {
 
 struct World {
     std::vector<Model*> models;
-    PointLight *scene_light;
+    std::vector<Light*> lights;
 
     Photon *photon_map;
     PhotonCoord *photon_coords;
@@ -177,6 +194,12 @@ struct World {
     Photon *caustic_map;
     PhotonCoord *caustic_coords;
     int num_caustic;
+
+    // Photon-emitter budget, set from the scene XML (<default name="casted_*_photons">).
+    // Consumed by photon-mapper/main.cu; ignored by the path tracer. Defaults apply when
+    // the scene omits them.
+    int casted_diffuse_photons = 750'000;
+    int casted_caustic_photons = 100;
 
     Camera *cam;
 };

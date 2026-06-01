@@ -6,6 +6,9 @@
 	<default name="max_depth" value="12" />
 	<!-- Renderer-only properties below (see common/data/loader/mitsuba3.cuh). -->
 	<default name="diffuse_scattered" value="8" />
+	<default name="indirect_intensity" value="1.0" />
+	<default name="casted_diffuse_photons" value="1000000" />
+	<default name="casted_caustic_photons" value="1000000" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>
