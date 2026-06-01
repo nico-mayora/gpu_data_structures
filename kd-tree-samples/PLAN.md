@@ -11,10 +11,10 @@ Phase 1: Scene & asset pipeline   →  DONE
    1.3  Textures                      (albedo; roughness/normal descoped)
    1.4  Camera focal length           (resolved: real issue was the FOV math, now fixed)
 
-Phase 2: Lighting overhaul        →  being done on a separate branch (teammate)
-   2.1  Multi-light refactor                  (a WIP version is in stash@{0} on this branch)
-   2.2  Spot & directional light types
-   2.3  Physically based units (Watts, hue)   (partially done early — see note in 2.3)
+Phase 2: Lighting overhaul        →  DONE
+   2.1  Multi-light refactor                  DONE
+   2.2  Spot & directional light types        DONE
+   2.3  Physically based units (Watts, hue)   DONE
 
 Phase 3: Viewer & UX              →  DONE
    3.1  Decoupled render / progressive accumulation   DONE
@@ -109,9 +109,20 @@ it is a Phase 5 nice-to-have, not a requirement.
 
 ---
 
-## Phase 2 — Lighting overhaul
+## Phase 2 — Lighting overhaul  ✅ DONE
 
-### 2.1 Multi-light refactor
+Implemented on this branch (the teammate's branch was not used). Tagged `Light` struct
+(point / spot / directional) in a `World::lights` vector; the emitter splits the photon
+budget across lights and emits per type; direct lighting + photon flux are physically
+normalized and unit-consistent. Regenerate photon maps after switching scenes/lights.
+
+### 2.1 Multi-light refactor  ✅ DONE
+
+**Resolution.** `World::scene_light` → `std::vector<Light*>`, flattened to an `OWL_USER_TYPE`
+device buffer + `num_lights`. Emitter loops lights, splitting the budget proportional to
+power (verified: 1 light = baseline count, 2 lights = same total split across them). Direct
+lighting loops all lights (noise-free; fine for these scene sizes). Photon records stay
+anonymous (no light id).
 
 **Tasks.**
 - Replace `World::scene_light` (`PointLight*`) with `std::vector<Light*>` plus a device-side flat buffer.
@@ -122,7 +133,17 @@ it is a Phase 5 nice-to-have, not a requirement.
 
 **Acceptance.** A scene with two point lights renders correctly; total emitted photon count matches the single-light baseline when only one light is present.
 
-### 2.2 Spot lights & directional lights
+### 2.2 Spot lights & directional lights  ✅ DONE
+
+**Resolution.** `Light` carries `direction` + `cos_inner`/`cos_outer`. Loader parses Mitsuba
+`<emitter type="spot">` (to_world → position + +Z axis, `cutoff_angle`/`beam_width`) and
+`<emitter type="directional">` (`direction` + `irradiance`). Direct lighting: spot applies a
+smoothstep cone falloff and 1/d²; directional uses a fixed `-direction`, no distance falloff,
+and an infinite shadow ray. Photon emission samples the spot's outer cone (energy weighted by
+the penumbra falloff) and, for directional, a disk sized to the scene bounding sphere fired
+parallel. Per-type flux factors (`4π` / `2π(1−cosOuter)` / `πR²`) keep emission unit-consistent
+with direct. Headless-verified: spot and directional both emit photons cleanly (cornell test).
+Visual confirmation (cone falloff, parallel shadows) pending on the user's machine.
 
 **Depends on 2.1.**
 
@@ -133,14 +154,15 @@ it is a Phase 5 nice-to-have, not a requirement.
 
 **Acceptance.** A spot light produces a visible cone with proper falloff; a directional light produces parallel shadows.
 
-### 2.3 Physically based units & spectral hue
+### 2.3 Physically based units & spectral hue  ✅ DONE
 
-**Partially done early (Phase 1 lighting pass).** Direct illumination now uses radiant
-intensity `I` with physical `I/d²` falloff; photons carry true flux `4π·I/N` (RGB); the
-photon-density estimate and final gather are normalized so direct and indirect share units
-(verified via Cornell colour bleeding). Still TODO below: making `EmittedPhoton::power` a
-proper RGB watt quantity (it's still `int`), separating `PointLight::power` from colour,
-multi-light budget split, and documenting the convention in `CLAUDE.md`.
+**Resolution.** `Light::power` is RGB radiant intensity (point/spot, W/sr) or irradiance
+(directional, W/m²) — it carries magnitude *and* hue, no separate colour field. Direct lighting
+is `(ρ/π)·power·attenuation·cos·spot`; the emitter converts `power` to total flux `Φ` via the
+per-type factor and stores `Φ/N` per photon, so the photon-density estimate shares units with
+the direct term. The convention is documented in `CLAUDE.md` (Lighting units). The leftover
+`EmittedPhoton::power int` is vestigial/unused by shading — removing it is a file-format change
+parked for Phase 5 rather than done here.
 
 **Tasks.**
 - Standardize all light power on Watts (`owl::vec3f` per-channel radiant flux). Today `EmittedPhoton::power` is `int` and `PointLight::power` doubles as color — separate them.

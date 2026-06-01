@@ -31,6 +31,12 @@ void setupPointLightRayGenProgram(Program &program) {
           { "position",OWL_FLOAT3,OWL_OFFSETOF(PointLightRGD,position)},
           { "color",OWL_FLOAT3,OWL_OFFSETOF(PointLightRGD,color)},
           { "intensity",OWL_FLOAT,OWL_OFFSETOF(PointLightRGD,intensity)},
+          { "lightType",OWL_INT,OWL_OFFSETOF(PointLightRGD,lightType)},
+          { "direction",OWL_FLOAT3,OWL_OFFSETOF(PointLightRGD,direction)},
+          { "cosOuter",OWL_FLOAT,OWL_OFFSETOF(PointLightRGD,cosOuter)},
+          { "cosInner",OWL_FLOAT,OWL_OFFSETOF(PointLightRGD,cosInner)},
+          { "diskCenter",OWL_FLOAT3,OWL_OFFSETOF(PointLightRGD,diskCenter)},
+          { "diskRadius",OWL_FLOAT,OWL_OFFSETOF(PointLightRGD,diskRadius)},
           { /* sentinel to mark end of list */ }
   };
 
@@ -133,24 +139,39 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
   return data;
 }
 
+static float emissionFactor(const Program &program, const PointLight *light);
+static float lightFluxScalar(const Program &program, const PointLight *light);
+
 void runPointLightRayGen(Program &program, const PointLight* light, bool causticsMode) {
+  const float factor = emissionFactor(program, light);
+  const owl::vec3f flux = light->power * factor;     // total emitted flux Phi (RGB)
+
+  // This light's share of the budget, proportional to its emitted flux.
+  const float perFlux = causticsMode ? program.causticsPhotonsPerWatt : program.photonsPerWatt;
+  const int initialPhotons = static_cast<int>(std::lround(perFlux * lightFluxScalar(program, light)));
+  if (initialPhotons < 1) return;   // negligible share -> skip (also avoids a 0-width launch)
+
   owlRayGenSet1b(program.rayGen,"causticsMode",causticsMode);
   owlRayGenSet3f(program.rayGen,"position",reinterpret_cast<const owl3f&>(light->position));
-  owlRayGenSet3f(program.rayGen,"color",reinterpret_cast<const owl3f&>(light->power));
+  owlRayGenSet3f(program.rayGen,"color",reinterpret_cast<const owl3f&>(flux));
   owlRayGenSet1f(program.rayGen,"intensity",1);
+  owlRayGenSet1i(program.rayGen,"lightType",static_cast<int>(light->type));
+  owlRayGenSet3f(program.rayGen,"direction",reinterpret_cast<const owl3f&>(light->direction));
+  owlRayGenSet1f(program.rayGen,"cosOuter",light->cos_outer);
+  owlRayGenSet1f(program.rayGen,"cosInner",light->cos_inner);
+  owlRayGenSet3f(program.rayGen,"diskCenter",reinterpret_cast<const owl3f&>(program.sceneCenter));
+  owlRayGenSet1f(program.rayGen,"diskRadius",program.sceneRadius);
 
-  int initialPhotons;
   if (causticsMode) {
     owlRayGenSetBuffer(program.rayGen,"photons",program.causticsPhotonsBuffer);
     owlRayGenSetBuffer(program.rayGen,"photonsCount",program.causticsPhotonsCount);
-    owlRayGenSet1i(program.rayGen, "totalPhotons", program.castedCausticsPhotons);
-    initialPhotons = static_cast<int>(std::lround(program.causticsPhotonsPerWatt * (light->power.x + light->power.y + light->power.z)));
   } else {
     owlRayGenSetBuffer(program.rayGen,"photons",program.photonsBuffer);
     owlRayGenSetBuffer(program.rayGen,"photonsCount",program.photonsCount);
-    owlRayGenSet1i(program.rayGen, "totalPhotons", program.castedDiffusePhotons);
-    initialPhotons = static_cast<int>(std::lround(program.photonsPerWatt * (light->power.x + light->power.y + light->power.z)));
   }
+  // savePhoton stores Phi/totalPhotons, so totalPhotons must be THIS light's launch
+  // count (not the global budget) for the per-photon flux to be correct.
+  owlRayGenSet1i(program.rayGen, "totalPhotons", initialPhotons);
 
   owlBuildSBT(program.owlContext);
   owlRayGenLaunch2D(program.rayGen,initialPhotons,1);
@@ -166,18 +187,57 @@ void initPhotonBuffers(Program &program) {
   owlBufferClear(program.causticsPhotonsCount);
 }
 
-void computePhotonsPerWatt(Program &program) {
-  auto light = program.world->scene_light;
-  auto totalWatts = light->power.x + light->power.y + light->power.z;
+// Per-light emission factor: converts `power` into total emitted flux Phi.
+//   point       Phi = 4*pi * I             (full sphere)
+//   spot        Phi = 2*pi*(1-cosOuter)*I  (outer cone solid angle)
+//   directional Phi = pi * R^2 * E         (disk area; E is irradiance)
+static float emissionFactor(const Program &program, const PointLight *light) {
+  constexpr float PI_F = 3.14159265358979f;
+  switch (light->type) {
+    case LIGHT_SPOT:        return 2.f * PI_F * (1.f - light->cos_outer);
+    case LIGHT_DIRECTIONAL: return PI_F * program.sceneRadius * program.sceneRadius;
+    default:                return 4.f * PI_F; // point
+  }
+}
 
-  program.photonsPerWatt = program.castedDiffusePhotons / totalWatts;
-  program.causticsPhotonsPerWatt = program.castedCausticsPhotons / totalWatts;
+// Scalar emitted flux of a light (sum of its RGB flux). Used to split the photon budget
+// across lights in consistent units (W), which raw `power` is NOT — a directional's
+// irradiance (~units) and a point's intensity (~1e5) are different quantities.
+static float lightFluxScalar(const Program &program, const PointLight *light) {
+  return emissionFactor(program, light) * (light->power.x + light->power.y + light->power.z);
+}
+
+void computeSceneBounds(Program &program) {
+  owl::vec3f lo(1e30f), hi(-1e30f);
+  for (const auto* model : program.world->models)
+    for (const auto& v : model->mesh->vertices) {
+      lo.x = fminf(lo.x, v.x); lo.y = fminf(lo.y, v.y); lo.z = fminf(lo.z, v.z);
+      hi.x = fmaxf(hi.x, v.x); hi.y = fmaxf(hi.y, v.y); hi.z = fmaxf(hi.z, v.z);
+    }
+  if (hi.x < lo.x) { lo = owl::vec3f(0.f); hi = owl::vec3f(0.f); } // no geometry
+  program.sceneCenter = 0.5f * (lo + hi);
+  program.sceneRadius = 0.5f * length(hi - lo);
+  if (program.sceneRadius <= 0.f) program.sceneRadius = 1.f;
+}
+
+void computePhotonsPerWatt(Program &program) {
+  // Budget split is proportional to each light's emitted flux Phi (consistent W across
+  // light types), so `photonsPerWatt` here is really "photons per unit flux".
+  float totalFlux = 0.f;
+  for (const auto* light : program.world->lights)
+    totalFlux += lightFluxScalar(program, light);
+
+  program.photonsPerWatt = totalFlux > 0.f ? program.castedDiffusePhotons / totalFlux : 0.f;
+  program.causticsPhotonsPerWatt = totalFlux > 0.f ? program.castedCausticsPhotons / totalFlux : 0.f;
 }
 
 void runNormal(Program &program, const std::string &output_filename) {
   LOG("launching normal photons ...")
 
-  runPointLightRayGen(program, program.world->scene_light, false);
+  // One launch per light; each appends into the shared buffer (photonsCount is an
+  // atomic counter, cleared once in initPhotonBuffers), so totals accumulate.
+  for (const auto* light : program.world->lights)
+    runPointLightRayGen(program, light, false);
 
   LOG("done with launch, writing normal photons ...")
   auto *fb = static_cast<const EmittedPhoton*>(owlBufferGetPointer(program.photonsBuffer, 0));
@@ -190,7 +250,8 @@ void runNormal(Program &program, const std::string &output_filename) {
 void runCaustics(Program &program, const std::string &output_filename) {
   LOG("launching caustic photons ...")
 
-  runPointLightRayGen(program, program.world->scene_light, true);
+  for (const auto* light : program.world->lights)
+    runPointLightRayGen(program, light, true);
 
   LOG("done with launch, writing caustic photons ...")
   auto *fb = static_cast<const EmittedPhoton*>(owlBufferGetPointer(program.causticsPhotonsBuffer, 0));
@@ -221,8 +282,8 @@ int main(int ac, char **av)
 
   auto normal_photons_filename = "normal_photons.txt";
   auto caustic_photons_filename = "caustic_photons.txt";
-  program.castedDiffusePhotons = 750'000;
-  program.castedCausticsPhotons = 100;
+  program.castedDiffusePhotons = program.world->casted_diffuse_photons;
+  program.castedCausticsPhotons = program.world->casted_caustic_photons;
   program.maxDepth = 10;
 
   LOG_OK("Loaded world in "
@@ -239,6 +300,7 @@ int main(int ac, char **av)
   owlGeomTypeSetClosestHit(program.geometryData.trianglesGeomType, 0, program.owlModule,"triangleMeshClosestHit");
   owlMissProgCreate(program.owlContext, program.owlModule, "miss", 0, nullptr, -1);
 
+  computeSceneBounds(program);
   computePhotonsPerWatt(program);
   initPhotonBuffers(program);
 

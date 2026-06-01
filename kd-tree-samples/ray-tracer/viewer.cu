@@ -126,7 +126,8 @@ Viewer::Viewer(const World *world, std::string scene_name) : sceneName(std::move
         { "camera.dir_00", OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.dir_00)},
         { "camera.dir_dv", OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.dir_dv)},
         { "camera.dir_du", OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.dir_du)},
-        { "scene_light", OWL_BUFPTR, OWL_OFFSETOF(RayGenData,scene_light)},
+        { "lights", OWL_BUFPTR, OWL_OFFSETOF(RayGenData,lights)},
+        { "num_lights", OWL_INT, OWL_OFFSETOF(RayGenData,num_lights)},
         { /* sentinel to mark end of list */ },
     };
 
@@ -134,8 +135,14 @@ Viewer::Viewer(const World *world, std::string scene_name) : sceneName(std::move
         = owlRayGenCreate(context,module,"ptRayGen", sizeof(RayGenData), rayGenVars,-1);
     owlRayGenSetGroup(rayGen,"world", owl_world);
 
-    auto scene_light_buf = owlDeviceBufferCreate(context, OWL_USER_TYPE(PointLight), 1, world->scene_light);
-    owlRayGenSetBuffer(rayGen,"scene_light", scene_light_buf);
+    // Flatten the vector<Light*> into a contiguous device buffer of Light records.
+    std::vector<Light> lights_flat;
+    lights_flat.reserve(world->lights.size());
+    for (const auto* l : world->lights) lights_flat.push_back(*l);
+    auto lights_buf = owlDeviceBufferCreate(
+        context, OWL_USER_TYPE(Light), lights_flat.size(), lights_flat.data());
+    owlRayGenSetBuffer(rayGen, "lights", lights_buf);
+    owlRayGenSet1i(rayGen, "num_lights", static_cast<int>(lights_flat.size()));
 
     // Initialise Viewer camera with params from scene description.
     camera.setOrientation(world->cam->lookFrom,

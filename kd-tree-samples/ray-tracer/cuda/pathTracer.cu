@@ -10,7 +10,8 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
                           const Photon *photon_map,
                           const PhotonCoord *coord_map,
                           const int num_photons,
-                          const PerRayData &prd) {
+                          const PerRayData &prd,
+                          const float max_radius = INFTY) {
     constexpr float k_filter = 1.f;
     constexpr float inv_k = 1.f / k_filter;
 #if defined(CUBIC)
@@ -32,12 +33,12 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
     result.initialize(heap);
     // Traverse the coords-only array (12 bytes/node) — full photons (48 bytes)
     // are only loaded for the K survivors below.
-    // Unbounded (adaptive) radius: collect the true K-nearest photons and let the
-    // density estimate normalize by the actual K-th-neighbor distance. A fixed cap
-    // (e.g. 0.01) is scene-scale dependent — at Sponza's ~1000-unit scale it finds
-    // <K photons, leaving the heap radius at INFTY and zeroing the estimate. The
-    // kd-tree still self-prunes once the heap fills (see queries.cuh insert).
-    get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, INFTY, &result);
+    // max_radius caps the search. The global map passes INFTY (adaptive): photons cover
+    // every surface, so a query always finds K neighbors quickly and the kd-tree self-prunes
+    // once the heap fills. The CAUSTIC map must pass a bounded radius — caustic photons are
+    // localized, so an INFTY query from a pixel far from any caustic explores ~the whole tree
+    // (O(N) per pixel), which on a caustic-heavy scene makes a frame effectively never finish.
+    get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, max_radius, &result);
 
     const float radiusSqr = result.getQueryRadiusSqr();
     const float inv_radius = 1.f / sqrtf(radiusSqr);
@@ -126,8 +127,14 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
             }
         }
 
+        // Caustics use a BOUNDED gather radius (unlike the adaptive global gather): caustic
+        // photons are localized, so an unbounded query from a pixel far from any caustic would
+        // scan ~the whole tree. The radius suits the unit-scale caustic scenes (cornell/water);
+        // it's world-space, so a much larger caustic scene would want a bigger value.
+        constexpr float CAUSTIC_GATHER_RADIUS = 0.1f;
         const owl::vec3f caustic_term = gather_photons<K_CAUSTIC_PHOTONS>(
-            prd.hitPoint, self.caustic_map, self.caustic_coords, self.num_caustic, prd);
+            prd.hitPoint, self.caustic_map, self.caustic_coords, self.num_caustic, prd,
+            CAUSTIC_GATHER_RADIUS);
 
         // Cosine-weighted MC of the Lambertian hemisphere integral: L_indirect =
         // rho_x * (1/M) * sum_j L(y_j). The cos/pdf cancels to give rho_x (prd.albedo);

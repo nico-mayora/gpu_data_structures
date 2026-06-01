@@ -14,11 +14,11 @@ inline __device__ void savePhoton(const PhotonMapperRGD &self, PhotonMapperPRD &
   int photonIndex = atomicAdd(self.photonsCount, 1);
 
   auto photon = &self.photons[photonIndex];
-  // Per-photon flux dPhi = Phi / N = 4*pi*I / N. prd.color tracks I * throughput
-  // (radiant intensity, W/sr); the 4*pi is the solid angle photons are emitted into,
-  // making the stored value true power so the path tracer's density estimate matches
-  // the direct term's units.
-  photon->color = prd.color * (4.f * PI) / static_cast<float>(self.totalPhotons);
+  // Per-photon flux dPhi = Phi / N. The host folds the per-light emission factor (4*pi
+  // for a point's full sphere, the cone solid angle for a spot, the disk area for a
+  // directional) into prd.color's initial value, so prd.color already tracks total flux
+  // Phi * throughput; here we only divide by the launch count N.
+  photon->color = prd.color / static_cast<float>(self.totalPhotons);
   photon->pos = prd.scattered.origin;
   photon->dir = prd.direction;
 }
@@ -89,6 +89,13 @@ inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray
   }
 }
 
+// Orthonormal basis (t, b) spanning the plane perpendicular to unit vector n.
+inline __device__ void orthoBasis(const vec3f &n, vec3f &t, vec3f &b) {
+  if (fabsf(n.x) > fabsf(n.z)) t = normalize(vec3f(-n.y, n.x, 0.f));
+  else                         t = normalize(vec3f(0.f, -n.z, n.y));
+  b = cross(n, t);
+}
+
 OPTIX_RAYGEN_PROGRAM(pointLightRayGen)(){
   const auto &self = owl::getProgramData<PointLightRGD>();
   const vec2i id = owl::getLaunchIndex();
@@ -97,14 +104,41 @@ OPTIX_RAYGEN_PROGRAM(pointLightRayGen)(){
   prd.random.init(id.x, id.y);
   prd.color = self.color;
 
-  auto direction = randomPointInUnitSphere(prd.random);
-
-  prd.direction = direction;
-
   Ray ray;
-  ray.origin = self.position;
-  ray.direction = direction;
   ray.tmin = EPS;
+
+  if (self.lightType == LIGHT_DIRECTIONAL) {
+    // Parallel rays along `direction`, launched from a disk (perpendicular to it,
+    // sized to the scene bounding sphere) backed off behind the scene.
+    vec3f t, b; orthoBasis(self.direction, t, b);
+    const float r = self.diskRadius * sqrtf(prd.random());
+    const float phi = 2.f * PI * prd.random();
+    const vec3f offset = (cosf(phi) * t + sinf(phi) * b) * r;
+    ray.origin = self.diskCenter - self.direction * (2.f * self.diskRadius) + offset;
+    ray.direction = self.direction;
+    prd.direction = self.direction;
+  } else if (self.lightType == LIGHT_SPOT) {
+    // Sample uniformly within the outer cone around `direction`.
+    vec3f t, b; orthoBasis(self.direction, t, b);
+    const float cosT = 1.f - prd.random() * (1.f - self.cosOuter);
+    const float sinT = sqrtf(fmaxf(0.f, 1.f - cosT * cosT));
+    const float phi = 2.f * PI * prd.random();
+    const vec3f dir = normalize(t * (sinT * cosf(phi)) + b * (sinT * sinf(phi))
+                                + self.direction * cosT);
+    ray.origin = self.position;
+    ray.direction = dir;
+    prd.direction = dir;
+    // Soften the penumbra: weight photon energy by the spot falloff at this angle.
+    float cw = (self.cosInner > self.cosOuter)
+             ? (cosT - self.cosOuter) / (self.cosInner - self.cosOuter) : 1.f;
+    cw = fminf(fmaxf(cw, 0.f), 1.f);
+    prd.color = self.color * (cw * cw * (3.f - 2.f * cw));
+  } else { // LIGHT_POINT
+    const vec3f dir = randomPointInUnitSphere(prd.random);
+    ray.origin = self.position;
+    ray.direction = dir;
+    prd.direction = dir;
+  }
 
   if (self.causticsMode) {
     shootCausticsPhoton(self, ray, prd);

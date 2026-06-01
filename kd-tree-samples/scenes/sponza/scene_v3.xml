@@ -2,14 +2,17 @@
 	<default name="integrator" value="path" />
 	<default name="spp" value="36" />
 	<default name="resx" value="800" />
-	<default name="resy" value="600" />
+	<default name="resy" value="800" />
 	<default name="max_depth" value="1" />
 	<!-- Renderer-only properties below (see common/data/loader/mitsuba3.cuh). -->
 	<default name="diffuse_scattered" value="8" />
 	<default name="load_material_files" value="true" />
 	<!-- Artistic gain on indirect/colour-bleed (1.0 = physical). Sponza's colour bleed
 	     is geometrically faint, so it's exaggerated here for the showcase. -->
-	<default name="indirect_intensity" value="100.0" />
+	<default name="indirect_intensity" value="4.0" />
+	<!-- photonEmitter budget: photons cast for the global (diffuse) and caustic passes. -->
+	<default name="casted_diffuse_photons" value="5000000" />
+	<default name="casted_caustic_photons" value="100" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>
@@ -37,8 +40,33 @@
 			<matrix value="1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1" />
 		</transform>
 	</shape>
-	<emitter type="point" id="SunSurrogate">
-		<rgb name="intensity" value="250000, 235000, 190000" />
+	<!-- Key light: warm directional "sun" raking down into the open atrium. Directional
+	     power is irradiance (W/m^2, no distance falloff), so values are small unlike the
+	     point light's W/sr intensity. The slight tilt casts parallel column shadows. -->
+	<emitter type="directional" id="Sun">
+		<rgb name="irradiance" value="3.5, 3.2, 2.6" />
+		<vector name="direction" value="0.25, -1.0, 0.05" />
+	</emitter>
+
+	<!-- Warm interior fill so the shadowed arcades the sun can't reach aren't pitch black.
+	     Intensity is W/sr with 1/d^2 falloff: over Sponza's ~700-unit throw these must be
+	     large (~1e6) to register against the directional sun, which has no falloff. -->
+	<emitter type="point" id="InteriorFill">
+		<rgb name="intensity" value="1500000, 1410000, 1140000" />
 		<point name="position" x="0" y="600" z="0" />
+	</emitter>
+
+	<!-- Accent spotlight aimed at a colored fabric drape (fabric_c, hanging at ~(677,142,201))
+	     to bleed its colour onto the floor at its base. Sits in the open courtyard at
+	     (677,500,-100), aiming +Z/down toward the drape (~470-unit throw). Near-white so the
+	     drape's own texture colour is what bleeds, not the spot's tint. The matrix's +Z column
+	     is the (normalized) aim direction (0,-0.764,0.643). -->
+	<emitter type="spot" id="DrapeSpot">
+		<rgb name="intensity" value="700000, 690000, 640000" />
+		<float name="cutoff_angle" value="26" />
+		<float name="beam_width" value="16" />
+		<transform name="to_world">
+			<matrix value="1 0 0 677  0 0.643 -0.764 500  0 0.764 0.643 -100  0 0 0 1" />
+		</transform>
 	</emitter>
 </scene>
