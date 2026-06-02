@@ -96,6 +96,73 @@ inline __device__ void orthoBasis(const vec3f &n, vec3f &t, vec3f &b) {
   b = cross(n, t);
 }
 
+// Store a volume photon at an in-medium scatter point. Like savePhoton, but the position
+// is the scatter point (not a surface hit) and prd.direction is the photon's incoming
+// travel direction (the omega_in fed to the phase function during the gather).
+inline __device__ void saveVolumePhoton(const PhotonMapperRGD &self, PhotonMapperPRD &prd, const vec3f &pos) {
+  const int idx = atomicAdd(self.photonsCount, 1);
+  auto photon = &self.photons[idx];
+  photon->color = prd.color / static_cast<float>(self.totalPhotons);
+  photon->pos = pos;
+  photon->dir = prd.direction;
+}
+
+// Importance-sample a scattered direction from the Henyey-Greenstein phase function,
+// relative to the current travel direction `wo` (g>0 = forward scattering).
+inline __device__ vec3f sampleHenyeyGreenstein(const vec3f &wo, const float g, Random &rnd) {
+  float cosT;
+  if (fabsf(g) < 1e-3f) {
+    cosT = 1.f - 2.f * rnd();
+  } else {
+    const float s = (1.f - g * g) / (1.f + g - 2.f * g * rnd());
+    cosT = (1.f + g * g - s * s) / (2.f * g);
+  }
+  const float sinT = sqrtf(fmaxf(0.f, 1.f - cosT * cosT));
+  const float phi = 2.f * PI * rnd();
+  vec3f t, b; orthoBasis(wo, t, b);
+  return normalize(t * (sinT * cosf(phi)) + b * (sinT * sinf(phi)) + wo * cosT);
+}
+
+// Volume photon tracing through a global homogeneous medium. Free-flight sampling places
+// the photon at a medium collision (deposit + HG scatter) or lets it reach a surface; the
+// transmittance between events is handled implicitly by the exponential distance sampling.
+inline __device__ void shootVolumePhoton(const PointLightRGD &self, Ray &ray, PhotonMapperPRD &prd) {
+  const float sigma_t = self.sigmaT;
+  const float albedo_mean = (self.mediumAlbedo.x + self.mediumAlbedo.y + self.mediumAlbedo.z) / 3.f;
+  const float maxDist = 2.f * self.diskRadius;   // scene-extent cap for rays that miss geometry
+
+  for (int i = 0; i < self.maxDepth; i++) {
+    owl::traceRay(self.world, ray, prd);
+
+    const float tHit = (prd.event == MISS) ? maxDist
+                     : length(prd.scattered.origin - ray.origin);
+    const float tScatter = -logf(1.f - prd.random()) / sigma_t;
+
+    if (tScatter < tHit) {
+      // Real collision in the medium: deposit, then Russian-roulette absorb vs scatter.
+      const vec3f pos = ray.origin + tScatter * ray.direction;
+      saveVolumePhoton(self, prd, pos);
+
+      if (prd.random() >= albedo_mean) break;                       // absorbed
+      prd.color = prd.color * (self.mediumAlbedo / albedo_mean);    // RGB, unbiased survival
+
+      const vec3f newDir = sampleHenyeyGreenstein(ray.direction, self.mediumG, prd.random);
+      ray.origin = pos;
+      ray.direction = newDir;
+      prd.direction = newDir;
+      continue;
+    }
+
+    // Reached a surface before colliding in the medium.
+    if (prd.event == MISS) break;
+    if (prd.event == SCATTER_SPECULAR || prd.event == SCATTER_REFRACT) {
+      updateScatteredRay(ray, prd);   // pass through / mirror, keep marching the medium
+      continue;
+    }
+    break;  // diffuse / absorbed: the energy belongs to the surface maps, stop here
+  }
+}
+
 OPTIX_RAYGEN_PROGRAM(pointLightRayGen)(){
   const auto &self = owl::getProgramData<PointLightRGD>();
   const vec2i id = owl::getLaunchIndex();
@@ -140,7 +207,9 @@ OPTIX_RAYGEN_PROGRAM(pointLightRayGen)(){
     prd.direction = dir;
   }
 
-  if (self.causticsMode) {
+  if (self.volumeMode) {
+    shootVolumePhoton(self, ray, prd);
+  } else if (self.causticsMode) {
     shootCausticsPhoton(self, ray, prd);
   } else {
     shootPhoton(self, ray, prd);

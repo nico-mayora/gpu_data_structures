@@ -24,6 +24,7 @@ struct Viewer : owl::viewer::OWLViewer {
     std::string lastScreenshotPath;
     int numPhotons = 0;
     int numCaustic = 0;
+    int numVolume = 0;
 
     // Progressive accumulation state. accumBuffer holds linear radiance summed across
     // launches; accumID is the launch count since the last reset (camera move / resize);

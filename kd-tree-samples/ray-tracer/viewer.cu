@@ -121,6 +121,13 @@ Viewer::Viewer(const World *world, std::string scene_name) : sceneName(std::move
         { "caustic_map", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,caustic_map)},
         { "caustic_coords", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,caustic_coords)},
         { "num_caustic", OWL_INT, OWL_OFFSETOF(RayGenData,num_caustic)},
+        { "volume_map", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,volume_map)},
+        { "volume_coords", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,volume_coords)},
+        { "num_volume", OWL_INT, OWL_OFFSETOF(RayGenData,num_volume)},
+        { "medium_sigma_t", OWL_FLOAT, OWL_OFFSETOF(RayGenData,medium_sigma_t)},
+        { "medium_g", OWL_FLOAT, OWL_OFFSETOF(RayGenData,medium_g)},
+        { "volume_gather_radius", OWL_FLOAT, OWL_OFFSETOF(RayGenData,volume_gather_radius)},
+        { "medium_max_dist", OWL_FLOAT, OWL_OFFSETOF(RayGenData,medium_max_dist)},
         { "resolution", OWL_INT2, OWL_OFFSETOF(RayGenData,resolution)},
         { "world",         OWL_GROUP,  OWL_OFFSETOF(RayGenData,world)},
         { "camera.pos",    OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.pos)},
@@ -165,6 +172,14 @@ Viewer::Viewer(const World *world, std::string scene_name) : sceneName(std::move
     owlRayGenSetPointer(rayGen, "caustic_map", world->caustic_map);
     owlRayGenSetPointer(rayGen, "caustic_coords", world->caustic_coords);
     owlRayGenSet1i(rayGen, "num_caustic", world->num_caustic);
+    owlRayGenSetPointer(rayGen, "volume_map", world->volume_map);
+    owlRayGenSetPointer(rayGen, "volume_coords", world->volume_coords);
+    owlRayGenSet1i(rayGen, "num_volume", world->num_volume);
+    // Global medium params + auto-scaled query/march extents (no extra XML knobs needed).
+    owlRayGenSet1f(rayGen, "medium_sigma_t", world->medium.sigma_t);
+    owlRayGenSet1f(rayGen, "medium_g", world->medium.g);
+    owlRayGenSet1f(rayGen, "volume_gather_radius", 0.15f * world->scene_radius);
+    owlRayGenSet1f(rayGen, "medium_max_dist", 2.0f * world->scene_radius);
     owlRayGenSet1i(rayGen, "depth", world->cam->image.depth);
     owlRayGenSet2i(rayGen, "resolution", reinterpret_cast<const owl2i&>(world->cam->image.resolution));
     setWindowSize(world->cam->image.resolution);
@@ -176,6 +191,7 @@ Viewer::Viewer(const World *world, std::string scene_name) : sceneName(std::move
     // HUD stats (read-only): photon counts captured once at load.
     numPhotons = world->num_photons;
     numCaustic = world->num_caustic;
+    numVolume = world->num_volume;
 
     // Dear ImGui init. The OWLViewer base ctor has already created the GLFW window
     // (`handle`). install_callbacks=false so ImGui doesn't replace OWLViewer's input
@@ -235,7 +251,7 @@ void Viewer::draw()
     const bool converged = accumID >= targetSpp;
     ImGui::Text("Sample:   %d / %d%s", accumID, targetSpp, converged ? "  (converged)" : "");
     ImGui::Text("Last sample took:    %.2f ms", lastFrameMs);
-    ImGui::Text("Total photons:  %d global, %d caustic", numPhotons, numCaustic);
+    ImGui::Text("Total photons:  %d global, %d caustic, %d volume", numPhotons, numCaustic, numVolume);
     ImGui::Text("Gathered photons:  %d global, %d caustic", K_GLOBAL_PHOTONS, K_CAUSTIC_PHOTONS);
     const owl::vec3f from = camera.getFrom();
     const owl::vec3f at = camera.getAt();

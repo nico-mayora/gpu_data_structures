@@ -5,6 +5,10 @@
 
 constexpr int K_GLOBAL_PHOTONS = 24;
 constexpr int K_CAUSTIC_PHOTONS = 1;
+constexpr int K_VOLUME_PHOTONS = 32;
+
+// Ray-march steps across the camera ray's medium segment (in-scatter integration).
+constexpr int VOLUME_MARCH_STEPS = 32;
 
 enum RayTypes {
     PRIMARY,
@@ -34,6 +38,15 @@ struct RayGenData {
     Photon *caustic_map;
     PhotonCoord *caustic_coords;
     int num_caustic;
+    Photon *volume_map;
+    PhotonCoord *volume_coords;
+    int num_volume;
+
+    // Global homogeneous medium (medium_sigma_t <= 0 disables it).
+    float medium_sigma_t;
+    float medium_g;            // Henyey-Greenstein asymmetry
+    float volume_gather_radius; // world-space kNN cap for the volume gather
+    float medium_max_dist;      // march cap for primary rays that miss all geometry
 
     struct {
         owl::vec3f pos;

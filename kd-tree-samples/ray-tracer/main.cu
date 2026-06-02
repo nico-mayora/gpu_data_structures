@@ -21,6 +21,12 @@ int main(int ac, char **av)
                                       world->caustic_coords,
                                       world->num_caustic,
                                       PhotonFileFormat::BINARY);
+    // Volume photons are optional: absent file -> num_volume = 0, medium stays off.
+    PhotonFileManager::loadKdTreeFromFile("volume_photons.kdt",
+                                      world->volume_map,
+                                      world->volume_coords,
+                                      world->num_volume,
+                                      PhotonFileFormat::BINARY);
 
     Viewer viewer(world, scene_name);
     viewer.enableFlyMode();

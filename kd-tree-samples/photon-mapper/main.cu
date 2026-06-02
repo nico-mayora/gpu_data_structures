@@ -27,6 +27,10 @@ void setupPointLightRayGenProgram(Program &program) {
           { "totalPhotons",OWL_INT,OWL_OFFSETOF(PointLightRGD,totalPhotons)},
           { "maxDepth",OWL_INT,OWL_OFFSETOF(PointLightRGD, maxDepth)},
           {"causticsMode", OWL_BOOL, OWL_OFFSETOF(PointLightRGD, causticsMode)},
+          {"volumeMode", OWL_BOOL, OWL_OFFSETOF(PointLightRGD, volumeMode)},
+          {"sigmaT", OWL_FLOAT, OWL_OFFSETOF(PointLightRGD, sigmaT)},
+          {"mediumAlbedo", OWL_FLOAT3, OWL_OFFSETOF(PointLightRGD, mediumAlbedo)},
+          {"mediumG", OWL_FLOAT, OWL_OFFSETOF(PointLightRGD, mediumG)},
           { "world",OWL_GROUP,OWL_OFFSETOF(PointLightRGD,world)},
           { "position",OWL_FLOAT3,OWL_OFFSETOF(PointLightRGD,position)},
           { "color",OWL_FLOAT3,OWL_OFFSETOF(PointLightRGD,color)},
@@ -142,16 +146,22 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
 static float emissionFactor(const Program &program, const PointLight *light);
 static float lightFluxScalar(const Program &program, const PointLight *light);
 
-void runPointLightRayGen(Program &program, const PointLight* light, bool causticsMode) {
+void runPointLightRayGen(Program &program, const PointLight* light, bool causticsMode, bool volumeMode = false) {
   const float factor = emissionFactor(program, light);
   const owl::vec3f flux = light->power * factor;     // total emitted flux Phi (RGB)
 
   // This light's share of the budget, proportional to its emitted flux.
-  const float perFlux = causticsMode ? program.causticsPhotonsPerWatt : program.photonsPerWatt;
+  const float perFlux = volumeMode   ? program.volumePhotonsPerWatt
+                      : causticsMode  ? program.causticsPhotonsPerWatt
+                                      : program.photonsPerWatt;
   const int initialPhotons = static_cast<int>(std::lround(perFlux * lightFluxScalar(program, light)));
   if (initialPhotons < 1) return;   // negligible share -> skip (also avoids a 0-width launch)
 
   owlRayGenSet1b(program.rayGen,"causticsMode",causticsMode);
+  owlRayGenSet1b(program.rayGen,"volumeMode",volumeMode);
+  owlRayGenSet1f(program.rayGen,"sigmaT",program.world->medium.sigma_t);
+  owlRayGenSet3f(program.rayGen,"mediumAlbedo",reinterpret_cast<const owl3f&>(program.world->medium.albedo));
+  owlRayGenSet1f(program.rayGen,"mediumG",program.world->medium.g);
   owlRayGenSet3f(program.rayGen,"position",reinterpret_cast<const owl3f&>(light->position));
   owlRayGenSet3f(program.rayGen,"color",reinterpret_cast<const owl3f&>(flux));
   owlRayGenSet1f(program.rayGen,"intensity",1);
@@ -162,7 +172,10 @@ void runPointLightRayGen(Program &program, const PointLight* light, bool caustic
   owlRayGenSet3f(program.rayGen,"diskCenter",reinterpret_cast<const owl3f&>(program.sceneCenter));
   owlRayGenSet1f(program.rayGen,"diskRadius",program.sceneRadius);
 
-  if (causticsMode) {
+  if (volumeMode) {
+    owlRayGenSetBuffer(program.rayGen,"photons",program.volumePhotonsBuffer);
+    owlRayGenSetBuffer(program.rayGen,"photonsCount",program.volumePhotonsCount);
+  } else if (causticsMode) {
     owlRayGenSetBuffer(program.rayGen,"photons",program.causticsPhotonsBuffer);
     owlRayGenSetBuffer(program.rayGen,"photonsCount",program.causticsPhotonsCount);
   } else {
@@ -185,6 +198,12 @@ void initPhotonBuffers(Program &program) {
   program.causticsPhotonsBuffer = owlHostPinnedBufferCreate(program.owlContext, OWL_USER_TYPE(EmittedPhoton), program.castedCausticsPhotons * program.maxDepth);
   program.causticsPhotonsCount = owlHostPinnedBufferCreate(program.owlContext, OWL_INT, 1);
   owlBufferClear(program.causticsPhotonsCount);
+
+  // A volume photon may scatter up to maxDepth times in the medium, each depositing a record.
+  const int volumeCapacity = std::max(1, program.castedVolumePhotons * program.maxDepth);
+  program.volumePhotonsBuffer = owlHostPinnedBufferCreate(program.owlContext, OWL_USER_TYPE(EmittedPhoton), volumeCapacity);
+  program.volumePhotonsCount = owlHostPinnedBufferCreate(program.owlContext, OWL_INT, 1);
+  owlBufferClear(program.volumePhotonsCount);
 }
 
 // Per-light emission factor: converts `power` into total emitted flux Phi.
@@ -229,6 +248,7 @@ void computePhotonsPerWatt(Program &program) {
 
   program.photonsPerWatt = totalFlux > 0.f ? program.castedDiffusePhotons / totalFlux : 0.f;
   program.causticsPhotonsPerWatt = totalFlux > 0.f ? program.castedCausticsPhotons / totalFlux : 0.f;
+  program.volumePhotonsPerWatt = totalFlux > 0.f ? program.castedVolumePhotons / totalFlux : 0.f;
 }
 
 void runNormal(Program &program, const std::string &output_filename) {
@@ -261,6 +281,20 @@ void runCaustics(Program &program, const std::string &output_filename) {
   PhotonFileManager::saveKdTreeToFile(fb, count, output_filename, PhotonFileFormat::BINARY);
 }
 
+void runVolume(Program &program, const std::string &output_filename) {
+  LOG("launching volume photons ...")
+
+  for (const auto* light : program.world->lights)
+    runPointLightRayGen(program, light, /*causticsMode=*/false, /*volumeMode=*/true);
+
+  LOG("done with launch, building + writing volume photon kd-tree ...")
+  auto *fb = static_cast<const EmittedPhoton*>(owlBufferGetPointer(program.volumePhotonsBuffer, 0));
+  auto count = *(int*)owlBufferGetPointer(program.volumePhotonsCount, 0);
+
+  LOG("volume photon count: " << count)
+  PhotonFileManager::saveKdTreeToFile(fb, count, output_filename, PhotonFileFormat::BINARY);
+}
+
 int main(int ac, char **av)
 {
   LOG("Starting up...");
@@ -282,8 +316,10 @@ int main(int ac, char **av)
 
   auto normal_photons_filename = "normal_photons.kdt";
   auto caustic_photons_filename = "caustic_photons.kdt";
+  auto volume_photons_filename = "volume_photons.kdt";
   program.castedDiffusePhotons = program.world->casted_diffuse_photons;
   program.castedCausticsPhotons = program.world->casted_caustic_photons;
+  program.castedVolumePhotons = program.world->casted_volume_photons;
   program.maxDepth = 10;
 
   LOG_OK("Loaded world in "
@@ -311,6 +347,14 @@ int main(int ac, char **av)
 
   runNormal(program, normal_photons_filename);
   runCaustics(program, caustic_photons_filename);
+
+  // Volume pass only when the scene declares a medium and a volume budget. Otherwise the
+  // path tracer gates the medium on sigma_t anyway, so a stale dump is harmless.
+  if (program.world->medium.enabled() && program.castedVolumePhotons > 0) {
+    runVolume(program, volume_photons_filename);
+  } else {
+    LOG("no medium / zero volume budget -> skipping volume photon pass")
+  }
 
   LOG("destroying devicegroup ...");
   owlContextDestroy(program.owlContext);

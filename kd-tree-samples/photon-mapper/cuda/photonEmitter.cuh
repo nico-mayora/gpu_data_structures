@@ -14,6 +14,12 @@ struct PhotonMapperRGD
     OptixTraversableHandle world;
     int maxDepth;
     bool causticsMode;
+    bool volumeMode;        // emit volumetric (in-medium scatter) photons instead
+
+    // Global homogeneous medium params (used only in volumeMode).
+    float sigmaT;
+    owl::vec3f mediumAlbedo;
+    float mediumG;
 };
 
 struct PointLightRGD: public PhotonMapperRGD
@@ -75,15 +81,19 @@ struct Program {
     OWLBuffer photonsCount;
     OWLBuffer causticsPhotonsBuffer;
     OWLBuffer causticsPhotonsCount;
+    OWLBuffer volumePhotonsBuffer;
+    OWLBuffer volumePhotonsCount;
 
     int maxDepth;
     int castedCausticsPhotons;
     int castedDiffusePhotons;
+    int castedVolumePhotons;
     // Photons-per-watt must be float: casted/totalWatts truncates to 0 as an int
     // whenever the casted count is below the total wattage (e.g. a small caustic
     // budget against Sponza's ~675000 W), which zeroes the launch width.
     float photonsPerWatt;
     float causticsPhotonsPerWatt;
+    float volumePhotonsPerWatt;
 
     // Scene bounding sphere (for directional-light disk emission). Computed once at load.
     owl::vec3f sceneCenter;

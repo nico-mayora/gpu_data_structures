@@ -185,6 +185,17 @@ struct PhotonCoord {
     static constexpr int dimension = DIM;
 };
 
+// Global homogeneous participating medium ("fog"). sigma_t <= 0 means vacuum (disabled).
+// sigma_t is scalar extinction; albedo is the per-channel single-scatter albedo
+// (sigma_s = sigma_t * albedo); g is the Henyey-Greenstein asymmetry (-1..1, 0 = isotropic).
+struct Medium {
+    float sigma_t = 0.f;
+    owl::vec3f albedo = owl::vec3f(0.9f);
+    float g = 0.f;
+
+    __host__ __device__ bool enabled() const { return sigma_t > 0.f; }
+};
+
 struct World {
     std::vector<Model*> models;
     std::vector<Light*> lights;
@@ -195,12 +206,24 @@ struct World {
     Photon *caustic_map;
     PhotonCoord *caustic_coords;
     int num_caustic;
+    Photon *volume_map;
+    PhotonCoord *volume_coords;
+    int num_volume;
 
     // Photon-emitter budget, set from the scene XML (<default name="casted_*_photons">).
     // Consumed by photon-mapper/main.cu; ignored by the path tracer. Defaults apply when
     // the scene omits them.
     int casted_diffuse_photons = 750'000;
     int casted_caustic_photons = 100;
+    int casted_volume_photons = 0;          // 0 = skip the volume pass
+
+    // Global homogeneous medium (from the scene XML). Vacuum unless sigma_t > 0.
+    Medium medium;
+
+    // Scene bounding sphere, computed once at load. Used by the volumetric march cap and
+    // (independently) by the emitter's directional-disk emission.
+    owl::vec3f scene_center = owl::vec3f(0.f);
+    float scene_radius = 1.f;
 
     Camera *cam;
 };

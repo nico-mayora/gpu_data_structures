@@ -71,6 +71,33 @@ World *Mitsuba3Loader::load() {
     if (const auto it = defaultValues.find("casted_caustic_photons"); it != defaultValues.end()) {
         world->casted_caustic_photons = resolveValue<int>(it->second);
     }
+    if (const auto it = defaultValues.find("casted_volume_photons"); it != defaultValues.end()) {
+        world->casted_volume_photons = resolveValue<int>(it->second);
+    }
+
+    // Global homogeneous medium (renderer-only, Mitsuba-inert defaults). sigma_t <= 0 = vacuum.
+    if (const auto it = defaultValues.find("medium_sigma_t"); it != defaultValues.end()) {
+        world->medium.sigma_t = resolveValue<float>(it->second);
+    }
+    if (const auto it = defaultValues.find("medium_albedo"); it != defaultValues.end()) {
+        world->medium.albedo = parseVec3f(it->second);
+    }
+    if (const auto it = defaultValues.find("medium_g"); it != defaultValues.end()) {
+        world->medium.g = resolveValue<float>(it->second);
+    }
+
+    // Scene bounding sphere (volume-march cap; also mirrors the emitter's own bounds).
+    owl::vec3f lo(1e30f), hi(-1e30f);
+    for (const auto* m : world->models)
+        for (const auto& v : m->mesh->vertices) {
+            lo.x = fminf(lo.x, v.x); lo.y = fminf(lo.y, v.y); lo.z = fminf(lo.z, v.z);
+            hi.x = fmaxf(hi.x, v.x); hi.y = fmaxf(hi.y, v.y); hi.z = fmaxf(hi.z, v.z);
+        }
+    if (hi.x >= lo.x) {
+        world->scene_center = 0.5f * (lo + hi);
+        world->scene_radius = 0.5f * length(hi - lo);
+    }
+    if (world->scene_radius <= 0.f) world->scene_radius = 1.f;
 
     return world;
 }

@@ -53,9 +53,48 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
     return illumination;
 }
 
+// Henyey-Greenstein phase function (normalized over the sphere). cosT is the cosine of the
+// angle between the photon's travel direction and the scattered (toward-camera) direction.
+inline __device__ float hg_phase(const float g, const float cosT) {
+    const float denom = 1.f + g * g - 2.f * g * cosT;
+    return (1.f - g * g) / (4.f * float(M_PI) * denom * sqrtf(fmaxf(denom, 1e-8f)));
+}
+
+// In-scattered source term sigma_s * integral(phase * L) at x, estimated from the volume
+// photon kd-tree with a spherical (4/3)pi r^3 normalization. sigma_s is baked into the
+// photon density (photons are deposited at scatter events), so it is NOT applied again.
+template <int K>
+inline __device__
+owl::vec3f gather_volume_photons(const owl::vec3f &x, const owl::vec3f &toward_cam,
+                                 const RayGenData &self) {
+    uint64_t heap[K];
+    HeapQueryResult<K> result;
+    result.initialize(heap);
+    const float query[] = { x.x, x.y, x.z };
+    get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(
+        query, self.volume_coords, self.num_volume, self.volume_gather_radius, &result);
+
+    const float r2 = result.getQueryRadiusSqr();
+    if (r2 <= 0.f || r2 == INFTY) return 0.f;            // no neighbours in range
+    const float r = sqrtf(r2);
+    const float inv_vol = 1.f / ((4.f / 3.f) * float(M_PI) * r2 * r);
+
+    owl::vec3f Li = 0.f;
+    for (int p = 0; p < K; p++) {
+        if (result.getDistance(p) == INFTY) break;
+        const Photon &ph = self.volume_map[result.getIndex(p)];
+        const float cosT = dot(into_vec3f(ph.dir), toward_cam);
+        Li += into_vec3f(ph.colour) * hg_phase(self.medium_g, cosT);
+    }
+    return Li * inv_vol;
+}
+
 inline __device__
 owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
+    const owl::vec3f primary_org = ray.origin;
+    const owl::vec3f primary_dir = ray.direction;
     owl::vec3f colour_acum = 0.f;
+    float first_hit_dist = -1.f;   // camera -> first hit, for the medium segment
 
     for (int32_t i = 0; i < self.depth; ++i) {
         uint32_t p0, p1;
@@ -75,8 +114,13 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
             p0, p1
         );
 
+        // Record the camera->first-hit distance for the medium march (MISS = use the cap).
+        if (i == 0)
+            first_hit_dist = (prd.event == MISS) ? self.medium_max_dist
+                           : length(prd.hitPoint - primary_org);
+
         if (prd.event == MISS || prd.event == ABSORBED)
-            return colour_acum;
+            break;
 
         if (prd.event == SCATTER_SPECULAR) {
             owl::vec3f new_ray_dir = reflect_or_refract_ray(
@@ -146,6 +190,28 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
         colour_acum += diffuse_contrib * inv_M * prd.albedo * self.indirect_intensity
                      + caustic_term * self.caustic_intensity;
         break;
+    }
+
+    // ---- Global homogeneous medium along the camera (primary) segment ----
+    // All surface radiance returns to the camera along this segment, so it is attenuated by
+    // the segment transmittance; the in-scatter integral adds the light scattered toward the
+    // camera from the medium itself (god-rays). Only the primary segment is handled (MVP);
+    // deeper-bounce media attenuation is a refinement.
+    if (self.medium_sigma_t > 0.f && self.num_volume > 0 && first_hit_dist > 0.f) {
+        colour_acum *= expf(-self.medium_sigma_t * first_hit_dist);
+
+        const owl::vec3f toward_cam = -primary_dir;   // light flow direction toward the eye
+        const float dt = first_hit_dist / float(VOLUME_MARCH_STEPS);
+        const float jitter = prd.random();            // decorrelate step positions (anti-banding)
+        owl::vec3f inscatter = 0.f;
+        for (int s = 0; s < VOLUME_MARCH_STEPS; ++s) {
+            const float t = (float(s) + jitter) * dt;
+            if (t >= first_hit_dist) break;
+            const owl::vec3f x = primary_org + t * primary_dir;
+            const float T = expf(-self.medium_sigma_t * t);
+            inscatter += T * gather_volume_photons<K_VOLUME_PHOTONS>(x, toward_cam, self) * dt;
+        }
+        colour_acum += inscatter;
     }
 
     return colour_acum;

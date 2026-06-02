@@ -10,6 +10,12 @@
 	<default name="caustic_intensity" value="1.0" />
 	<default name="casted_diffuse_photons" value="1000000" />
 	<default name="casted_caustic_photons" value="100000" />
+	<!-- Global homogeneous fog (Phase 4). sigma_t = scalar extinction (0 = vacuum),
+	     albedo = single-scatter albedo (sigma_s = sigma_t*albedo), g = HG asymmetry. -->
+	<default name="medium_sigma_t" value="0.4" />
+	<default name="medium_albedo" value="0.9, 0.9, 0.9" />
+	<default name="medium_g" value="0.0" />
+	<default name="casted_volume_photons" value="2000000" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>

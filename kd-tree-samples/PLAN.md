@@ -21,10 +21,10 @@ Phase 3: Viewer & UX              →  DONE
    3.2  PNG save hotkey                                DONE
    3.3  ImGui HUD                                      DONE
 
-Phase 4: Volumetrics              →  depends on 2.1–2.3 and photon pipeline
-   4.1  Volume photons in emitter
-   4.2  In-scatter integration via kd-tree
-   4.3  Media in scene XML
+Phase 4: Volumetrics              →  MVP DONE (global homogeneous medium)
+   4.1  Volume photons in emitter             DONE
+   4.2  In-scatter integration via kd-tree    DONE
+   4.3  Media in scene XML                     DONE (via <default> props; <medium> element deferred)
 
 Phase 5: Nice-to-haves            →  independent, low priority
    5.1  Per-face-corner UV dedup (clean texture seams)
@@ -227,9 +227,30 @@ global+caustic photon counts, camera pos/at, and last screenshot path. **`H`** t
 
 ---
 
-## Phase 4 — Volumetrics
+## Phase 4 — Volumetrics  ✅ MVP DONE (single global homogeneous medium)
 
 This is the largest single goal and the reason to nail Phases 1–2 first: it touches the photon pipeline, the kd-tree query path, the material/light system, and the scene XML.
+
+**Resolution (vertical slice).** A single global homogeneous medium (no boundary tracking),
+delivered end-to-end against cornell-box. `Medium` (`sigma_t` scalar extinction, RGB `albedo`,
+HG `g`) lives on `World`, read from `<default>` props (`medium_sigma_t` / `medium_albedo` /
+`medium_g` / `casted_volume_photons`) — consistent with the existing custom-prop convention and
+Mitsuba-inert. The emitter adds a third **volume pass** (`shootVolumePhoton`): free-flight
+sampling `t = -ln(ξ)/σ_t`, deposit a volume photon at each in-medium collision, HG-scatter with
+Russian-roulette absorption by the scalar albedo, pass through specular/refractive surfaces, stop
+at diffuse. Volume photons dump through the binary kd-tree pipeline to `volume_photons.kdt`. The
+path tracer ray-marches the **camera→first-hit** segment (`VOLUME_MARCH_STEPS`), estimating the
+in-scatter source term via a radius-limited kNN over the volume tree with a **spherical**
+`(4/3)πr³` normalization and the HG phase (σ_s is baked into photon density, not re-applied), and
+attenuates all surface radiance by `exp(-σ_t·t_hit)`. `K_VOLUME_PHOTONS` in `pathTracer.cuh`;
+gather radius + march cap auto-scale from the scene bounding sphere (no extra XML knobs). Headless
+verified: 1,049,978 volume photons deposited (2M budget) and built into a valid `.kdt`. Visual
+confirmation (god-rays) + brightness tuning pending on the user's machine.
+
+**Deferred (not in the MVP):** bounded per-shape media + boundary tracking; the proper
+`<medium type="homogeneous">` XML element (currently `<default>` props); multi-bounce / non-primary
+medium attenuation (only the camera segment is integrated); a `volume_intensity` artistic knob
+(mirror of `indirect_intensity`/`caustic_intensity`) if the in-scatter needs decoupling from σ_t.
 
 ### 4.1 Volume photons in the emitter
 
