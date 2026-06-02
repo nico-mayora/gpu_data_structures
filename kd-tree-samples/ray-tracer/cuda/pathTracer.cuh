@@ -3,8 +3,12 @@
 #include "owl/include/owl/common/math/random.h"
 #include "../../common/data/world.cuh"
 
+#ifndef K_GLOBAL_PHOTONS
 constexpr int K_GLOBAL_PHOTONS = 24;
+#endif
+#ifndef K_CAUSTIC_PHOTONS
 constexpr int K_CAUSTIC_PHOTONS = 1;
+#endif
 
 enum RayTypes {
     PRIMARY,

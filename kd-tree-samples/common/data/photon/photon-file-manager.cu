@@ -70,8 +70,8 @@ std::vector<Photon> PhotonFileManager::buildTreeHost(const std::vector<EmittedPh
 bool PhotonFileManager::saveKdTreeToFile(const EmittedPhoton* photons, int count,
                                          const std::string& filename,
                                          PhotonFileFormat format) {
-    if (count <= 0 || photons == nullptr) {
-        std::cerr << "Warning: No photons to save." << std::endl;
+    if (count < 0 || photons == nullptr) {
+        std::cerr << "Warning: invalid photon data (null or negative count)." << std::endl;
         return false;
     }
 

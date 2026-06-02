@@ -12,7 +12,13 @@
 
 extern "C" char pathTracer_ptx[];
 
-Viewer::Viewer(const World *world, std::string scene_name) : sceneName(std::move(scene_name)) {
+Viewer::Viewer(const World *world, std::string scene_name, bool benchmark)
+    : owl::viewer::OWLViewer("Path Tracer " + scene_name,
+                             world->cam->image.resolution,
+                             !benchmark,  // visible
+                             false),      // vsync off
+      sceneName(std::move(scene_name))
+{
     context = owlContextCreate(nullptr, 1);
     owlContextSetRayTypeCount(context, RAY_TYPES_COUNT);
     OWLModule module = owlModuleCreate(context, pathTracer_ptx);
@@ -215,6 +221,9 @@ void Viewer::render()
 
     accumID++;
     lastFrameMs = std::chrono::duration<float, std::milli>(end - start).count();
+    if (benchmarkMode) {
+        benchmarkTimes.push_back(lastFrameMs);
+    }
 }
 
 void Viewer::draw()
