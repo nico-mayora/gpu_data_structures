@@ -100,6 +100,7 @@ struct Camera {
         int pixel_samples;
         int num_diffuse_scattered;
         float indirect_intensity; // artistic gain on indirect term (1.0 = physical)
+        float caustic_intensity;  // artistic gain on caustic term (1.0 = physical)
         owl::vec2i resolution;
         float fov;
     } image;

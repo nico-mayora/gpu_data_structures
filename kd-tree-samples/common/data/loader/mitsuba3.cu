@@ -55,6 +55,14 @@ World *Mitsuba3Loader::load() {
         world->cam->image.indirect_intensity = 1.0f;
     }
 
+    // Artistic gain on the caustic term. 1.0 = physically correct; raise it to make
+    // sparse/faint caustics pop without re-emitting more caustic photons.
+    if (const auto it = defaultValues.find("caustic_intensity"); it != defaultValues.end()) {
+        world->cam->image.caustic_intensity = resolveValue<float>(it->second);
+    } else {
+        world->cam->image.caustic_intensity = 1.0f;
+    }
+
     // Photon-emitter budget (emitter-only; the path tracer ignores these). Keep the
     // World defaults when the scene omits them.
     if (const auto it = defaultValues.find("casted_diffuse_photons"); it != defaultValues.end()) {
@@ -398,6 +406,26 @@ void Mitsuba3Loader::loadSensor(const tinyxml2::XMLElement *sensor) {
 }
 
 Mat4f load_transform(const tinyxml2::XMLElement* transform) {
+    // Mitsuba allows either an explicit <matrix> or a <lookat origin/target/up>.
+    if (const auto lookat = transform->FirstChildElement("lookat")) {
+        const owl::vec3f origin = parseVec3f(lookat->Attribute("origin"));
+        const owl::vec3f target = parseVec3f(lookat->Attribute("target"));
+        const owl::vec3f up     = parseVec3f(lookat->Attribute("up"));
+
+        // Mitsuba's look_at convention: camera looks along local +Z toward the
+        // target, columns = [left, new_up, dir, origin].
+        const owl::vec3f dir    = normalize(target - origin);
+        const owl::vec3f left   = normalize(cross(up, dir));
+        const owl::vec3f new_up = cross(dir, left);
+
+        return Mat4f(std::array<float, 16>{
+            left.x, new_up.x, dir.x, origin.x,
+            left.y, new_up.y, dir.y, origin.y,
+            left.z, new_up.z, dir.z, origin.z,
+            0.f,    0.f,      0.f,   1.f
+        });
+    }
+
     const auto matrix_element = transform->FirstChildElement("matrix");
     return Mat4f(matrix_element->Attribute("value"));
 }

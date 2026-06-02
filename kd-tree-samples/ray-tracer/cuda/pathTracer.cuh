@@ -4,7 +4,7 @@
 #include "../../common/data/world.cuh"
 
 constexpr int K_GLOBAL_PHOTONS = 24;
-constexpr int K_CAUSTIC_PHOTONS = 16;
+constexpr int K_CAUSTIC_PHOTONS = 1;
 
 enum RayTypes {
     PRIMARY,
@@ -26,6 +26,7 @@ struct RayGenData {
     int pixel_samples;
     int num_diffuse_scattered;
     float indirect_intensity; // artistic gain on the final-gather term (1.0 = physical)
+    float caustic_intensity;  // artistic gain on the caustic term (1.0 = physical)
 
     Photon *photon_map;
     PhotonCoord *photon_coords;

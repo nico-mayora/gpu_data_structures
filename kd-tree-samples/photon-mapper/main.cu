@@ -239,12 +239,12 @@ void runNormal(Program &program, const std::string &output_filename) {
   for (const auto* light : program.world->lights)
     runPointLightRayGen(program, light, false);
 
-  LOG("done with launch, writing normal photons ...")
+  LOG("done with launch, building + writing normal photon kd-tree ...")
   auto *fb = static_cast<const EmittedPhoton*>(owlBufferGetPointer(program.photonsBuffer, 0));
   auto count = *(int*)owlBufferGetPointer(program.photonsCount, 0);
 
   LOG("normal photon count: " << count)
-  PhotonFileManager::savePhotonsToFile(fb, count, output_filename);
+  PhotonFileManager::saveKdTreeToFile(fb, count, output_filename, PhotonFileFormat::BINARY);
 }
 
 void runCaustics(Program &program, const std::string &output_filename) {
@@ -253,12 +253,12 @@ void runCaustics(Program &program, const std::string &output_filename) {
   for (const auto* light : program.world->lights)
     runPointLightRayGen(program, light, true);
 
-  LOG("done with launch, writing caustic photons ...")
+  LOG("done with launch, building + writing caustic photon kd-tree ...")
   auto *fb = static_cast<const EmittedPhoton*>(owlBufferGetPointer(program.causticsPhotonsBuffer, 0));
   auto count = *(int*)owlBufferGetPointer(program.causticsPhotonsCount, 0);
 
   LOG("caustic photon count: " << count)
-  PhotonFileManager::savePhotonsToFile(fb, count, output_filename);
+  PhotonFileManager::saveKdTreeToFile(fb, count, output_filename, PhotonFileFormat::BINARY);
 }
 
 int main(int ac, char **av)
@@ -280,8 +280,8 @@ int main(int ac, char **av)
   program.world = loader->load();
   const auto t_load_end = std::chrono::steady_clock::now();
 
-  auto normal_photons_filename = "normal_photons.txt";
-  auto caustic_photons_filename = "caustic_photons.txt";
+  auto normal_photons_filename = "normal_photons.kdt";
+  auto caustic_photons_filename = "caustic_photons.kdt";
   program.castedDiffusePhotons = program.world->casted_diffuse_photons;
   program.castedCausticsPhotons = program.world->casted_caustic_photons;
   program.maxDepth = 10;

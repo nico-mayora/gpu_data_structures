@@ -143,7 +143,8 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
                           ? 1.f / float(self.num_diffuse_scattered) : 0.f;
         // indirect_intensity is an artistic gain (1.0 = physically correct); it lets a
         // scene exaggerate colour bleeding where it is geometrically faint (e.g. Sponza).
-        colour_acum += diffuse_contrib * inv_M * prd.albedo * self.indirect_intensity + caustic_term;
+        colour_acum += diffuse_contrib * inv_M * prd.albedo * self.indirect_intensity
+                     + caustic_term * self.caustic_intensity;
         break;
     }
 

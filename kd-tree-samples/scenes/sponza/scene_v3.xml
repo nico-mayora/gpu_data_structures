@@ -9,7 +9,9 @@
 	<default name="load_material_files" value="true" />
 	<!-- Artistic gain on indirect/colour-bleed (1.0 = physical). Sponza's colour bleed
 	     is geometrically faint, so it's exaggerated here for the showcase. -->
-	<default name="indirect_intensity" value="4.0" />
+	<default name="indirect_intensity" value="10.0" />
+	<!-- Artistic gain on caustics (1.0 = physical). Sponza has no caustic geometry. -->
+	<default name="caustic_intensity" value="1.0" />
 	<!-- photonEmitter budget: photons cast for the global (diffuse) and caustic passes. -->
 	<default name="casted_diffuse_photons" value="5000000" />
 	<default name="casted_caustic_photons" value="100" />

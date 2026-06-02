@@ -7,15 +7,16 @@
 	<!-- Renderer-only properties below (see common/data/loader/mitsuba3.cuh). -->
 	<default name="diffuse_scattered" value="8" />
 	<default name="indirect_intensity" value="1.0" />
+	<default name="caustic_intensity" value="1.0" />
 	<default name="casted_diffuse_photons" value="1000000" />
-	<default name="casted_caustic_photons" value="1000000" />
+	<default name="casted_caustic_photons" value="100000" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>
 	<sensor type="perspective">
 		<float name="fov" value="19.5" />
 		<transform name="to_world">
-			<matrix value="-1 0 0 0 0 1 0 1 0 0 -1 6.8 0 0 0 1" />
+			<lookat origin="0, 1, 12.65" target="0, 1, 11.65" up="0, 1, 0" />
 		</transform>
 		<sampler type="independent">
 			<integer name="sample_count" value="$spp" />
@@ -111,7 +112,7 @@
 		<ref id="GlassEggBSDF" />
 	</shape>
 	<emitter type="point" id="Light">
-		<rgb name="intensity" value="1, 1, 1"/>
+		<rgb name="intensity" value="3, 2, 1"/>
 		<point name="position" x="0.5" y="1.75" z="-0.15"/>
 	</emitter>
 </scene>

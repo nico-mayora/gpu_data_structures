@@ -114,6 +114,7 @@ Viewer::Viewer(const World *world, std::string scene_name) : sceneName(std::move
         { "pixel_samples", OWL_INT, OWL_OFFSETOF(RayGenData,pixel_samples)},
         { "num_diffuse_scattered", OWL_INT, OWL_OFFSETOF(RayGenData,num_diffuse_scattered)},
         { "indirect_intensity", OWL_FLOAT, OWL_OFFSETOF(RayGenData,indirect_intensity)},
+        { "caustic_intensity", OWL_FLOAT, OWL_OFFSETOF(RayGenData,caustic_intensity)},
         { "photon_map", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,photon_map)},
         { "photon_coords", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,photon_coords)},
         { "num_photons", OWL_INT, OWL_OFFSETOF(RayGenData,num_photons)},
@@ -157,6 +158,7 @@ Viewer::Viewer(const World *world, std::string scene_name) : sceneName(std::move
     targetSpp = world->cam->image.pixel_samples > 0 ? world->cam->image.pixel_samples : 1;
     owlRayGenSet1i(rayGen, "num_diffuse_scattered", world->cam->image.num_diffuse_scattered);
     owlRayGenSet1f(rayGen, "indirect_intensity", world->cam->image.indirect_intensity);
+    owlRayGenSet1f(rayGen, "caustic_intensity", world->cam->image.caustic_intensity);
     owlRayGenSetPointer(rayGen, "photon_map", world->photon_map);
     owlRayGenSetPointer(rayGen, "photon_coords", world->photon_coords);
     owlRayGenSet1i(rayGen, "num_photons", world->num_photons);

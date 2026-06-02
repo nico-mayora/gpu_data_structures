@@ -7,15 +7,16 @@
 	<!-- Renderer-only properties below (see common/data/loader/mitsuba3.cuh). -->
 	<default name="diffuse_scattered" value="4" />
 	<default name="indirect_intensity" value="1.0" />
-	<default name="casted_diffuse_photons" value="1000000" />
-	<default name="casted_caustic_photons" value="2000000" />
+	<default name="caustic_intensity" value="2.0" />
+	<default name="casted_diffuse_photons" value="10000" />
+	<default name="casted_caustic_photons" value="10000000" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>
 	<sensor type="perspective">
 		<float name="fov" value="19.5" />
 		<transform name="to_world">
-			<matrix value="-1 0 0 0 0 1 0 1 0 0 -1 3 0 0 0 1" />
+			<lookat origin="0, 3, 12" target="0, 0.8, 0" up="0, 1, 0" />
 		</transform>
 		<sampler type="independent">
 			<integer name="sample_count" value="$spp" />
@@ -111,7 +112,7 @@
 	<emitter type="point" id="Light">
 		<!-- Unit-scale box (cf. cornell-box intensity ~1). The original 100 was Tungsten's
 		     light units and blows out to white under our physical I/d^2 + tonemap. -->
-		<rgb name="intensity" value="3, 3, 3"/>
+		<rgb name="intensity" value="3, 2, 1"/>
 		<point name="position" x="0" y="1.8" z="0.75"/>
 	</emitter>
 	<shape type="obj" >

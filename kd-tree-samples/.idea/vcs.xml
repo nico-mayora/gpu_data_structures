@@ -3,6 +3,7 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$/.." vcs="Git" />
     <mapping directory="$PROJECT_DIR$/common/externals/glfw" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/common/externals/imgui" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/common/externals/owl" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/common/externals/stb" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/common/externals/tinyobjloader" vcs="Git" />
