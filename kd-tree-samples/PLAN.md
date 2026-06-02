@@ -21,7 +21,7 @@ Phase 3: Viewer & UX              →  DONE
    3.2  PNG save hotkey                                DONE
    3.3  ImGui HUD                                      DONE
 
-Phase 4: Volumetrics              →  depends on 2.1–2.3 and photon pipeline
+Phase 4: Volumetrics              →  ABANDONED (too invasive; spike stashed on a branch)
    4.1  Volume photons in emitter
    4.2  In-scatter integration via kd-tree
    4.3  Media in scene XML
@@ -227,7 +227,15 @@ global+caustic photon counts, camera pos/at, and last screenshot path. **`H`** t
 
 ---
 
-## Phase 4 — Volumetrics
+## Phase 4 — Volumetrics  ❌ ABANDONED
+
+**Status: abandoned.** A full vertical-slice spike (global homogeneous medium: volume-photon
+emission pass, ray-marched in-scatter via a volume kd-tree, `<default>`-prop media in the scene
+XML) was implemented and worked, but it touched too much of the codebase at once — the emitter,
+the kd-tree query path, the path-tracer integrator, the scene format, and the viewer — for the
+value it added to the kd-tree-focused goals of this project. The spike is **stashed on a separate
+branch** rather than merged; revisit it there if volumetrics is ever resumed, ideally split into
+smaller, independently-reviewable steps. The tasks below are kept for reference only.
 
 This is the largest single goal and the reason to nail Phases 1–2 first: it touches the photon pipeline, the kd-tree query path, the material/light system, and the scene XML.
 
