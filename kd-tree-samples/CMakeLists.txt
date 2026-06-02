@@ -9,17 +9,6 @@ set(glfw_dir ${PROJECT_SOURCE_DIR}/common/externals/glfw)
 set(OptiX_ROOT_DIR $ENV{OptiX_INSTALL_DIR})
 set(CMAKE_PREFIX_PATH $ENV{OptiX_INSTALL_DIR})
 
-# Path Tracer
-
-embed_ptx(
-        OUTPUT_TARGET
-            pathTracer_ptx
-        PTX_LINK_LIBRARIES
-            owl::owl
-        SOURCES
-            ray-tracer/cuda/pathTracer.cu
-)
-
 set(pathTracer_sources
         ray-tracer/main.cu
         common/data/loader/mitsuba3.cu
@@ -30,7 +19,48 @@ set(pathTracer_sources
         common/data/photon/photon-file-manager.cu
 )
 
+# Helper to create a path-tracer executable with specific K compile-time constants.
+# Each variant needs its own PTX target because K is a template parameter in device code.
+function(add_path_tracer_executable exe_name k_global k_caustic)
+    set(ptx_target ${exe_name}_ptx)
+    set(embed_target ${exe_name}_embed)
+
+    embed_ptx(
+            OUTPUT_TARGET ${embed_target}
+            PTX_TARGET ${ptx_target}
+            PTX_LINK_LIBRARIES owl::owl
+            SOURCES ray-tracer/cuda/pathTracer.cu
+    )
+
+    target_compile_definitions(${ptx_target} PRIVATE K_GLOBAL_PHOTONS=${k_global} K_CAUSTIC_PHOTONS=${k_caustic})
+
+    add_executable(${exe_name} ${pathTracer_sources})
+    target_compile_definitions(${exe_name} PRIVATE K_GLOBAL_PHOTONS=${k_global} K_CAUSTIC_PHOTONS=${k_caustic})
+    target_link_libraries(${exe_name} PRIVATE ${embed_target} owl::owl owl_viewer tinyxml2::tinyxml2 tinyobjloader imgui)
+endfunction()
+
+# Original pathTracer (kept for compatibility; uses defaults K_GLOBAL=24, K_CAUSTIC=1)
+embed_ptx(
+        OUTPUT_TARGET
+            pathTracer_ptx
+        PTX_LINK_LIBRARIES
+            owl::owl
+        SOURCES
+            ray-tracer/cuda/pathTracer.cu
+)
+
 add_executable(pathTracer ${pathTracer_sources})
+target_link_libraries(pathTracer PRIVATE pathTracer_ptx owl::owl owl_viewer tinyxml2::tinyxml2 tinyobjloader imgui)
+
+# 5 executables with varying K_GLOBAL_PHOTONS (caustic K fixed at 1)
+foreach(K 4 16 64 128 256)
+    add_path_tracer_executable(pathTracer_kglobal_${K} ${K} 1)
+endforeach()
+
+# 5 executables with varying K_CAUSTIC_PHOTONS (global K fixed at 24)
+foreach(K 4 16 64 128 256)
+    add_path_tracer_executable(pathTracer_kcaustic_${K} 24 ${K})
+endforeach()
 
 # Photon Emitter
 
@@ -88,7 +118,6 @@ add_library(imgui STATIC
 target_include_directories(imgui PUBLIC ${imgui_dir} ${imgui_dir}/backends)
 target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
 
-target_link_libraries(pathTracer PRIVATE pathTracer_ptx owl::owl owl_viewer tinyxml2::tinyxml2 tinyobjloader imgui)
 target_link_libraries(photonEmitter PRIVATE photonEmitter_ptx owl::owl tinyxml2::tinyxml2 tinyobjloader)
 
 add_executable(kdtree_benchmark benchmark/main.cu)

@@ -129,7 +129,7 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
             // Skip MISS: the miss program only sets `event`, leaving sprd.hpMaterial
             // dangling. The final-gather evaluates radiance leaving the SECONDARY hit
             // toward the primary, so pass sprd (not prd) for its hitPoint/normal/material.
-            if (sprd.event != MISS) {
+            if (sprd.event != MISS && self.num_photons > 0) {
                 // Design B: the global map includes the first (directly-lit) bounce,
                 // so a single gather at the secondary hit already yields its full
                 // radiance (direct + indirect) — this is the term that carries colour
@@ -144,9 +144,12 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
         // scan ~the whole tree. The radius suits the unit-scale caustic scenes (cornell/water);
         // it's world-space, so a much larger caustic scene would want a bigger value.
         constexpr float CAUSTIC_GATHER_RADIUS = 0.1f;
-        const owl::vec3f caustic_term = gather_photons<K_CAUSTIC_PHOTONS>(
-            prd.hitPoint, self.caustic_map, self.caustic_coords, self.num_caustic, prd,
-            CAUSTIC_GATHER_RADIUS);
+        owl::vec3f caustic_term = 0.f;
+        if (self.num_caustic > 0) {
+            caustic_term = gather_photons<K_CAUSTIC_PHOTONS>(
+                prd.hitPoint, self.caustic_map, self.caustic_coords, self.num_caustic, prd,
+                CAUSTIC_GATHER_RADIUS);
+        }
 
         // Cosine-weighted MC of the Lambertian hemisphere integral: L_indirect =
         // rho_x * (1/M) * sum_j L(y_j). The cos/pdf cancels to give rho_x (prd.albedo);

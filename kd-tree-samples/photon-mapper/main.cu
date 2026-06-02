@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
 #include "owl/owl.h"
 #include "./cuda/photonEmitter.cuh"
 #include "../common/data/loader/mitsuba3.cuh"
@@ -280,10 +281,22 @@ int main(int ac, char **av)
   program.world = loader->load();
   const auto t_load_end = std::chrono::steady_clock::now();
 
-  auto normal_photons_filename = "normal_photons.kdt";
-  auto caustic_photons_filename = "caustic_photons.kdt";
   program.castedDiffusePhotons = program.world->casted_diffuse_photons;
   program.castedCausticsPhotons = program.world->casted_caustic_photons;
+
+  // Allow overriding photon counts from command line
+  if (ac > 2) {
+    program.castedDiffusePhotons = std::stoi(av[2]);
+    LOG("Overriding normal photons to: " << program.castedDiffusePhotons)
+  }
+  if (ac > 3) {
+    program.castedCausticsPhotons = std::stoi(av[3]);
+    LOG("Overriding caustic photons to: " << program.castedCausticsPhotons)
+  }
+
+  std::filesystem::create_directories("photon_maps");
+  auto normal_photons_filename = "photon_maps/" + scene_name + "_normal_" + std::to_string(program.castedDiffusePhotons) + ".kdt";
+  auto caustic_photons_filename = "photon_maps/" + scene_name + "_caustic_" + std::to_string(program.castedCausticsPhotons) + ".kdt";
   program.maxDepth = 10;
 
   LOG_OK("Loaded world in "
