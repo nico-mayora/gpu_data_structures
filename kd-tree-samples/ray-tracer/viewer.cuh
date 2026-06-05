@@ -5,7 +5,7 @@
 #include "../common/data/world.cuh"
 
 struct Viewer : owl::viewer::OWLViewer {
-    explicit Viewer(const World *world, std::string scene_name = "frame", bool benchmark = false);
+    explicit Viewer(const World *world, std::string scene_name = "frame", bool benchmark = false, bool visible = true);
     ~Viewer();
     void render() override;
     void draw() override;   // base blit + ImGui HUD overlay

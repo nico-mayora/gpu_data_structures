@@ -14,10 +14,25 @@ int main(int ac, char **av)
     int normal_photons = 0;
     int caustic_photons = 0;
     bool benchmark = false;
+    bool visible = true;
 
     if (ac > 2) normal_photons = std::stoi(av[2]);
     if (ac > 3) caustic_photons = std::stoi(av[3]);
-    if (ac > 4) benchmark = (std::string(av[4]) == "benchmark");
+    // Remaining args are flags: "benchmark" and/or "visible"
+    for (int i = 4; i < ac; ++i) {
+        std::string arg(av[i]);
+        if (arg == "benchmark") benchmark = true;
+        else if (arg == "visible") visible = true;
+        else if (arg == "nowindow") visible = false;
+    }
+    // Default: benchmark hides window unless "visible" is explicitly passed
+    if (benchmark) {
+        bool explicit_visible = false;
+        for (int i = 4; i < ac; ++i) {
+            if (std::string(av[i]) == "visible") { explicit_visible = true; break; }
+        }
+        if (!explicit_visible) visible = false;
+    }
 
     const auto loader = new Mitsuba3Loader(scene_name);
     const auto world = loader->load();
@@ -39,7 +54,10 @@ int main(int ac, char **av)
                                       world->num_caustic,
                                       PhotonFileFormat::BINARY);
 
-    Viewer viewer(world, scene_name, benchmark);
+    std::cout << "Benchmark: " << (benchmark ? "ON" : "OFF")
+              << ", Visible: " << (visible ? "ON" : "OFF") << "\n";
+
+    Viewer viewer(world, scene_name, benchmark, visible);
 
     if (benchmark) {
         viewer.showAndRun([&viewer]() {
@@ -50,9 +68,9 @@ int main(int ac, char **av)
             for (size_t i = 1; i < viewer.benchmarkTimes.size(); ++i)
                 sum += viewer.benchmarkTimes[i];
             float avg = sum / float(viewer.benchmarkTimes.size() - 1);
-            std::cout << "BENCHMARK_RESULT: " << avg << " ms\n";
+            std::cout << "BENCHMARK_RESULT: " << avg << " ms" << std::endl;
         } else {
-            std::cout << "BENCHMARK_RESULT: 0 ms\n";
+            std::cout << "BENCHMARK_RESULT: 0 ms" << std::endl;
         }
     } else {
         viewer.enableFlyMode();

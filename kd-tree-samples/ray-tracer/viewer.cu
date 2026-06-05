@@ -12,12 +12,13 @@
 
 extern "C" char pathTracer_ptx[];
 
-Viewer::Viewer(const World *world, std::string scene_name, bool benchmark)
+Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool visible)
     : owl::viewer::OWLViewer("Path Tracer " + scene_name,
                              world->cam->image.resolution,
-                             !benchmark,  // visible
+                             visible,
                              false),      // vsync off
-      sceneName(std::move(scene_name))
+      sceneName(std::move(scene_name)),
+      benchmarkMode(benchmark)
 {
     context = owlContextCreate(nullptr, 1);
     owlContextSetRayTypeCount(context, RAY_TYPES_COUNT);
@@ -186,12 +187,16 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark)
     // Dear ImGui init. The OWLViewer base ctor has already created the GLFW window
     // (`handle`). install_callbacks=false so ImGui doesn't replace OWLViewer's input
     // callbacks (the HUD is read-only, so it doesn't need mouse/keyboard routing).
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-    glfwMakeContextCurrent(handle);
-    ImGui_ImplGlfw_InitForOpenGL(handle, /*install_callbacks=*/false);
-    ImGui_ImplOpenGL3_Init("#version 130");
+    // Skip in benchmark mode — the HUD is invisible and ImGui teardown would warn
+    // because OWLViewer destroys the GLFW window before we can shut down backends.
+    if (!benchmarkMode) {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGui::StyleColorsDark();
+        glfwMakeContextCurrent(handle);
+        ImGui_ImplGlfw_InitForOpenGL(handle, /*install_callbacks=*/false);
+        ImGui_ImplOpenGL3_Init("#version 130");
+    }
 }
 
 Viewer::~Viewer()
@@ -200,14 +205,22 @@ Viewer::~Viewer()
     // get here, so the GLFW/GL backends are already torn down — calling their Shutdown()
     // would hit "GLFW library is not initialized". Only the CPU-side context needs freeing;
     // the backend resources are reclaimed as the process exits.
-    ImGui::DestroyContext();
+    if (!benchmarkMode)
+        ImGui::DestroyContext();
 }
 
 void Viewer::render()
 {
     // Converged: the accumulation has reached the target sample count, so there is
     // nothing new to compute. fbPtr already holds the result; let the viewer re-blit it.
-    if (accumID >= targetSpp) return;
+    // In benchmark mode, reset accumID so every frame does real rendering work.
+    if (accumID >= targetSpp) {
+        if (benchmarkMode) {
+            accumID = 0;
+        } else {
+            return;
+        }
+    }
 
     // accumID is a per-launch uniform, so the SBT must be rebuilt before each launch.
     owlRayGenSet1i(rayGen, "accumID", accumID);
@@ -223,6 +236,8 @@ void Viewer::render()
     lastFrameMs = std::chrono::duration<float, std::milli>(end - start).count();
     if (benchmarkMode) {
         benchmarkTimes.push_back(lastFrameMs);
+        std::cout << "  [benchmark] frame " << benchmarkTimes.size()
+                  << "/10: " << lastFrameMs << " ms\n" << std::flush;
     }
 }
 
@@ -232,7 +247,7 @@ void Viewer::draw()
     // overlay the ImGui HUD on top, before showAndRun swaps buffers.
     OWLViewer::draw();
 
-    if (!hudVisible) return;
+    if (!hudVisible || benchmarkMode) return;
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();

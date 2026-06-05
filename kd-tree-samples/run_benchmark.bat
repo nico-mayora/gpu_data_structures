@@ -4,6 +4,8 @@ setlocal EnableDelayedExpansion
 set SCENE=%1
 set NORMAL=%2
 set CAUSTIC=%3
+set "VISIBLE="
+if /i "%4"=="visible" set "VISIBLE=visible"
 
 if "%SCENE%"=="" goto usage
 if "%NORMAL%"=="" goto usage
@@ -11,8 +13,9 @@ if "%CAUSTIC%"=="" goto usage
 goto start
 
 :usage
-echo Usage: run_benchmark.bat ^<scene^> ^<normal_photons^> ^<caustic_photons^>
+echo Usage: run_benchmark.bat ^<scene^> ^<normal_photons^> ^<caustic_photons^> [visible]
 echo Example: run_benchmark.bat cornell-box 1000000 100000
+echo          run_benchmark.bat cornell-box 1000000 100000 visible
 echo.
 exit /b 1
 
@@ -29,7 +32,7 @@ for %%E in (%EXES%) do (
     echo [RUN] %%E ...
     set "time_ms=DNF"
     if exist "%%E.exe" (
-        %%E.exe %SCENE% %NORMAL% %CAUSTIC% benchmark > tmp_%%E.log 2>&1
+        .\%%E.exe %SCENE% %NORMAL% %CAUSTIC% benchmark %VISIBLE% > tmp_%%E.log 2>&1
         if not errorlevel 1 (
             for /f "tokens=2" %%A in ('findstr "BENCHMARK_RESULT:" tmp_%%E.log') do (
                 set "time_ms=%%A"
