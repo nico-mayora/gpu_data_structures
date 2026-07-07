@@ -167,13 +167,30 @@ owl::vec3f calculate_refracted(const Material& material,
 }
 
 inline __device__
+owl::vec3f random_unit_vector(Random &rand) {
+    const float theta = 2.f * float(M_PI) * rand();
+    const float phi = acosf(2.f * rand() - 1.f);
+    return owl::vec3f(sinf(phi) * cosf(theta), sinf(phi) * sinf(theta), cosf(phi));
+}
+
+inline __device__
 owl::vec3f reflect_or_refract_ray(const Material& material,
                                   const owl::vec3f& ray_dir,
                                   const owl::vec3f& normal,
                                   Random& rand)
 {
     if (material.matType == CONDUCTOR) {
-        return reflect(ray_dir, normal);
+        const owl::vec3f reflected = reflect(ray_dir, normal);
+        if (material.roughness > 0.f) {
+            // "Fuzzy mirror" stand-in for a microfacet lobe: jitter the mirror
+            // direction inside a sphere scaled by 2*alpha (roughly matching a GGX
+            // lobe's spread). Keep the mirror dir if the jitter dips below horizon.
+            const owl::vec3f fuzzed = normalize(
+                reflected + 2.f * material.roughness * random_unit_vector(rand));
+            if (dot(fuzzed, normal) > 0.f)
+                return fuzzed;
+        }
+        return reflected;
     }
 
     if (material.matType == DIELECTRIC) {

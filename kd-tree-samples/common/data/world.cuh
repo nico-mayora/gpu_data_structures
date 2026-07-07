@@ -79,6 +79,9 @@ struct Material {
     float diffuse;
     float specular;
     float ior;
+    // Microfacet alpha for CONDUCTOR, approximated at scatter time as a "fuzzy
+    // mirror" (reflection dir perturbed proportionally). 0 = perfect mirror.
+    float roughness = 0.f;
 };
 
 struct Model {
@@ -201,6 +204,11 @@ struct World {
     // the scene omits them.
     int casted_diffuse_photons = 750'000;
     int casted_caustic_photons = 100;
+
+    // Backdrop radiance for rays that escape the scene (<default name="sky_colour">).
+    // Cosmetic only: shown to camera/specular paths by the path tracer's miss program,
+    // never sampled as a light. Black when the scene omits it.
+    owl::vec3f sky_colour = 0.f;
 
     Camera *cam;
 };

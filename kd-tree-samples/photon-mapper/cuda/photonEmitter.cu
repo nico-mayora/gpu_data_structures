@@ -173,7 +173,17 @@ inline __device__ void scatterSpecular(PhotonMapperPRD &prd, const TrianglesGeom
 
   prd.event = SCATTER_SPECULAR;
   prd.scattered.origin = hitPoint;
-  prd.scattered.direction = reflect(rayDir, normal);
+  // "Fuzzy mirror" (kept in sync with the path tracer's conductor scatter):
+  // jitter the mirror direction by 2*alpha; keep it if the jitter dips below horizon.
+  vec3f reflected = reflect(rayDir, normal);
+  const float roughness = self.material->roughness;
+  if (roughness > 0.f) {
+    const vec3f fuzzed = normalize(
+        reflected + 2.f * roughness * randomPointInUnitSphere(prd.random));
+    if (dot(fuzzed, normal) > 0.f)
+      reflected = fuzzed;
+  }
+  prd.scattered.direction = reflected;
   prd.scattered.color = multiplyColor(albedo, prd.color);
 }
 

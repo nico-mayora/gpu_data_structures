@@ -56,6 +56,9 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
 inline __device__
 owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
     owl::vec3f colour_acum = 0.f;
+    // Product of albedos along the specular prefix of the path, so radiance seen
+    // through mirrors/glass is tinted by them (e.g. steel reflects ~58% gray).
+    owl::vec3f throughput = 1.f;
 
     for (int32_t i = 0; i < self.depth; ++i) {
         uint32_t p0, p1;
@@ -75,7 +78,15 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
             p0, p1
         );
 
-        if (prd.event == MISS || prd.event == ABSORBED)
+        if (prd.event == MISS) {
+            // Sky backdrop: cosmetic radiance for camera/specular paths that escape
+            // the scene (e.g. out a window). It is NOT a light source — final-gather
+            // rays ignore it and the photon maps never see it; scene lights (like the
+            // kitchen's WindowLight) carry the actual energy.
+            colour_acum += throughput * prd.missColour;
+            return colour_acum;
+        }
+        if (prd.event == ABSORBED)
             return colour_acum;
 
         if (prd.event == SCATTER_SPECULAR) {
@@ -83,12 +94,13 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
                 *prd.hpMaterial, ray.direction, prd.normalAtHp, prd.random
             );
 
+            throughput *= prd.albedo;
             ray = owl::Ray(prd.hitPoint, new_ray_dir, EPS, INFTY);
             continue;
         }
 
         auto direct_illumination_fact = calculateDirectIllumination(self, prd);
-        colour_acum += direct_illumination_fact;
+        colour_acum += throughput * direct_illumination_fact;
 
         owl::vec3f diffuse_contrib = 0.f;
         // "Reach out" into the scene and perform gathers, this gives us global lighting with less local variance.
@@ -143,8 +155,9 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
                           ? 1.f / float(self.num_diffuse_scattered) : 0.f;
         // indirect_intensity is an artistic gain (1.0 = physically correct); it lets a
         // scene exaggerate colour bleeding where it is geometrically faint (e.g. Sponza).
-        colour_acum += diffuse_contrib * inv_M * prd.albedo * self.indirect_intensity
-                     + caustic_term * self.caustic_intensity;
+        colour_acum += throughput
+                     * (diffuse_contrib * inv_M * prd.albedo * self.indirect_intensity
+                        + caustic_term * self.caustic_intensity);
         break;
     }
 
@@ -201,8 +214,10 @@ OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
 
 OPTIX_MISS_PROGRAM(miss)()
 {
+    const auto &self = owl::getProgramData<MissProgData>();
     auto &prd = owl::getPRD<PerRayData>();
     prd.event = MISS;
+    prd.missColour = self.sky_colour;
 }
 
 OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()

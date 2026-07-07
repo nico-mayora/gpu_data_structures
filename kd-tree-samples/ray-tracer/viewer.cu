@@ -102,7 +102,8 @@ Viewer::Viewer(const World *world, std::string scene_name) : sceneName(std::move
     OWLMissProg missProg
       = owlMissProgCreate(context,module,"miss",sizeof(MissProgData),
                           missProgVars,-1);
-    owlMissProgSet3f(missProg,"sky_colour",owl3f{.1f,.01f,.2f});
+    owlMissProgSet3f(missProg,"sky_colour",
+                     owl3f{world->sky_colour.x, world->sky_colour.y, world->sky_colour.z});
 
     owlMissProgCreate(context, module,"shadow",0,nullptr,-1);
 

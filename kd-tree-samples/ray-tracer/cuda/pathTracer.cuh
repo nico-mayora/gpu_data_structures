@@ -3,8 +3,8 @@
 #include "owl/include/owl/common/math/random.h"
 #include "../../common/data/world.cuh"
 
-constexpr int K_GLOBAL_PHOTONS = 24;
-constexpr int K_CAUSTIC_PHOTONS = 1;
+constexpr int K_GLOBAL_PHOTONS = 16;
+constexpr int K_CAUSTIC_PHOTONS = 64;
 
 enum RayTypes {
     PRIMARY,
@@ -54,4 +54,5 @@ struct PerRayData {
     owl::vec3f albedo;       // albedo at the hit point (texture sample or flat material albedo)
     owl::vec3f hitPoint;
     owl::vec3f normalAtHp;
+    owl::vec3f missColour;   // sky/backdrop radiance, set by the miss program (MISS only)
 };

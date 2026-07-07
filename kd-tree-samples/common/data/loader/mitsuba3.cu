@@ -72,6 +72,12 @@ World *Mitsuba3Loader::load() {
         world->casted_caustic_photons = resolveValue<int>(it->second);
     }
 
+    // Backdrop radiance for escaped rays (e.g. the view out a window). Stays
+    // black when the scene omits it.
+    if (const auto it = defaultValues.find("sky_colour"); it != defaultValues.end()) {
+        world->sky_colour = parseVec3f(it->second);
+    }
+
     return world;
 }
 
@@ -203,8 +209,15 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
     if (type == "rectangle" || type == "cube") {
         Mesh *mesh = (type == "rectangle") ? Mesh::makeBaseRectangle() : Mesh::makeBaseCube();
         mesh->applyTransform(tf);
-        const std::string mat_id = shape->FirstChildElement("ref")->Attribute("id");
-        auto *model = new Model{ mesh, materials.at(mat_id) };
+        const auto ref = shape->FirstChildElement("ref");
+        if (!ref) {
+            std::cerr << "ERROR: shape '" << (shape->Attribute("id") ? shape->Attribute("id") : "<unnamed>")
+                      << "' of type '" << type << "' has no material <ref>" << std::endl;
+            std::abort();
+        }
+        const std::string mat_id = ref->Attribute("id");
+        Material *material = materials.at(mat_id);
+        auto *model = new Model{ mesh, material, xmlTexturePath(material) };
         world->models.emplace_back(model);
         return;
     }
@@ -239,8 +252,20 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
     for (auto &sub : submeshes) {
         sub.mesh->applyTransform(tf);
         Material *material = resolveSubmeshMaterial(sub, shape);
-        world->models.emplace_back(new Model{ sub.mesh, material, sub.albedo_texture_path });
+        // The submesh's own .mtl texture wins; otherwise fall back to the XML
+        // material's bitmap reflectance, if it declared one.
+        const std::string &tex = sub.albedo_texture_path.empty()
+            ? xmlTexturePath(material) : sub.albedo_texture_path;
+        world->models.emplace_back(new Model{ sub.mesh, material, tex });
     }
+}
+
+// Albedo texture declared on the XML material itself (bitmap reflectance);
+// empty for untextured materials.
+const std::string &Mitsuba3Loader::xmlTexturePath(const Material *material) const {
+    static const std::string kNoTexture;
+    const auto it = materialTextures.find(material);
+    return it != materialTextures.end() ? it->second : kNoTexture;
 }
 
 float Mitsuba3Loader::getDiffuseCoeff(const Material* mat, const tinyxml2::XMLElement *inner_bsdf=nullptr) {
@@ -265,9 +290,12 @@ float Mitsuba3Loader::getSpecularCoeff(const Material* mat, const tinyxml2::XMLE
         return 0.f;
     }
     if (mat->matType == CONDUCTOR) {
-      const auto specular = inner_bsdf->FirstChildElement("float");
-      assert(std::string(specular->Attribute("name")) == "specular");
-      return resolveValue<float>(specular->Attribute("value"));
+      // <float name="specular"> is this project's convention; Mitsuba-style
+      // conductors (material/eta/k) don't carry it -> perfect mirror.
+      if (const auto specular = find_named_child(inner_bsdf, "float", "specular")) {
+        return resolveValue<float>(specular->Attribute("value"));
+      }
+      return 1.f;
     }
     std::cerr << "ERROR: Unknown material type in getSpecularCoeff" << std::endl;
     std::abort();
@@ -279,9 +307,10 @@ float Mitsuba3Loader::getTransmissionCoeff(const Material* mat, const tinyxml2::
     }
     if (mat->matType == DIELECTRIC) {
         // We assume ext_ior to always be 1.0
-        const auto ior = inner_bsdf->FirstChildElement("float");
-        assert(std::string(ior->Attribute("name")) == "int_ior");
-        return resolveValue<float>(ior->Attribute("value"));
+        if (const auto ior = find_named_child(inner_bsdf, "float", "int_ior")) {
+            return resolveValue<float>(ior->Attribute("value"));
+        }
+        return 1.5f;   // Mitsuba's dielectric default (bk7 glass)
     }
     if (mat->matType == CONDUCTOR) {
         return 0.f;
@@ -291,16 +320,85 @@ float Mitsuba3Loader::getTransmissionCoeff(const Material* mat, const tinyxml2::
 }
 
 // Returns the effective leaf BSDF element to read material properties from.
-// Mitsuba's `twosided` is a modifier that wraps a real BSDF; everything else
-// (diffuse, dielectric, conductor, roughconductor) is itself a leaf.
+// Mitsuba's `twosided` and `mask` are modifiers that wrap a real BSDF (and can
+// nest, e.g. mask > twosided > diffuse); everything else (diffuse, dielectric,
+// conductor, roughconductor) is itself a leaf. Mask opacity is dropped: the
+// wrapped BSDF is treated as fully opaque.
 static const tinyxml2::XMLElement *unwrap_twosided(const tinyxml2::XMLElement *bsdf) {
-    if (const auto type = bsdf->Attribute("type"); type && std::string(type) == "twosided") {
-        return bsdf->FirstChildElement("bsdf");
+    while (bsdf) {
+        const auto type = bsdf->Attribute("type");
+        if (!type || (std::string(type) != "twosided" && std::string(type) != "mask")) break;
+        const auto inner = bsdf->FirstChildElement("bsdf");
+        if (!inner) break;
+        bsdf = inner;
     }
     return bsdf;
 }
 
+// Reflection tint for a (rough)conductor. Mitsuba's actual reflectance is
+// F(theta) * specular_reflectance; we approximate F with its normal-incidence
+// value F0 derived from eta/k per channel. Either property may be absent
+// (e.g. <string name="material" value="none"/> is a perfect mirror -> 1).
+owl::vec3f Mitsuba3Loader::conductorAlbedo(const tinyxml2::XMLElement *inner) {
+    owl::vec3f albedo(1.f);
+    if (const auto refl = find_named_child(inner, "rgb", "specular_reflectance")) {
+        albedo = parseVec3f(refl->Attribute("value"));
+    }
+    const auto eta_elem = find_named_child(inner, "rgb", "eta");
+    const auto k_elem = find_named_child(inner, "rgb", "k");
+    if (eta_elem && k_elem) {
+        const owl::vec3f eta = parseVec3f(eta_elem->Attribute("value"));
+        const owl::vec3f k = parseVec3f(k_elem->Attribute("value"));
+        const auto f0 = [](const float e, const float kk) {
+            return ((e - 1.f) * (e - 1.f) + kk * kk) / ((e + 1.f) * (e + 1.f) + kk * kk);
+        };
+        albedo *= owl::vec3f(f0(eta.x, k.x), f0(eta.y, k.y), f0(eta.z, k.z));
+    }
+    return albedo;
+}
+
+// Reads a reflectance-style property (`prop`) into the material's albedo.
+// Handles both an inline <rgb> colour and a bitmap <texture> (whose path is
+// remembered for Model creation; the gray albedo is only the fallback if the
+// texture fails to load).
+void Mitsuba3Loader::loadReflectance(Material *material, const std::string &name,
+                                     const tinyxml2::XMLElement *inner, const char *prop) {
+    if (const auto rgb = find_named_child(inner, "rgb", prop)) {
+        material->albedo = parseVec3f(rgb->Attribute("value"));
+        return;
+    }
+    material->albedo = owl::vec3f(0.8f);
+    if (const auto texture = find_named_child(inner, "texture", prop)) {
+        if (const auto file_elem = find_named_child(texture, "string", "filename")) {
+            materialTextures.emplace(material, sceneDir + "\\" + file_elem->Attribute("value"));
+        } else {
+            std::cerr << "WARNING: BSDF '" << name << "' has a texture " << prop
+                      << " without a filename" << std::endl;
+        }
+    } else {
+        std::cerr << "WARNING: BSDF '" << name << "' has no " << prop
+                  << "; using default Lambertian gray" << std::endl;
+    }
+}
+
 void Mitsuba3Loader::loadMaterial(const tinyxml2::XMLElement *bsdf) {
+    // `bumpmap` is an id-less wrapper: the referenced material (with the id) is
+    // the nested <bsdf>. Drop the bump map and load the wrapped BSDF instead.
+    if (const auto type_attr = bsdf->Attribute("type"); type_attr && std::string(type_attr) == "bumpmap") {
+        if (const auto wrapped = bsdf->FirstChildElement("bsdf")) {
+            std::cerr << "WARNING: bumpmap wrapper dropped; loading wrapped BSDF '"
+                      << (wrapped->Attribute("id") ? wrapped->Attribute("id") : "<unnamed>")
+                      << "' without bump mapping" << std::endl;
+            loadMaterial(wrapped);
+        }
+        return;
+    }
+    if (!bsdf->Attribute("id")) {
+        std::cerr << "WARNING: skipping <bsdf type=\"" << (bsdf->Attribute("type") ? bsdf->Attribute("type") : "?")
+                  << "\"> without id; it cannot be referenced" << std::endl;
+        return;
+    }
+
     const auto inner = unwrap_twosided(bsdf);
     auto material = new Material;
 
@@ -309,12 +407,20 @@ void Mitsuba3Loader::loadMaterial(const tinyxml2::XMLElement *bsdf) {
 
     if (type == "diffuse") {
         material->matType = LAMBERTIAN;
-        const auto reflectance = inner->FirstChildElement("rgb");
-        assert(std::string(reflectance->Attribute("name")) == "reflectance");
-        material->albedo = parseVec3f(reflectance->Attribute("value"));
+        loadReflectance(material, name, inner, "reflectance");
         material->diffuse = getDiffuseCoeff(material, inner);
         material->specular = getSpecularCoeff(material, inner);
         material->ior = getTransmissionCoeff(material, inner);
+    } else if (type == "roughplastic" || type == "plastic") {
+        // Collapse to LAMBERTIAN keeping the diffuse_reflectance colour/texture;
+        // the specular coat is dropped until a microfacet pass exists.
+        material->matType = LAMBERTIAN;
+        loadReflectance(material, name, inner, "diffuse_reflectance");
+        material->diffuse = 1.f;
+        material->specular = 0.f;
+        material->ior = 0.f;
+        std::cerr << "WARNING: " << type << " '" << name
+                  << "' collapsed to LAMBERTIAN; specular coat dropped" << std::endl;
     } else if (type == "dielectric") {
         material->matType = DIELECTRIC;
         material->albedo = 1.f;
@@ -323,27 +429,21 @@ void Mitsuba3Loader::loadMaterial(const tinyxml2::XMLElement *bsdf) {
         material->ior = getTransmissionCoeff(material, inner);
     } else if (type == "conductor") {
         material->matType = CONDUCTOR;
-        material->albedo = 1.f;
+        material->albedo = conductorAlbedo(inner);
         material->diffuse = getDiffuseCoeff(material, inner);
         material->ior = getTransmissionCoeff(material, inner);
         material->specular = getSpecularCoeff(material, inner);
     } else if (type == "roughconductor") {
-        // Collapse to smooth CONDUCTOR; alpha (roughness) is dropped until a microfacet pass exists.
+        // Approximated as a tinted "fuzzy mirror": alpha perturbs the reflection
+        // direction at scatter time in lieu of a real microfacet lobe.
         material->matType = CONDUCTOR;
-        material->albedo = 1.f;
+        material->albedo = conductorAlbedo(inner);
         material->diffuse = 0.f;
         material->ior = 0.f;
         material->specular = 1.f;
-        const char *alpha_str = nullptr;
-        for (auto f = inner->FirstChildElement("float"); f; f = f->NextSiblingElement("float")) {
-            if (f->Attribute("name") && std::string(f->Attribute("name")) == "alpha") {
-                alpha_str = f->Attribute("value");
-                break;
-            }
+        if (const auto alpha = find_named_child(inner, "float", "alpha")) {
+            material->roughness = resolveValue<float>(alpha->Attribute("value"));
         }
-        std::cerr << "WARNING: roughconductor '" << name << "' collapsed to smooth CONDUCTOR; "
-                  << "dropped alpha=" << (alpha_str ? alpha_str : "(unset)")
-                  << " until microfacet pass lands" << std::endl;
     } else {
         std::cerr << "WARNING: BSDF '" << name << "' uses unsupported type '" << type
                   << "'; using default Lambertian" << std::endl;
