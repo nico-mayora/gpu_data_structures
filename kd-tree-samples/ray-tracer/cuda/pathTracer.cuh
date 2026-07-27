@@ -3,8 +3,8 @@
 #include "owl/include/owl/common/math/random.h"
 #include "../../common/data/world.cuh"
 
-constexpr int K_GLOBAL_PHOTONS = 24;
-constexpr int K_CAUSTIC_PHOTONS = 128;
+constexpr int K_GLOBAL_PHOTONS = 16;
+constexpr int K_CAUSTIC_PHOTONS = 64;
 
 enum RayTypes {
     PRIMARY,
@@ -18,11 +18,15 @@ struct MissProgData {
 
 struct RayGenData {
     uint32_t *fbPtr;
+    owl::vec3f *accumBuffer;   // linear radiance accumulated across launches (one vec3f/pixel)
+    int accumID;               // launches since last reset; 0 overwrites instead of accumulating
     owl::vec2i resolution;
     OptixTraversableHandle world;
     int depth;
     int pixel_samples;
     int num_diffuse_scattered;
+    float indirect_intensity; // artistic gain on the final-gather term (1.0 = physical)
+    float caustic_intensity;  // artistic gain on the caustic term (1.0 = physical)
 
     Photon *photon_map;
     PhotonCoord *photon_coords;
@@ -38,7 +42,8 @@ struct RayGenData {
         owl::vec3f dir_du;
     } camera;
 
-    PointLight *scene_light;
+    Light *lights;
+    int num_lights;
 };
 
 struct PerRayData {
@@ -46,6 +51,8 @@ struct PerRayData {
     RayEvent event;
 
     const Material *hpMaterial;
+    owl::vec3f albedo;       // albedo at the hit point (texture sample or flat material albedo)
     owl::vec3f hitPoint;
     owl::vec3f normalAtHp;
+    owl::vec3f missColour;   // sky/backdrop radiance, set by the miss program (MISS only)
 };

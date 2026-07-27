@@ -4,24 +4,25 @@
 #include "../common/data/loader/mitsuba3.cuh"
 #include "../common/data/photon/photon-file-manager.cuh"
 
-int main()
+int main(int ac, char **av)
 {
     std::cout << "Start!\n";
-    // TODO: pass scene name as argv
-    const auto loader = new Mitsuba3Loader("cornell-box");
+    const std::string scene_name = (ac > 1) ? av[1] : "sponza";
+    std::cout << "Scene: " << scene_name << "\n";
+    const auto loader = new Mitsuba3Loader(scene_name);
     const auto world = loader->load();
-    PhotonFileManager::loadKdTreeFromFile("normal_photons.txt",
+    PhotonFileManager::loadKdTreeFromFile("normal_photons.kdt",
                                           world->photon_map,
                                           world->photon_coords,
                                           world->num_photons,
-                                          PhotonFileFormat::TEXT);
-    PhotonFileManager::loadKdTreeFromFile("caustic_photons.txt",
+                                          PhotonFileFormat::BINARY);
+    PhotonFileManager::loadKdTreeFromFile("caustic_photons.kdt",
                                       world->caustic_map,
                                       world->caustic_coords,
                                       world->num_caustic,
-                                      PhotonFileFormat::TEXT);
+                                      PhotonFileFormat::BINARY);
 
-    Viewer viewer(world);
+    Viewer viewer(world, scene_name);
     viewer.enableFlyMode();
 
     std::cout << "Launching...\n";
