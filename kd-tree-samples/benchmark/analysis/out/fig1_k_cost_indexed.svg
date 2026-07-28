@@ -1,0 +1,606 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="944" height="1115" viewBox="0 0 944 1115" class="fig" role="img" aria-label="Fig 1 - Cost of K, indexed within each configuration">
+<style>
+  text  { font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .title { font-size: 15px; font-weight: 600; }
+  .sub   { font-size: 11px; }
+  .panel { font-size: 11px; font-weight: 600; }
+  .axis  { font-size: 9.5px; font-variant-numeric: tabular-nums; }
+  .note  { font-size: 9.5px; }
+  /* Heatmap cell values sit on ramp colours that do NOT change between modes,
+     so they keep their own fill and are deliberately absent from the dark
+     block below -- a .axis dark rule would repaint them into their cells. */
+  .cellval { font-size: 9.5px; font-variant-numeric: tabular-nums; font-weight: 600; }
+  @media (prefers-color-scheme: dark) {
+    .bg    { fill: #1a1a19; }
+    .title, .panel { fill: #ffffff; }
+    .sub   { fill: #c3c2b7; }
+    .axis  { fill: #c3c2b7; }
+    .note  { fill: #8a8880; }
+    .grid  { stroke: #2e2e2c; }
+    .ring  { stroke: #1a1a19; }
+    /* Element-qualified: a bare `.s-x { fill }` rule would beat the fill="none"
+       presentation attribute on the polylines and fill each line into a closed
+       polygon. Strokes and fills must be re-declared per element type. */
+    polyline.s-global, path.s-global   { stroke: #3987e5; fill: none; }
+    polyline.s-caustic, path.s-caustic { stroke: #d95926; fill: none; }
+    polyline.s-0, path.s-0 { stroke: #3987e5; fill: none; }
+    polyline.s-1, path.s-1 { stroke: #d95926; fill: none; }
+    polyline.s-2, path.s-2 { stroke: #199e70; fill: none; }
+    circle.s-global,  text.s-global  { fill: #3987e5; }
+    circle.s-caustic, text.s-caustic { fill: #d95926; }
+    /* Hollow GPU markers keep the surface as their fill, not the series hue. */
+    rect.s-global  { stroke: #3987e5; fill: #1a1a19; }
+    rect.s-caustic { stroke: #d95926; fill: #1a1a19; }
+    circle.s-0, text.s-0 { fill: #3987e5; }
+    circle.s-1, text.s-1 { fill: #d95926; }
+    circle.s-2, text.s-2 { fill: #199e70; }
+    circle.ring { stroke: #1a1a19; }
+  }
+</style>
+<rect class="bg" fill="#fcfcfb" x="0" y="0" width="944" height="1115"/>
+<text class="title" fill="#0b0b0b" x="20.0" y="26.0">Fig 1 - Cost of K, indexed within each configuration</text>
+<text class="sub" fill="#52514e" x="20.0" y="43.0">Each series indexed to its panel's smallest shared K. x = K (log2), y = log. Flat means K is free; rising means K dominates.</text>
+<circle class="s-global" cx="24.0" cy="57.0" r="4" fill="#2a78d6"/>
+<text class="sub" fill="#52514e" x="33.0" y="60.0">global-map K sweep (caustic K pinned at 1)</text>
+<circle class="s-caustic" cx="349.8" cy="57.0" r="4" fill="#eb6834"/>
+<text class="sub" fill="#52514e" x="358.8" y="60.0">caustic-map K sweep (global K pinned at 24)</text>
+<line x1="20.0" y1="77.0" x2="46.0" y2="77.0" stroke="#52514e" stroke-width="2"/>
+<circle class="ring " cx="33.0" cy="77.0" r="4" fill="#52514e" stroke="#fcfcfb" stroke-width="2"/>
+<text class="sub" fill="#52514e" x="53.0" y="80.0">RTX 4070</text>
+<line x1="121.2" y1="77.0" x2="147.2" y2="77.0" stroke="#52514e" stroke-width="2" stroke-dasharray="6 3"/>
+<rect class="" x="130.6" y="73.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#52514e" stroke-width="2"/>
+<text class="sub" fill="#52514e" x="154.2" y="80.0">RTX 3060 Ti</text>
+<text class="panel" fill="#0b0b0b" x="66.0" y="110.0">cornell-box</text>
+<text class="sub" fill="#52514e" x="66.0" y="123.0">global 1k / caustic 1k</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="297.0" x2="316.0" y2="297.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="300.0" text-anchor="end">0.1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="280.4" x2="316.0" y2="280.4"/>
+<text class="axis" fill="#52514e" x="61.0" y="283.4" text-anchor="end">0.2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="258.6" x2="316.0" y2="258.6"/>
+<text class="axis" fill="#52514e" x="61.0" y="261.6" text-anchor="end">0.5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="242.0" x2="316.0" y2="242.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="245.0" text-anchor="end">1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="225.4" x2="316.0" y2="225.4"/>
+<text class="axis" fill="#52514e" x="61.0" y="228.4" text-anchor="end">2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="203.6" x2="316.0" y2="203.6"/>
+<text class="axis" fill="#52514e" x="61.0" y="206.6" text-anchor="end">5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="187.0" x2="316.0" y2="187.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="190.0" text-anchor="end">10x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="170.4" x2="316.0" y2="170.4"/>
+<text class="axis" fill="#52514e" x="61.0" y="173.4" text-anchor="end">20x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="148.6" x2="316.0" y2="148.6"/>
+<text class="axis" fill="#52514e" x="61.0" y="151.6" text-anchor="end">50x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="132.0" x2="316.0" y2="132.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="135.0" text-anchor="end">100x</text>
+<text class="axis" fill="#52514e" x="66.0" y="310.0" text-anchor="middle">4</text>
+<text class="axis" fill="#52514e" x="149.3" y="310.0" text-anchor="middle">16</text>
+<text class="axis" fill="#52514e" x="232.7" y="310.0" text-anchor="middle">64</text>
+<text class="axis" fill="#52514e" x="274.3" y="310.0" text-anchor="middle">128</text>
+<text class="axis" fill="#52514e" x="316.0" y="310.0" text-anchor="middle">256</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="297.0" x2="316.0" y2="297.0"/>
+<polyline class="s-global" points="66.0,242.0 149.3,205.1 232.7,155.3 274.3,135.1" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-global" cx="66.0" cy="242.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="149.3" cy="205.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="232.7" cy="155.3" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="274.3" cy="135.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<path class="s-global" d="M312.8,313.0 l6.4,6.4 M319.2,313.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-global" points="66.0,242.0 149.3,204.2 232.7,156.3 274.3,136.3" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-global" x="62.4" y="238.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="145.7" y="200.6" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="229.1" y="152.7" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="270.7" y="132.7" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<path class="s-global" d="M312.8,313.0 l6.4,6.4 M319.2,313.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<text class="note" fill="#8a8880" x="66.0" y="335.0">indexed to K=4</text>
+<text class="panel" fill="#0b0b0b" x="368.0" y="110.0">cornell-box</text>
+<text class="sub" fill="#52514e" x="368.0" y="123.0">global 1M / caustic 100k</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="297.0" x2="618.0" y2="297.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="300.0" text-anchor="end">0.1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="280.4" x2="618.0" y2="280.4"/>
+<text class="axis" fill="#52514e" x="363.0" y="283.4" text-anchor="end">0.2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="258.6" x2="618.0" y2="258.6"/>
+<text class="axis" fill="#52514e" x="363.0" y="261.6" text-anchor="end">0.5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="242.0" x2="618.0" y2="242.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="245.0" text-anchor="end">1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="225.4" x2="618.0" y2="225.4"/>
+<text class="axis" fill="#52514e" x="363.0" y="228.4" text-anchor="end">2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="203.6" x2="618.0" y2="203.6"/>
+<text class="axis" fill="#52514e" x="363.0" y="206.6" text-anchor="end">5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="187.0" x2="618.0" y2="187.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="190.0" text-anchor="end">10x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="170.4" x2="618.0" y2="170.4"/>
+<text class="axis" fill="#52514e" x="363.0" y="173.4" text-anchor="end">20x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="148.6" x2="618.0" y2="148.6"/>
+<text class="axis" fill="#52514e" x="363.0" y="151.6" text-anchor="end">50x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="132.0" x2="618.0" y2="132.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="135.0" text-anchor="end">100x</text>
+<text class="axis" fill="#52514e" x="368.0" y="310.0" text-anchor="middle">4</text>
+<text class="axis" fill="#52514e" x="451.3" y="310.0" text-anchor="middle">16</text>
+<text class="axis" fill="#52514e" x="534.7" y="310.0" text-anchor="middle">64</text>
+<text class="axis" fill="#52514e" x="576.3" y="310.0" text-anchor="middle">128</text>
+<text class="axis" fill="#52514e" x="618.0" y="310.0" text-anchor="middle">256</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="297.0" x2="618.0" y2="297.0"/>
+<polyline class="s-global" points="368.0,261.1 451.3,242.0 534.7,206.7 576.3,189.9" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-global" cx="368.0" cy="261.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="451.3" cy="242.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="534.7" cy="206.7" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="576.3" cy="189.9" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text class="axis lbl s-global" x="576.3" y="180.9" text-anchor="middle" fill="#2a78d6" font-weight="600">global</text>
+<path class="s-global" d="M614.8,313.0 l6.4,6.4 M621.2,313.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="451.3,242.0 534.7,241.9 576.3,240.3" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-caustic" cx="451.3" cy="242.0" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="534.7" cy="241.9" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="576.3" cy="240.3" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text class="axis lbl s-caustic" x="576.3" y="255.3" text-anchor="middle" fill="#eb6834" font-weight="600">caustic</text>
+<path class="s-caustic" d="M364.8,313.0 l6.4,6.4 M371.2,313.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<path class="s-caustic" d="M614.8,313.0 l6.4,6.4 M621.2,313.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<text class="note" fill="#8a8880" x="368.0" y="335.0">indexed to K=16</text>
+<text class="panel" fill="#0b0b0b" x="670.0" y="110.0">cornell-box</text>
+<text class="sub" fill="#52514e" x="670.0" y="123.0">global 1M / caustic 1M</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="297.0" x2="920.0" y2="297.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="300.0" text-anchor="end">0.1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="280.4" x2="920.0" y2="280.4"/>
+<text class="axis" fill="#52514e" x="665.0" y="283.4" text-anchor="end">0.2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="258.6" x2="920.0" y2="258.6"/>
+<text class="axis" fill="#52514e" x="665.0" y="261.6" text-anchor="end">0.5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="242.0" x2="920.0" y2="242.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="245.0" text-anchor="end">1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="225.4" x2="920.0" y2="225.4"/>
+<text class="axis" fill="#52514e" x="665.0" y="228.4" text-anchor="end">2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="203.6" x2="920.0" y2="203.6"/>
+<text class="axis" fill="#52514e" x="665.0" y="206.6" text-anchor="end">5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="187.0" x2="920.0" y2="187.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="190.0" text-anchor="end">10x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="170.4" x2="920.0" y2="170.4"/>
+<text class="axis" fill="#52514e" x="665.0" y="173.4" text-anchor="end">20x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="148.6" x2="920.0" y2="148.6"/>
+<text class="axis" fill="#52514e" x="665.0" y="151.6" text-anchor="end">50x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="132.0" x2="920.0" y2="132.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="135.0" text-anchor="end">100x</text>
+<text class="axis" fill="#52514e" x="670.0" y="310.0" text-anchor="middle">4</text>
+<text class="axis" fill="#52514e" x="753.3" y="310.0" text-anchor="middle">16</text>
+<text class="axis" fill="#52514e" x="836.7" y="310.0" text-anchor="middle">64</text>
+<text class="axis" fill="#52514e" x="878.3" y="310.0" text-anchor="middle">128</text>
+<text class="axis" fill="#52514e" x="920.0" y="310.0" text-anchor="middle">256</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="297.0" x2="920.0" y2="297.0"/>
+<polyline class="s-global" points="670.0,242.0 753.3,223.2 836.7,189.3 878.3,172.5" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-global" x="666.4" y="238.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="749.7" y="219.6" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="833.1" y="185.7" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="874.7" y="168.9" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<text class="axis lbl s-global" x="878.3" y="163.5" text-anchor="middle" fill="#2a78d6" font-weight="600">global</text>
+<path class="s-global" d="M916.8,313.0 l6.4,6.4 M923.2,313.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="670.0,242.0 753.3,241.9 836.7,241.6 878.3,241.1" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-caustic" x="666.4" y="238.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="749.7" y="238.3" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="833.1" y="238.0" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="874.7" y="237.5" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<text class="axis lbl s-caustic" x="878.3" y="256.1" text-anchor="middle" fill="#eb6834" font-weight="600">caustic</text>
+<path class="s-caustic" d="M916.8,313.0 l6.4,6.4 M923.2,313.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<text class="note" fill="#8a8880" x="670.0" y="335.0">indexed to K=4</text>
+<text class="panel" fill="#0b0b0b" x="66.0" y="353.0">cornell-box</text>
+<text class="sub" fill="#52514e" x="66.0" y="366.0">global 10M / caustic 1M</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="540.0" x2="316.0" y2="540.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="543.0" text-anchor="end">0.1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="523.4" x2="316.0" y2="523.4"/>
+<text class="axis" fill="#52514e" x="61.0" y="526.4" text-anchor="end">0.2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="501.6" x2="316.0" y2="501.6"/>
+<text class="axis" fill="#52514e" x="61.0" y="504.6" text-anchor="end">0.5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="485.0" x2="316.0" y2="485.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="488.0" text-anchor="end">1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="468.4" x2="316.0" y2="468.4"/>
+<text class="axis" fill="#52514e" x="61.0" y="471.4" text-anchor="end">2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="446.6" x2="316.0" y2="446.6"/>
+<text class="axis" fill="#52514e" x="61.0" y="449.6" text-anchor="end">5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="430.0" x2="316.0" y2="430.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="433.0" text-anchor="end">10x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="413.4" x2="316.0" y2="413.4"/>
+<text class="axis" fill="#52514e" x="61.0" y="416.4" text-anchor="end">20x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="391.6" x2="316.0" y2="391.6"/>
+<text class="axis" fill="#52514e" x="61.0" y="394.6" text-anchor="end">50x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="375.0" x2="316.0" y2="375.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="378.0" text-anchor="end">100x</text>
+<text class="axis" fill="#52514e" x="66.0" y="553.0" text-anchor="middle">4</text>
+<text class="axis" fill="#52514e" x="149.3" y="553.0" text-anchor="middle">16</text>
+<text class="axis" fill="#52514e" x="232.7" y="553.0" text-anchor="middle">64</text>
+<text class="axis" fill="#52514e" x="274.3" y="553.0" text-anchor="middle">128</text>
+<text class="axis" fill="#52514e" x="316.0" y="553.0" text-anchor="middle">256</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="540.0" x2="316.0" y2="540.0"/>
+<polyline class="s-global" points="66.0,485.0 149.3,482.7 232.7,475.5 274.3,463.1" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-global" cx="66.0" cy="485.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="149.3" cy="482.7" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="232.7" cy="475.5" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="274.3" cy="463.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text class="axis lbl s-global" x="274.3" y="454.1" text-anchor="middle" fill="#2a78d6" font-weight="600">global</text>
+<path class="s-global" d="M312.8,556.0 l6.4,6.4 M319.2,556.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="66.0,485.0 149.3,484.9 232.7,484.9 274.3,484.9" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-caustic" cx="66.0" cy="485.0" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="149.3" cy="484.9" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="232.7" cy="484.9" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="274.3" cy="484.9" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text class="axis lbl s-caustic" x="274.3" y="499.9" text-anchor="middle" fill="#eb6834" font-weight="600">caustic</text>
+<path class="s-caustic" d="M312.8,556.0 l6.4,6.4 M319.2,556.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<text class="note" fill="#8a8880" x="66.0" y="578.0">indexed to K=4</text>
+<text class="panel" fill="#0b0b0b" x="368.0" y="353.0">cornell-box</text>
+<text class="sub" fill="#52514e" x="368.0" y="366.0">global 10M / caustic 10M</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="540.0" x2="618.0" y2="540.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="543.0" text-anchor="end">0.1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="523.4" x2="618.0" y2="523.4"/>
+<text class="axis" fill="#52514e" x="363.0" y="526.4" text-anchor="end">0.2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="501.6" x2="618.0" y2="501.6"/>
+<text class="axis" fill="#52514e" x="363.0" y="504.6" text-anchor="end">0.5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="485.0" x2="618.0" y2="485.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="488.0" text-anchor="end">1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="468.4" x2="618.0" y2="468.4"/>
+<text class="axis" fill="#52514e" x="363.0" y="471.4" text-anchor="end">2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="446.6" x2="618.0" y2="446.6"/>
+<text class="axis" fill="#52514e" x="363.0" y="449.6" text-anchor="end">5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="430.0" x2="618.0" y2="430.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="433.0" text-anchor="end">10x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="413.4" x2="618.0" y2="413.4"/>
+<text class="axis" fill="#52514e" x="363.0" y="416.4" text-anchor="end">20x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="391.6" x2="618.0" y2="391.6"/>
+<text class="axis" fill="#52514e" x="363.0" y="394.6" text-anchor="end">50x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="375.0" x2="618.0" y2="375.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="378.0" text-anchor="end">100x</text>
+<text class="axis" fill="#52514e" x="368.0" y="553.0" text-anchor="middle">4</text>
+<text class="axis" fill="#52514e" x="451.3" y="553.0" text-anchor="middle">16</text>
+<text class="axis" fill="#52514e" x="534.7" y="553.0" text-anchor="middle">64</text>
+<text class="axis" fill="#52514e" x="576.3" y="553.0" text-anchor="middle">128</text>
+<text class="axis" fill="#52514e" x="618.0" y="553.0" text-anchor="middle">256</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="540.0" x2="618.0" y2="540.0"/>
+<polyline class="s-global" points="368.0,485.0 451.3,479.8 534.7,460.8 576.3,446.2" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-global" x="364.4" y="481.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="447.7" y="476.2" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="531.1" y="457.2" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="572.7" y="442.6" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<text class="axis lbl s-global" x="576.3" y="437.2" text-anchor="middle" fill="#2a78d6" font-weight="600">global</text>
+<path class="s-global" d="M614.8,556.0 l6.4,6.4 M621.2,556.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="368.0,485.0 451.3,484.4 534.7,484.1 576.3,484.0" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-caustic" x="364.4" y="481.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="447.7" y="480.8" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="531.1" y="480.5" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="572.7" y="480.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<text class="axis lbl s-caustic" x="576.3" y="499.0" text-anchor="middle" fill="#eb6834" font-weight="600">caustic</text>
+<path class="s-caustic" d="M614.8,556.0 l6.4,6.4 M621.2,556.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<text class="note" fill="#8a8880" x="368.0" y="578.0">indexed to K=4</text>
+<text class="panel" fill="#0b0b0b" x="670.0" y="353.0">sponza</text>
+<text class="sub" fill="#52514e" x="670.0" y="366.0">global 1k / caustic 1k</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="540.0" x2="920.0" y2="540.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="543.0" text-anchor="end">0.1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="523.4" x2="920.0" y2="523.4"/>
+<text class="axis" fill="#52514e" x="665.0" y="526.4" text-anchor="end">0.2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="501.6" x2="920.0" y2="501.6"/>
+<text class="axis" fill="#52514e" x="665.0" y="504.6" text-anchor="end">0.5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="485.0" x2="920.0" y2="485.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="488.0" text-anchor="end">1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="468.4" x2="920.0" y2="468.4"/>
+<text class="axis" fill="#52514e" x="665.0" y="471.4" text-anchor="end">2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="446.6" x2="920.0" y2="446.6"/>
+<text class="axis" fill="#52514e" x="665.0" y="449.6" text-anchor="end">5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="430.0" x2="920.0" y2="430.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="433.0" text-anchor="end">10x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="413.4" x2="920.0" y2="413.4"/>
+<text class="axis" fill="#52514e" x="665.0" y="416.4" text-anchor="end">20x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="391.6" x2="920.0" y2="391.6"/>
+<text class="axis" fill="#52514e" x="665.0" y="394.6" text-anchor="end">50x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="375.0" x2="920.0" y2="375.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="378.0" text-anchor="end">100x</text>
+<text class="axis" fill="#52514e" x="670.0" y="553.0" text-anchor="middle">4</text>
+<text class="axis" fill="#52514e" x="753.3" y="553.0" text-anchor="middle">16</text>
+<text class="axis" fill="#52514e" x="836.7" y="553.0" text-anchor="middle">64</text>
+<text class="axis" fill="#52514e" x="878.3" y="553.0" text-anchor="middle">128</text>
+<text class="axis" fill="#52514e" x="920.0" y="553.0" text-anchor="middle">256</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="540.0" x2="920.0" y2="540.0"/>
+<polyline class="s-global" points="670.0,485.0 753.3,449.5 836.7,398.5 878.3,380.3" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-global" x="666.4" y="481.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="749.7" y="445.9" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="833.1" y="394.9" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="874.7" y="376.7" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<text class="axis lbl s-global" x="878.3" y="371.3" text-anchor="middle" fill="#2a78d6" font-weight="600">global</text>
+<path class="s-global" d="M916.8,556.0 l6.4,6.4 M923.2,556.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="670.0,485.0 753.3,485.0 836.7,485.8 878.3,485.1" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-caustic" x="666.4" y="481.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="749.7" y="481.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="833.1" y="482.2" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="874.7" y="481.5" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<text class="axis lbl s-caustic" x="878.3" y="500.1" text-anchor="middle" fill="#eb6834" font-weight="600">caustic</text>
+<path class="s-caustic" d="M916.8,556.0 l6.4,6.4 M923.2,556.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<text class="note" fill="#8a8880" x="670.0" y="578.0">indexed to K=4</text>
+<text class="panel" fill="#0b0b0b" x="66.0" y="596.0">sponza</text>
+<text class="sub" fill="#52514e" x="66.0" y="609.0">global 1M / caustic 1M</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="783.0" x2="316.0" y2="783.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="786.0" text-anchor="end">0.1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="766.4" x2="316.0" y2="766.4"/>
+<text class="axis" fill="#52514e" x="61.0" y="769.4" text-anchor="end">0.2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="744.6" x2="316.0" y2="744.6"/>
+<text class="axis" fill="#52514e" x="61.0" y="747.6" text-anchor="end">0.5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="728.0" x2="316.0" y2="728.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="731.0" text-anchor="end">1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="711.4" x2="316.0" y2="711.4"/>
+<text class="axis" fill="#52514e" x="61.0" y="714.4" text-anchor="end">2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="689.6" x2="316.0" y2="689.6"/>
+<text class="axis" fill="#52514e" x="61.0" y="692.6" text-anchor="end">5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="673.0" x2="316.0" y2="673.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="676.0" text-anchor="end">10x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="656.4" x2="316.0" y2="656.4"/>
+<text class="axis" fill="#52514e" x="61.0" y="659.4" text-anchor="end">20x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="634.6" x2="316.0" y2="634.6"/>
+<text class="axis" fill="#52514e" x="61.0" y="637.6" text-anchor="end">50x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="618.0" x2="316.0" y2="618.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="621.0" text-anchor="end">100x</text>
+<text class="axis" fill="#52514e" x="66.0" y="796.0" text-anchor="middle">4</text>
+<text class="axis" fill="#52514e" x="149.3" y="796.0" text-anchor="middle">16</text>
+<text class="axis" fill="#52514e" x="232.7" y="796.0" text-anchor="middle">64</text>
+<text class="axis" fill="#52514e" x="274.3" y="796.0" text-anchor="middle">128</text>
+<text class="axis" fill="#52514e" x="316.0" y="796.0" text-anchor="middle">256</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="783.0" x2="316.0" y2="783.0"/>
+<polyline class="s-global" points="66.0,728.0 149.3,701.0 232.7,670.6 274.3,651.9" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-global" cx="66.0" cy="728.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="149.3" cy="701.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="232.7" cy="670.6" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="274.3" cy="651.9" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<path class="s-global" d="M312.8,799.0 l6.4,6.4 M319.2,799.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-global" points="66.0,728.0 149.3,688.5 232.7,649.0 274.3,629.6" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-global" x="62.4" y="724.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="145.7" y="684.9" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="229.1" y="645.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="270.7" y="626.0" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<path class="s-global" d="M312.8,799.0 l6.4,6.4 M319.2,799.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="66.0,728.0 149.3,728.1 232.7,728.2 274.3,727.7" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-caustic" x="62.4" y="724.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="145.7" y="724.5" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="229.1" y="724.6" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="270.7" y="724.1" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<path class="s-caustic" d="M312.8,799.0 l6.4,6.4 M319.2,799.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<text class="note" fill="#8a8880" x="66.0" y="821.0">indexed to K=4</text>
+<text class="panel" fill="#0b0b0b" x="368.0" y="596.0">sponza</text>
+<text class="sub" fill="#52514e" x="368.0" y="609.0">global 10M / caustic 10M</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="783.0" x2="618.0" y2="783.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="786.0" text-anchor="end">0.1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="766.4" x2="618.0" y2="766.4"/>
+<text class="axis" fill="#52514e" x="363.0" y="769.4" text-anchor="end">0.2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="744.6" x2="618.0" y2="744.6"/>
+<text class="axis" fill="#52514e" x="363.0" y="747.6" text-anchor="end">0.5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="728.0" x2="618.0" y2="728.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="731.0" text-anchor="end">1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="711.4" x2="618.0" y2="711.4"/>
+<text class="axis" fill="#52514e" x="363.0" y="714.4" text-anchor="end">2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="689.6" x2="618.0" y2="689.6"/>
+<text class="axis" fill="#52514e" x="363.0" y="692.6" text-anchor="end">5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="673.0" x2="618.0" y2="673.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="676.0" text-anchor="end">10x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="656.4" x2="618.0" y2="656.4"/>
+<text class="axis" fill="#52514e" x="363.0" y="659.4" text-anchor="end">20x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="634.6" x2="618.0" y2="634.6"/>
+<text class="axis" fill="#52514e" x="363.0" y="637.6" text-anchor="end">50x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="618.0" x2="618.0" y2="618.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="621.0" text-anchor="end">100x</text>
+<text class="axis" fill="#52514e" x="368.0" y="796.0" text-anchor="middle">4</text>
+<text class="axis" fill="#52514e" x="451.3" y="796.0" text-anchor="middle">16</text>
+<text class="axis" fill="#52514e" x="534.7" y="796.0" text-anchor="middle">64</text>
+<text class="axis" fill="#52514e" x="576.3" y="796.0" text-anchor="middle">128</text>
+<text class="axis" fill="#52514e" x="618.0" y="796.0" text-anchor="middle">256</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="783.0" x2="618.0" y2="783.0"/>
+<polyline class="s-global" points="368.0,728.0 451.3,705.0 534.7,672.9 576.3,648.8" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-global" cx="368.0" cy="728.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="451.3" cy="705.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="534.7" cy="672.9" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="576.3" cy="648.8" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<path class="s-global" d="M614.8,799.0 l6.4,6.4 M621.2,799.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-global" points="368.0,728.0 451.3,698.8 534.7,664.6 576.3,646.5" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-global" x="364.4" y="724.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="447.7" y="695.2" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="531.1" y="661.0" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="572.7" y="642.9" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<path class="s-global" d="M614.8,799.0 l6.4,6.4 M621.2,799.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<text class="note" fill="#8a8880" x="368.0" y="821.0">indexed to K=4</text>
+<text class="panel" fill="#0b0b0b" x="670.0" y="596.0">water-caustic</text>
+<text class="sub" fill="#52514e" x="670.0" y="609.0">global 1k / caustic 1k</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="783.0" x2="920.0" y2="783.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="786.0" text-anchor="end">0.1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="766.4" x2="920.0" y2="766.4"/>
+<text class="axis" fill="#52514e" x="665.0" y="769.4" text-anchor="end">0.2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="744.6" x2="920.0" y2="744.6"/>
+<text class="axis" fill="#52514e" x="665.0" y="747.6" text-anchor="end">0.5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="728.0" x2="920.0" y2="728.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="731.0" text-anchor="end">1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="711.4" x2="920.0" y2="711.4"/>
+<text class="axis" fill="#52514e" x="665.0" y="714.4" text-anchor="end">2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="689.6" x2="920.0" y2="689.6"/>
+<text class="axis" fill="#52514e" x="665.0" y="692.6" text-anchor="end">5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="673.0" x2="920.0" y2="673.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="676.0" text-anchor="end">10x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="656.4" x2="920.0" y2="656.4"/>
+<text class="axis" fill="#52514e" x="665.0" y="659.4" text-anchor="end">20x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="634.6" x2="920.0" y2="634.6"/>
+<text class="axis" fill="#52514e" x="665.0" y="637.6" text-anchor="end">50x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="618.0" x2="920.0" y2="618.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="621.0" text-anchor="end">100x</text>
+<text class="axis" fill="#52514e" x="670.0" y="796.0" text-anchor="middle">4</text>
+<text class="axis" fill="#52514e" x="753.3" y="796.0" text-anchor="middle">16</text>
+<text class="axis" fill="#52514e" x="836.7" y="796.0" text-anchor="middle">64</text>
+<text class="axis" fill="#52514e" x="878.3" y="796.0" text-anchor="middle">128</text>
+<text class="axis" fill="#52514e" x="920.0" y="796.0" text-anchor="middle">256</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="783.0" x2="920.0" y2="783.0"/>
+<polyline class="s-global" points="670.0,728.0 753.3,720.9 836.7,688.6 878.3,671.6" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-global" cx="670.0" cy="728.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="753.3" cy="720.9" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="836.7" cy="688.6" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="878.3" cy="671.6" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<path class="s-global" d="M916.8,799.0 l6.4,6.4 M923.2,799.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-global" points="670.0,728.0 753.3,716.3 836.7,668.4 878.3,650.4" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-global" x="666.4" y="724.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="749.7" y="712.7" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="833.1" y="664.8" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="874.7" y="646.8" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<path class="s-global" d="M916.8,799.0 l6.4,6.4 M923.2,799.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="670.0,728.0 753.3,728.5 836.7,726.3 878.3,725.1" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-caustic" cx="670.0" cy="728.0" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="753.3" cy="728.5" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="836.7" cy="726.3" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="878.3" cy="725.1" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<path class="s-caustic" d="M916.8,799.0 l6.4,6.4 M923.2,799.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="670.0,728.0 753.3,727.5 836.7,724.6 878.3,723.1" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-caustic" x="666.4" y="724.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="749.7" y="723.9" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="833.1" y="721.0" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="874.7" y="719.5" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<path class="s-caustic" d="M916.8,799.0 l6.4,6.4 M923.2,799.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<text class="note" fill="#8a8880" x="670.0" y="821.0">indexed to K=4</text>
+<text class="panel" fill="#0b0b0b" x="66.0" y="839.0">water-caustic</text>
+<text class="sub" fill="#52514e" x="66.0" y="852.0">global 100k / caustic 100k</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="1026.0" x2="316.0" y2="1026.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="1029.0" text-anchor="end">0.1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="1009.4" x2="316.0" y2="1009.4"/>
+<text class="axis" fill="#52514e" x="61.0" y="1012.4" text-anchor="end">0.2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="987.6" x2="316.0" y2="987.6"/>
+<text class="axis" fill="#52514e" x="61.0" y="990.6" text-anchor="end">0.5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="971.0" x2="316.0" y2="971.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="974.0" text-anchor="end">1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="954.4" x2="316.0" y2="954.4"/>
+<text class="axis" fill="#52514e" x="61.0" y="957.4" text-anchor="end">2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="932.6" x2="316.0" y2="932.6"/>
+<text class="axis" fill="#52514e" x="61.0" y="935.6" text-anchor="end">5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="916.0" x2="316.0" y2="916.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="919.0" text-anchor="end">10x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="899.4" x2="316.0" y2="899.4"/>
+<text class="axis" fill="#52514e" x="61.0" y="902.4" text-anchor="end">20x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="877.6" x2="316.0" y2="877.6"/>
+<text class="axis" fill="#52514e" x="61.0" y="880.6" text-anchor="end">50x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="861.0" x2="316.0" y2="861.0"/>
+<text class="axis" fill="#52514e" x="61.0" y="864.0" text-anchor="end">100x</text>
+<text class="axis" fill="#52514e" x="66.0" y="1039.0" text-anchor="middle">4</text>
+<text class="axis" fill="#52514e" x="149.3" y="1039.0" text-anchor="middle">16</text>
+<text class="axis" fill="#52514e" x="232.7" y="1039.0" text-anchor="middle">64</text>
+<text class="axis" fill="#52514e" x="274.3" y="1039.0" text-anchor="middle">128</text>
+<text class="axis" fill="#52514e" x="316.0" y="1039.0" text-anchor="middle">256</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="66.0" y1="1026.0" x2="316.0" y2="1026.0"/>
+<polyline class="s-global" points="66.0,972.0 149.3,971.0 232.7,967.5 274.3,963.9" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-global" cx="66.0" cy="972.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="149.3" cy="971.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="232.7" cy="967.5" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="274.3" cy="963.9" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<path class="s-global" d="M312.8,1042.0 l6.4,6.4 M319.2,1042.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-global" points="66.0,972.3 149.3,971.0 232.7,965.1 274.3,953.7" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-global" x="62.4" y="968.7" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="145.7" y="967.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="229.1" y="961.5" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="270.7" y="950.1" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<path class="s-global" d="M312.8,1042.0 l6.4,6.4 M319.2,1042.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="149.3,971.0 232.7,970.6 274.3,970.4" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-caustic" cx="149.3" cy="971.0" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="232.7" cy="970.6" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="274.3" cy="970.4" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<path class="s-caustic" d="M62.8,1042.0 l6.4,6.4 M69.2,1042.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<path class="s-caustic" d="M312.8,1042.0 l6.4,6.4 M319.2,1042.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="66.0,971.1 149.3,971.0 232.7,970.8 274.3,970.4" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-caustic" x="62.4" y="967.5" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="145.7" y="967.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="229.1" y="967.2" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="270.7" y="966.8" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<path class="s-caustic" d="M312.8,1042.0 l6.4,6.4 M319.2,1042.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<text class="note" fill="#8a8880" x="66.0" y="1064.0">indexed to K=16</text>
+<text class="panel" fill="#0b0b0b" x="368.0" y="839.0">water-caustic</text>
+<text class="sub" fill="#52514e" x="368.0" y="852.0">global 500k / caustic 500k</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="1026.0" x2="618.0" y2="1026.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="1029.0" text-anchor="end">0.1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="1009.4" x2="618.0" y2="1009.4"/>
+<text class="axis" fill="#52514e" x="363.0" y="1012.4" text-anchor="end">0.2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="987.6" x2="618.0" y2="987.6"/>
+<text class="axis" fill="#52514e" x="363.0" y="990.6" text-anchor="end">0.5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="971.0" x2="618.0" y2="971.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="974.0" text-anchor="end">1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="954.4" x2="618.0" y2="954.4"/>
+<text class="axis" fill="#52514e" x="363.0" y="957.4" text-anchor="end">2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="932.6" x2="618.0" y2="932.6"/>
+<text class="axis" fill="#52514e" x="363.0" y="935.6" text-anchor="end">5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="916.0" x2="618.0" y2="916.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="919.0" text-anchor="end">10x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="899.4" x2="618.0" y2="899.4"/>
+<text class="axis" fill="#52514e" x="363.0" y="902.4" text-anchor="end">20x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="877.6" x2="618.0" y2="877.6"/>
+<text class="axis" fill="#52514e" x="363.0" y="880.6" text-anchor="end">50x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="861.0" x2="618.0" y2="861.0"/>
+<text class="axis" fill="#52514e" x="363.0" y="864.0" text-anchor="end">100x</text>
+<text class="axis" fill="#52514e" x="368.0" y="1039.0" text-anchor="middle">4</text>
+<text class="axis" fill="#52514e" x="451.3" y="1039.0" text-anchor="middle">16</text>
+<text class="axis" fill="#52514e" x="534.7" y="1039.0" text-anchor="middle">64</text>
+<text class="axis" fill="#52514e" x="576.3" y="1039.0" text-anchor="middle">128</text>
+<text class="axis" fill="#52514e" x="618.0" y="1039.0" text-anchor="middle">256</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="368.0" y1="1026.0" x2="618.0" y2="1026.0"/>
+<polyline class="s-global" points="368.0,971.0 451.3,970.8 534.7,969.6 576.3,968.3" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-global" cx="368.0" cy="971.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="451.3" cy="970.8" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="534.7" cy="969.6" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-global" cx="576.3" cy="968.3" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<path class="s-global" d="M614.8,1042.0 l6.4,6.4 M621.2,1042.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-global" points="368.0,971.0 451.3,970.4 534.7,967.7 576.3,964.1" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-global" x="364.4" y="967.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="447.7" y="966.8" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="531.1" y="964.1" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="572.7" y="960.5" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<path class="s-global" d="M614.8,1042.0 l6.4,6.4 M621.2,1042.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="368.0,971.0 451.3,971.0 534.7,970.8 576.3,970.9" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-caustic" cx="368.0" cy="971.0" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="451.3" cy="971.0" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="534.7" cy="970.8" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="576.3" cy="970.9" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<path class="s-caustic" d="M614.8,1042.0 l6.4,6.4 M621.2,1042.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="368.0,971.0 451.3,975.0 534.7,974.8 576.3,974.6" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-caustic" x="364.4" y="967.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="447.7" y="971.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="531.1" y="971.2" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="572.7" y="971.0" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<path class="s-caustic" d="M614.8,1042.0 l6.4,6.4 M621.2,1042.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<text class="note" fill="#8a8880" x="368.0" y="1064.0">indexed to K=4</text>
+<text class="panel" fill="#0b0b0b" x="670.0" y="839.0">water-caustic</text>
+<text class="sub" fill="#52514e" x="670.0" y="852.0">global 1M / caustic 1M</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="1026.0" x2="920.0" y2="1026.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="1029.0" text-anchor="end">0.1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="1009.4" x2="920.0" y2="1009.4"/>
+<text class="axis" fill="#52514e" x="665.0" y="1012.4" text-anchor="end">0.2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="987.6" x2="920.0" y2="987.6"/>
+<text class="axis" fill="#52514e" x="665.0" y="990.6" text-anchor="end">0.5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="971.0" x2="920.0" y2="971.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="974.0" text-anchor="end">1x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="954.4" x2="920.0" y2="954.4"/>
+<text class="axis" fill="#52514e" x="665.0" y="957.4" text-anchor="end">2x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="932.6" x2="920.0" y2="932.6"/>
+<text class="axis" fill="#52514e" x="665.0" y="935.6" text-anchor="end">5x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="916.0" x2="920.0" y2="916.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="919.0" text-anchor="end">10x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="899.4" x2="920.0" y2="899.4"/>
+<text class="axis" fill="#52514e" x="665.0" y="902.4" text-anchor="end">20x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="877.6" x2="920.0" y2="877.6"/>
+<text class="axis" fill="#52514e" x="665.0" y="880.6" text-anchor="end">50x</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="861.0" x2="920.0" y2="861.0"/>
+<text class="axis" fill="#52514e" x="665.0" y="864.0" text-anchor="end">100x</text>
+<text class="axis" fill="#52514e" x="670.0" y="1039.0" text-anchor="middle">4</text>
+<text class="axis" fill="#52514e" x="753.3" y="1039.0" text-anchor="middle">16</text>
+<text class="axis" fill="#52514e" x="836.7" y="1039.0" text-anchor="middle">64</text>
+<text class="axis" fill="#52514e" x="878.3" y="1039.0" text-anchor="middle">128</text>
+<text class="axis" fill="#52514e" x="920.0" y="1039.0" text-anchor="middle">256</text>
+<line class="grid" stroke="#e6e5e2" stroke-width="1" x1="670.0" y1="1026.0" x2="920.0" y2="1026.0"/>
+<polyline class="s-global" points="670.0,971.0 753.3,970.4 836.7,968.8 878.3,966.7" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-global" x="666.4" y="967.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="749.7" y="966.8" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="833.1" y="965.2" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<rect class="s-global" x="874.7" y="963.1" width="7.2" height="7.2" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<path class="s-global" d="M916.8,1042.0 l6.4,6.4 M923.2,1042.0 l-6.4,6.4" stroke="#2a78d6" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="670.0,971.0 753.3,970.9 836.7,970.9 878.3,970.9" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="ring s-caustic" cx="670.0" cy="971.0" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="753.3" cy="970.9" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="836.7" cy="970.9" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle class="ring s-caustic" cx="878.3" cy="970.9" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<path class="s-caustic" d="M916.8,1042.0 l6.4,6.4 M923.2,1042.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<polyline class="s-caustic" points="670.0,971.0 753.3,972.3 836.7,972.2 878.3,972.1" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>
+<rect class="s-caustic" x="666.4" y="967.4" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="749.7" y="968.7" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="833.1" y="968.6" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<rect class="s-caustic" x="874.7" y="968.5" width="7.2" height="7.2" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<path class="s-caustic" d="M916.8,1042.0 l6.4,6.4 M923.2,1042.0 l-6.4,6.4" stroke="#eb6834" stroke-width="1.6" fill="none" opacity="0.85"/>
+<text class="note" fill="#8a8880" x="670.0" y="1064.0">indexed to K=4</text>
+<text class="note" fill="#8a8880" x="20.0" y="1080.0">x below axis = run did not finish. K=256 fails with CUDA error 718 on every configuration (sticky fault, real cause is the gather kernel).</text>
+<text class="note" fill="#8a8880" x="20.0" y="1093.0">Sweeps against an empty photon map (cornell-box caustic, sponza caustic) are excluded -- they measure nothing.</text>
+<text class="note" fill="#8a8880" x="20.0" y="1106.0">Each series is normalised to its own anchor, so the gap between the two lines compares growth, not cost. For cost, see fig 2.</text>
+</svg>

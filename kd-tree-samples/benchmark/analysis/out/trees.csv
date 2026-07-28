@@ -1,0 +1,9 @@
+gpu,scene,kind,requested,actual,yield_pct
+RTX 4070,cornell-box,caustic,1000,0,0.0
+RTX 4070,cornell-box,normal,1000,1816,181.6
+RTX 4070,sponza,caustic,10000000,0,0.0
+RTX 4070,sponza,normal,10000000,7564261,75.64
+RTX 4070,water-caustic,caustic,1000000,183015,18.3
+RTX 4070,water-caustic,caustic,5000000,918717,18.37
+RTX 4070,water-caustic,normal,1000000,1184684,118.47
+RTX 4070,water-caustic,normal,5000000,5929434,118.59

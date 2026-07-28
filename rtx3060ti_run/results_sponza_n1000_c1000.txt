@@ -1,0 +1,17 @@
+Benchmark: scene=sponza normal=1000 caustic=1000 
+ 
+Executable                Time(ms) 
+------------------------- -------- 
+pathTracer_kglobal_4 18.4811 
+pathTracer_kglobal_16 81.7829 
+pathTracer_kglobal_64 689.842 
+pathTracer_kglobal_128 1478.28 
+pathTracer_kglobal_256 DNF 
+pathTracer_kcaustic_4 172.257 
+pathTracer_kcaustic_16 172.521 
+pathTracer_kcaustic_64 166.779 
+pathTracer_kcaustic_128 171.698 
+pathTracer_kcaustic_256 DNF 
+ 
+Summary Table 
+------------------------- -------- 

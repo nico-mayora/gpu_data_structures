@@ -1,0 +1,26 @@
+Start!
+Scene: cornell-box
+Loading scene from: scenes\cornell-box\scene_v3.xml
+OBJ 'scenes\cornell-box\models/glass_egg.obj': 1 shapes, 0 .mtl materials
+OBJ 'scenes\cornell-box\models/glass_egg.obj': 1 usemtl buckets
+Loading normal photons from: photon_maps/cornell-box_normal_1000.kdt
+Loading caustic photons from: photon_maps/cornell-box_caustic_1000.kdt
+Loaded prebuilt kd-tree (1816 photons) from: photon_maps/cornell-box_normal_1000.kdt
+Loaded prebuilt kd-tree (0 photons) from: photon_maps/cornell-box_caustic_1000.kdt
+Warning: loaded 0 photons from photon_maps/cornell-box_caustic_1000.kdt
+Benchmark: ON, Visible: OFF
+Building geometries...
+  [benchmark] frame 1/10: 32.6696 ms
+  [benchmark] frame 2/10: 24.0873 ms
+  [benchmark] frame 3/10: 18.0088 ms
+  [benchmark] frame 4/10: 23.2626 ms
+  [benchmark] frame 5/10: 21.867 ms
+  [benchmark] frame 6/10: 23.7541 ms
+  [benchmark] frame 7/10: 15.7863 ms
+  [benchmark] frame 8/10: 19.5595 ms
+  [benchmark] frame 9/10: 20.4507 ms
+  [benchmark] frame 10/10: 17.7736 ms
+BENCHMARK_RESULT: 20.5055 ms
+[00010] [imgui-error] (current settings: Assert=1, Log=1, Tooltip=1)
+[00010] [imgui-error] In window 'NULL': Forgot to shutdown Platform backend?
+[00010] [imgui-error] In window 'NULL': Forgot to shutdown Renderer backend?

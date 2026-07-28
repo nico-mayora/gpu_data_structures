@@ -1,0 +1,17 @@
+Benchmark: scene=water-caustic normal=100000 caustic=100000 
+ 
+Executable                Time(ms) 
+------------------------- -------- 
+pathTracer_kglobal_4 1972.16 
+pathTracer_kglobal_16 2085.72 
+pathTracer_kglobal_64 2671.29 
+pathTracer_kglobal_128 4304.49 
+pathTracer_kglobal_256 DNF 
+pathTracer_kcaustic_4 2130.74 
+pathTracer_kcaustic_16 2139.22 
+pathTracer_kcaustic_64 2160.12 
+pathTracer_kcaustic_128 2197.91 
+pathTracer_kcaustic_256 DNF 
+ 
+Summary Table 
+------------------------- -------- 

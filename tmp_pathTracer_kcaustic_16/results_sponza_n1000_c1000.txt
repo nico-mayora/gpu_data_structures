@@ -1,0 +1,4 @@
+Benchmark: scene=sponza normal=1000 caustic=1000 
+ 
+Executable                Time(ms) 
+------------------------- -------- 

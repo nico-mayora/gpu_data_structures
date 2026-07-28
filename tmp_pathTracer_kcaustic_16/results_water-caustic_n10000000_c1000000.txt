@@ -1,0 +1,4 @@
+Benchmark: scene=water-caustic normal=10000000 caustic=1000000 
+ 
+Executable                Time(ms) 
+------------------------- -------- 

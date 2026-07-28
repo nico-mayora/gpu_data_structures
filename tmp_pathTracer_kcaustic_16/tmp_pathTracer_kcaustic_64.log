@@ -1,0 +1,24 @@
+Start!
+Scene: water-caustic
+Loading scene from: scenes\water-caustic\scene_v3.xml
+OBJ 'scenes\water-caustic\models/Mesh001.obj': 1 shapes, 0 .mtl materials
+OBJ 'scenes\water-caustic\models/Mesh001.obj': 1 usemtl buckets
+OBJ 'scenes\water-caustic\models/Mesh000.obj': 1 shapes, 0 .mtl materials
+OBJ 'scenes\water-caustic\models/Mesh000.obj': 1 usemtl buckets
+Loading normal photons from: photon_maps/water-caustic_normal_1000000.kdt
+Loading caustic photons from: photon_maps/water-caustic_caustic_1000000.kdt
+Loaded prebuilt kd-tree (1184684 photons) from: photon_maps/water-caustic_normal_1000000.kdt
+Loaded prebuilt kd-tree (183015 photons) from: photon_maps/water-caustic_caustic_1000000.kdt
+Benchmark: ON, Visible: ON
+Building geometries...
+  [benchmark] frame 1/10: 11675.6 ms
+  [benchmark] frame 2/10: 11678.2 ms
+  [benchmark] frame 3/10: 11673.2 ms
+  [benchmark] frame 4/10: 11721.3 ms
+  [benchmark] frame 5/10: 11682.5 ms
+  [benchmark] frame 6/10: 11729.5 ms
+  [benchmark] frame 7/10: 11588.9 ms
+  [benchmark] frame 8/10: 11743.3 ms
+  [benchmark] frame 9/10: 11638.3 ms
+  [benchmark] frame 10/10: 11676.1 ms
+BENCHMARK_RESULT: 11681.2 ms

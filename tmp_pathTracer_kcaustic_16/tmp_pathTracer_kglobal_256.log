@@ -1,0 +1,42 @@
+Start!
+Scene: sponza
+Loading scene from: scenes\sponza\scene_v3.xml
+tinyobjloader warning on 'scenes\sponza\models/sponza.obj': Both `d` and `Tr` parameters defined for "leaf". Use the value of `d` for dissolve (line 8 in .mtl.)
+Both `d` and `Tr` parameters defined for "vase_round". Use the value of `d` for dissolve (line 24 in .mtl.)
+Both `d` and `Tr` parameters defined for "Material__57". Use the value of `d` for dissolve (line 39 in .mtl.)
+Both `d` and `Tr` parameters defined for "Material__298". Use the value of `d` for dissolve (line 54 in .mtl.)
+Both `d` and `Tr` parameters defined for "bricks". Use the value of `d` for dissolve (line 70 in .mtl.)
+Both `d` and `Tr` parameters defined for "arch". Use the value of `d` for dissolve (line 86 in .mtl.)
+Both `d` and `Tr` parameters defined for "ceiling". Use the value of `d` for dissolve (line 100 in .mtl.)
+Both `d` and `Tr` parameters defined for "column_a". Use the value of `d` for dissolve (line 114 in .mtl.)
+Both `d` and `Tr` parameters defined for "floor". Use the value of `d` for dissolve (line 129 in .mtl.)
+Both `d` and `Tr` parameters defined for "column_c". Use the value of `d` for dissolve (line 144 in .mtl.)
+Both `d` and `Tr` parameters defined for "details". Use the value of `d` for dissolve (line 159 in .mtl.)
+Both `d` and `Tr` parameters defined for "column_b". Use the value of `d` for dissolve (line 173 in .mtl.)
+Both `d` and `Tr` parameters defined for "Material__47". Use the value of `d` for dissolve (line 188 in .mtl.)
+Both `d` and `Tr` parameters defined for "flagpole". Use the value of `d` for dissolve (line 200 in .mtl.)
+Both `d` and `Tr` parameters defined for "fabric_e". Use the value of `d` for dissolve (line 214 in .mtl.)
+Both `d` and `Tr` parameters defined for "fabric_d". Use the value of `d` for dissolve (line 228 in .mtl.)
+Both `d` and `Tr` parameters defined for "fabric_a". Use the value of `d` for dissolve (line 242 in .mtl.)
+Both `d` and `Tr` parameters defined for "fabric_g". Use the value of `d` for dissolve (line 256 in .mtl.)
+Both `d` and `Tr` parameters defined for "fabric_c". Use the value of `d` for dissolve (line 270 in .mtl.)
+Both `d` and `Tr` parameters defined for "fabric_f". Use the value of `d` for dissolve (line 284 in .mtl.)
+Both `d` and `Tr` parameters defined for "chain". Use the value of `d` for dissolve (line 298 in .mtl.)
+Both `d` and `Tr` parameters defined for "vase_hanging". Use the value of `d` for dissolve (line 314 in .mtl.)
+Both `d` and `Tr` parameters defined for "vase". Use the value of `d` for dissolve (line 329 in .mtl.)
+Both `d` and `Tr` parameters defined for "Material__25". Use the value of `d` for dissolve (line 344 in .mtl.)
+Both `d` and `Tr` parameters defined for "roof". Use the value of `d` for dissolve (line 359 in .mtl.)
+
+OBJ 'scenes\sponza\models/sponza.obj': 381 shapes, 25 .mtl materials
+OBJ 'scenes\sponza\models/sponza.obj': 25 usemtl buckets
+WARNING: UV seams in 'scenes\sponza\models/sponza.obj' (16 of 25 submeshes have positions with multiple UVs; keeping last-written). Per-face-corner vertex dedup needed for clean seams (Phase 5.1).
+Loading normal photons from: photon_maps/sponza_normal_10000000.kdt
+Loading caustic photons from: photon_maps/sponza_caustic_10000000.kdt
+Loaded prebuilt kd-tree (7564261 photons) from: photon_maps/sponza_normal_10000000.kdt
+Loaded prebuilt kd-tree (0 photons) from: photon_maps/sponza_caustic_10000000.kdt
+Warning: loaded 0 photons from photon_maps/sponza_caustic_10000000.kdt
+Benchmark: ON, Visible: ON
+Building geometries...
+  [benchmark] frame 1/10: 23.4384 ms
+CUDA call (cudaGraphicsMapResources(1, &cuDisplayTexture)) failed with code 718 (line 235): invalid program counter
+fatal cuda error

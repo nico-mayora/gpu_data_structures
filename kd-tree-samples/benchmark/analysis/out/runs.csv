@@ -1,0 +1,178 @@
+gpu,scene,requested_global,requested_caustic,actual_global_n,actual_caustic_n,sweep,k,ms,status,source_file
+RTX 3060 Ti,cornell-box,1000,1000,,,caustic,4,162.786,invalid_empty_map_inferred,results_cornell-box_n1000_c1000.txt
+RTX 3060 Ti,cornell-box,1000,1000,,,caustic,16,162.901,invalid_empty_map_inferred,results_cornell-box_n1000_c1000.txt
+RTX 3060 Ti,cornell-box,1000,1000,,,caustic,64,165.14,invalid_empty_map_inferred,results_cornell-box_n1000_c1000.txt
+RTX 3060 Ti,cornell-box,1000,1000,,,caustic,128,164.328,invalid_empty_map_inferred,results_cornell-box_n1000_c1000.txt
+RTX 3060 Ti,cornell-box,1000,1000,,,caustic,256,,dnf,results_cornell-box_n1000_c1000.txt
+RTX 3060 Ti,cornell-box,1000,1000,,,global,4,17.9135,ok,results_cornell-box_n1000_c1000.txt
+RTX 3060 Ti,cornell-box,1000,1000,,,global,16,87.0723,ok,results_cornell-box_n1000_c1000.txt
+RTX 3060 Ti,cornell-box,1000,1000,,,global,64,648.455,ok,results_cornell-box_n1000_c1000.txt
+RTX 3060 Ti,cornell-box,1000,1000,,,global,128,1494.37,ok,results_cornell-box_n1000_c1000.txt
+RTX 3060 Ti,cornell-box,1000,1000,,,global,256,,dnf,results_cornell-box_n1000_c1000.txt
+RTX 3060 Ti,cornell-box,1000000,1000000,,,caustic,4,1520.24,ok,results_cornell-box_n1000000_c1000000.txt
+RTX 3060 Ti,cornell-box,1000000,1000000,,,caustic,16,1526.69,ok,results_cornell-box_n1000000_c1000000.txt
+RTX 3060 Ti,cornell-box,1000000,1000000,,,caustic,64,1547.0,ok,results_cornell-box_n1000000_c1000000.txt
+RTX 3060 Ti,cornell-box,1000000,1000000,,,caustic,128,1575.86,ok,results_cornell-box_n1000000_c1000000.txt
+RTX 3060 Ti,cornell-box,1000000,1000000,,,caustic,256,,dnf,results_cornell-box_n1000000_c1000000.txt
+RTX 3060 Ti,cornell-box,1000000,1000000,,,global,4,466.036,ok,results_cornell-box_n1000000_c1000000.txt
+RTX 3060 Ti,cornell-box,1000000,1000000,,,global,16,1025.25,ok,results_cornell-box_n1000000_c1000000.txt
+RTX 3060 Ti,cornell-box,1000000,1000000,,,global,64,4228.26,ok,results_cornell-box_n1000000_c1000000.txt
+RTX 3060 Ti,cornell-box,1000000,1000000,,,global,128,8551.89,ok,results_cornell-box_n1000000_c1000000.txt
+RTX 3060 Ti,cornell-box,1000000,1000000,,,global,256,,dnf,results_cornell-box_n1000000_c1000000.txt
+RTX 3060 Ti,cornell-box,10000000,10000000,,,caustic,4,4151.12,ok,results_cornell-box_n10000000_c10000000.txt
+RTX 3060 Ti,cornell-box,10000000,10000000,,,caustic,16,4253.65,ok,results_cornell-box_n10000000_c10000000.txt
+RTX 3060 Ti,cornell-box,10000000,10000000,,,caustic,64,4308.78,ok,results_cornell-box_n10000000_c10000000.txt
+RTX 3060 Ti,cornell-box,10000000,10000000,,,caustic,128,4322.29,ok,results_cornell-box_n10000000_c10000000.txt
+RTX 3060 Ti,cornell-box,10000000,10000000,,,caustic,256,,dnf,results_cornell-box_n10000000_c10000000.txt
+RTX 3060 Ti,cornell-box,10000000,10000000,,,global,4,2838.44,ok,results_cornell-box_n10000000_c10000000.txt
+RTX 3060 Ti,cornell-box,10000000,10000000,,,global,16,3535.95,ok,results_cornell-box_n10000000_c10000000.txt
+RTX 3060 Ti,cornell-box,10000000,10000000,,,global,64,7808.41,ok,results_cornell-box_n10000000_c10000000.txt
+RTX 3060 Ti,cornell-box,10000000,10000000,,,global,128,14416.6,ok,results_cornell-box_n10000000_c10000000.txt
+RTX 3060 Ti,cornell-box,10000000,10000000,,,global,256,,dnf,results_cornell-box_n10000000_c10000000.txt
+RTX 3060 Ti,sponza,1000,1000,,,caustic,4,172.257,ok,results_sponza_n1000_c1000.txt
+RTX 3060 Ti,sponza,1000,1000,,,caustic,16,172.521,ok,results_sponza_n1000_c1000.txt
+RTX 3060 Ti,sponza,1000,1000,,,caustic,64,166.779,ok,results_sponza_n1000_c1000.txt
+RTX 3060 Ti,sponza,1000,1000,,,caustic,128,171.698,ok,results_sponza_n1000_c1000.txt
+RTX 3060 Ti,sponza,1000,1000,,,caustic,256,,dnf,results_sponza_n1000_c1000.txt
+RTX 3060 Ti,sponza,1000,1000,,,global,4,18.4811,ok,results_sponza_n1000_c1000.txt
+RTX 3060 Ti,sponza,1000,1000,,,global,16,81.7829,ok,results_sponza_n1000_c1000.txt
+RTX 3060 Ti,sponza,1000,1000,,,global,64,689.842,ok,results_sponza_n1000_c1000.txt
+RTX 3060 Ti,sponza,1000,1000,,,global,128,1478.28,ok,results_sponza_n1000_c1000.txt
+RTX 3060 Ti,sponza,1000,1000,,,global,256,,dnf,results_sponza_n1000_c1000.txt
+RTX 3060 Ti,sponza,1000000,1000000,,,caustic,4,828.944,ok,results_sponza_n1000000_c1000000.txt
+RTX 3060 Ti,sponza,1000000,1000000,,,caustic,16,823.762,ok,results_sponza_n1000000_c1000000.txt
+RTX 3060 Ti,sponza,1000000,1000000,,,caustic,64,823.015,ok,results_sponza_n1000000_c1000000.txt
+RTX 3060 Ti,sponza,1000000,1000000,,,caustic,128,839.121,ok,results_sponza_n1000000_c1000000.txt
+RTX 3060 Ti,sponza,1000000,1000000,,,caustic,256,,dnf,results_sponza_n1000000_c1000000.txt
+RTX 3060 Ti,sponza,1000000,1000000,,,global,4,101.144,ok,results_sponza_n1000000_c1000000.txt
+RTX 3060 Ti,sponza,1000000,1000000,,,global,16,528.253,ok,results_sponza_n1000000_c1000000.txt
+RTX 3060 Ti,sponza,1000000,1000000,,,global,64,2758.1,ok,results_sponza_n1000000_c1000000.txt
+RTX 3060 Ti,sponza,1000000,1000000,,,global,128,6223.76,ok,results_sponza_n1000000_c1000000.txt
+RTX 3060 Ti,sponza,1000000,1000000,,,global,256,,dnf,results_sponza_n1000000_c1000000.txt
+RTX 3060 Ti,sponza,10000000,10000000,,,caustic,4,1393.58,invalid_empty_map_inferred,results_sponza_n10000000_c10000000.txt
+RTX 3060 Ti,sponza,10000000,10000000,,,caustic,16,1391.33,invalid_empty_map_inferred,results_sponza_n10000000_c10000000.txt
+RTX 3060 Ti,sponza,10000000,10000000,,,caustic,64,1411.81,invalid_empty_map_inferred,results_sponza_n10000000_c10000000.txt
+RTX 3060 Ti,sponza,10000000,10000000,,,caustic,128,1418.36,invalid_empty_map_inferred,results_sponza_n10000000_c10000000.txt
+RTX 3060 Ti,sponza,10000000,10000000,,,caustic,256,,dnf,results_sponza_n10000000_c10000000.txt
+RTX 3060 Ti,sponza,10000000,10000000,,,global,4,274.075,ok,results_sponza_n10000000_c10000000.txt
+RTX 3060 Ti,sponza,10000000,10000000,,,global,16,930.362,ok,results_sponza_n10000000_c10000000.txt
+RTX 3060 Ti,sponza,10000000,10000000,,,global,64,3892.96,ok,results_sponza_n10000000_c10000000.txt
+RTX 3060 Ti,sponza,10000000,10000000,,,global,128,8306.48,ok,results_sponza_n10000000_c10000000.txt
+RTX 3060 Ti,sponza,10000000,10000000,,,global,256,,dnf,results_sponza_n10000000_c10000000.txt
+RTX 3060 Ti,water-caustic,1000,1000,,,caustic,4,94.8447,ok,results_water-caustic_n1000_c1000.txt
+RTX 3060 Ti,water-caustic,1000,1000,,,caustic,16,96.9508,ok,results_water-caustic_n1000_c1000.txt
+RTX 3060 Ti,water-caustic,1000,1000,,,caustic,64,109.544,ok,results_water-caustic_n1000_c1000.txt
+RTX 3060 Ti,water-caustic,1000,1000,,,caustic,128,116.562,ok,results_water-caustic_n1000_c1000.txt
+RTX 3060 Ti,water-caustic,1000,1000,,,caustic,256,,dnf,results_water-caustic_n1000_c1000.txt
+RTX 3060 Ti,water-caustic,1000,1000,,,global,4,36.2159,ok,results_water-caustic_n1000_c1000.txt
+RTX 3060 Ti,water-caustic,1000,1000,,,global,16,59.1364,ok,results_water-caustic_n1000_c1000.txt
+RTX 3060 Ti,water-caustic,1000,1000,,,global,64,438.367,ok,results_water-caustic_n1000_c1000.txt
+RTX 3060 Ti,water-caustic,1000,1000,,,global,128,931.726,ok,results_water-caustic_n1000_c1000.txt
+RTX 3060 Ti,water-caustic,1000,1000,,,global,256,,dnf,results_water-caustic_n1000_c1000.txt
+RTX 3060 Ti,water-caustic,100000,100000,,,caustic,4,2130.74,ok,results_water-caustic_n100000_c100000.txt
+RTX 3060 Ti,water-caustic,100000,100000,,,caustic,16,2139.22,ok,results_water-caustic_n100000_c100000.txt
+RTX 3060 Ti,water-caustic,100000,100000,,,caustic,64,2160.12,ok,results_water-caustic_n100000_c100000.txt
+RTX 3060 Ti,water-caustic,100000,100000,,,caustic,128,2197.91,ok,results_water-caustic_n100000_c100000.txt
+RTX 3060 Ti,water-caustic,100000,100000,,,caustic,256,,dnf,results_water-caustic_n100000_c100000.txt
+RTX 3060 Ti,water-caustic,100000,100000,,,global,4,1972.16,ok,results_water-caustic_n100000_c100000.txt
+RTX 3060 Ti,water-caustic,100000,100000,,,global,16,2085.72,ok,results_water-caustic_n100000_c100000.txt
+RTX 3060 Ti,water-caustic,100000,100000,,,global,64,2671.29,ok,results_water-caustic_n100000_c100000.txt
+RTX 3060 Ti,water-caustic,100000,100000,,,global,128,4304.49,ok,results_water-caustic_n100000_c100000.txt
+RTX 3060 Ti,water-caustic,100000,100000,,,global,256,,dnf,results_water-caustic_n100000_c100000.txt
+RTX 3060 Ti,water-caustic,500000,500000,,,caustic,4,12881.9,ok,results_water-caustic_n500000_c500000.txt
+RTX 3060 Ti,water-caustic,500000,500000,,,caustic,16,10883.7,ok,results_water-caustic_n500000_c500000.txt
+RTX 3060 Ti,water-caustic,500000,500000,,,caustic,64,10991.2,ok,results_water-caustic_n500000_c500000.txt
+RTX 3060 Ti,water-caustic,500000,500000,,,caustic,128,11099.6,ok,results_water-caustic_n500000_c500000.txt
+RTX 3060 Ti,water-caustic,500000,500000,,,caustic,256,,dnf,results_water-caustic_n500000_c500000.txt
+RTX 3060 Ti,water-caustic,500000,500000,,,global,4,10426.7,ok,results_water-caustic_n500000_c500000.txt
+RTX 3060 Ti,water-caustic,500000,500000,,,global,16,10699.6,ok,results_water-caustic_n500000_c500000.txt
+RTX 3060 Ti,water-caustic,500000,500000,,,global,64,11991.1,ok,results_water-caustic_n500000_c500000.txt
+RTX 3060 Ti,water-caustic,500000,500000,,,global,128,13930.7,ok,results_water-caustic_n500000_c500000.txt
+RTX 3060 Ti,water-caustic,500000,500000,,,global,256,,dnf,results_water-caustic_n500000_c500000.txt
+RTX 3060 Ti,water-caustic,1000000,1000000,,,caustic,4,23517.9,ok,results_water-caustic_n1000000_c1000000.txt
+RTX 3060 Ti,water-caustic,1000000,1000000,,,caustic,16,22265.7,ok,results_water-caustic_n1000000_c1000000.txt
+RTX 3060 Ti,water-caustic,1000000,1000000,,,caustic,64,22342.6,ok,results_water-caustic_n1000000_c1000000.txt
+RTX 3060 Ti,water-caustic,1000000,1000000,,,caustic,128,22457.3,ok,results_water-caustic_n1000000_c1000000.txt
+RTX 3060 Ti,water-caustic,1000000,1000000,,,caustic,256,,dnf,results_water-caustic_n1000000_c1000000.txt
+RTX 3060 Ti,water-caustic,1000000,1000000,,,global,4,21647.8,ok,results_water-caustic_n1000000_c1000000.txt
+RTX 3060 Ti,water-caustic,1000000,1000000,,,global,16,22180.1,ok,results_water-caustic_n1000000_c1000000.txt
+RTX 3060 Ti,water-caustic,1000000,1000000,,,global,64,23740.6,ok,results_water-caustic_n1000000_c1000000.txt
+RTX 3060 Ti,water-caustic,1000000,1000000,,,global,128,25967.4,ok,results_water-caustic_n1000000_c1000000.txt
+RTX 3060 Ti,water-caustic,1000000,1000000,,,global,256,,dnf,results_water-caustic_n1000000_c1000000.txt
+RTX 4070,cornell-box,1000,1000,1816,0,caustic,4,224.688,invalid_empty_map,results_cornell-box_n1000_c1000.txt
+RTX 4070,cornell-box,1000,1000,1816,0,caustic,16,196.548,invalid_empty_map,results_cornell-box_n1000_c1000.txt
+RTX 4070,cornell-box,1000,1000,1816,0,caustic,64,194.928,invalid_empty_map,results_cornell-box_n1000_c1000.txt
+RTX 4070,cornell-box,1000,1000,1816,0,caustic,128,198.87,invalid_empty_map,results_cornell-box_n1000_c1000.txt
+RTX 4070,cornell-box,1000,1000,1816,0,caustic,256,,dnf,results_cornell-box_n1000_c1000.txt
+RTX 4070,cornell-box,1000,1000,1816,0,global,4,19.102,ok,results_cornell-box_n1000_c1000.txt
+RTX 4070,cornell-box,1000,1000,1816,0,global,16,89.6258,ok,results_cornell-box_n1000_c1000.txt
+RTX 4070,cornell-box,1000,1000,1816,0,global,64,721.633,ok,results_cornell-box_n1000_c1000.txt
+RTX 4070,cornell-box,1000,1000,1816,0,global,128,1679.66,ok,results_cornell-box_n1000_c1000.txt
+RTX 4070,cornell-box,1000,1000,1816,0,global,256,,dnf,results_cornell-box_n1000_c1000.txt
+RTX 4070,cornell-box,1000000,100000,,,caustic,4,,dnf,results_cornell-box_n1000000_c100000.txt
+RTX 4070,cornell-box,1000000,100000,,,caustic,16,1782.88,ok,results_cornell-box_n1000000_c100000.txt
+RTX 4070,cornell-box,1000000,100000,,,caustic,64,1792.88,ok,results_cornell-box_n1000000_c100000.txt
+RTX 4070,cornell-box,1000000,100000,,,caustic,128,1912.81,ok,results_cornell-box_n1000000_c100000.txt
+RTX 4070,cornell-box,1000000,100000,,,caustic,256,,dnf,results_cornell-box_n1000000_c100000.txt
+RTX 4070,cornell-box,1000000,100000,,,global,4,606.121,ok,results_cornell-box_n1000000_c100000.txt
+RTX 4070,cornell-box,1000000,100000,,,global,16,1348.91,ok,results_cornell-box_n1000000_c100000.txt
+RTX 4070,cornell-box,1000000,100000,,,global,64,5924.88,ok,results_cornell-box_n1000000_c100000.txt
+RTX 4070,cornell-box,1000000,100000,,,global,128,11925.4,ok,results_cornell-box_n1000000_c100000.txt
+RTX 4070,cornell-box,1000000,100000,,,global,256,,dnf,results_cornell-box_n1000000_c100000.txt
+RTX 4070,cornell-box,10000000,1000000,,,caustic,4,1813.09,ok,results_cornell-box_n10000000_c1000000.txt
+RTX 4070,cornell-box,10000000,1000000,,,caustic,16,1820.67,ok,results_cornell-box_n10000000_c1000000.txt
+RTX 4070,cornell-box,10000000,1000000,,,caustic,64,1822.85,ok,results_cornell-box_n10000000_c1000000.txt
+RTX 4070,cornell-box,10000000,1000000,,,caustic,128,1824.26,ok,results_cornell-box_n10000000_c1000000.txt
+RTX 4070,cornell-box,10000000,1000000,,,caustic,256,,dnf,results_cornell-box_n10000000_c1000000.txt
+RTX 4070,cornell-box,10000000,1000000,,,global,4,1556.02,ok,results_cornell-box_n10000000_c1000000.txt
+RTX 4070,cornell-box,10000000,1000000,,,global,16,1712.54,ok,results_cornell-box_n10000000_c1000000.txt
+RTX 4070,cornell-box,10000000,1000000,,,global,64,2318.69,ok,results_cornell-box_n10000000_c1000000.txt
+RTX 4070,cornell-box,10000000,1000000,,,global,128,3898.51,ok,results_cornell-box_n10000000_c1000000.txt
+RTX 4070,cornell-box,10000000,1000000,,,global,256,,dnf,results_cornell-box_n10000000_c1000000.txt
+RTX 4070,sponza,1000000,1000000,,,global,4,47.8135,ok,results_sponza_n1000000_c1000000.txt
+RTX 4070,sponza,1000000,1000000,,,global,16,148.193,ok,results_sponza_n1000000_c1000000.txt
+RTX 4070,sponza,1000000,1000000,,,global,64,528.479,ok,results_sponza_n1000000_c1000000.txt
+RTX 4070,sponza,1000000,1000000,,,global,128,1156.75,ok,results_sponza_n1000000_c1000000.txt
+RTX 4070,sponza,1000000,1000000,,,global,256,,dnf,results_sponza_n1000000_c1000000.txt
+RTX 4070,sponza,10000000,10000000,7564261,0,global,4,76.7443,ok,results_sponza_n10000000_c10000000.txt
+RTX 4070,sponza,10000000,10000000,7564261,0,global,16,200.854,ok,results_sponza_n10000000_c10000000.txt
+RTX 4070,sponza,10000000,10000000,7564261,0,global,64,769.415,ok,results_sponza_n10000000_c10000000.txt
+RTX 4070,sponza,10000000,10000000,7564261,0,global,128,2110.14,ok,results_sponza_n10000000_c10000000.txt
+RTX 4070,sponza,10000000,10000000,7564261,0,global,256,,dnf,results_sponza_n10000000_c10000000.txt
+RTX 4070,water-caustic,1000,1000,,,caustic,4,41.8791,ok,results_water-caustic_n1000_c1000.txt
+RTX 4070,water-caustic,1000,1000,,,caustic,16,41.0112,ok,results_water-caustic_n1000_c1000.txt
+RTX 4070,water-caustic,1000,1000,,,caustic,64,44.9529,ok,results_water-caustic_n1000_c1000.txt
+RTX 4070,water-caustic,1000,1000,,,caustic,128,47.2084,ok,results_water-caustic_n1000_c1000.txt
+RTX 4070,water-caustic,1000,1000,,,caustic,256,,dnf,results_water-caustic_n1000_c1000.txt
+RTX 4070,water-caustic,1000,1000,,,global,4,21.4065,ok,results_water-caustic_n1000_c1000.txt
+RTX 4070,water-caustic,1000,1000,,,global,16,28.8654,ok,results_water-caustic_n1000_c1000.txt
+RTX 4070,water-caustic,1000,1000,,,global,64,111.608,ok,results_water-caustic_n1000_c1000.txt
+RTX 4070,water-caustic,1000,1000,,,global,128,227.062,ok,results_water-caustic_n1000_c1000.txt
+RTX 4070,water-caustic,1000,1000,,,global,256,,dnf,results_water-caustic_n1000_c1000.txt
+RTX 4070,water-caustic,100000,100000,,,caustic,4,,dnf,results_water-caustic_n100000_c100000.txt
+RTX 4070,water-caustic,100000,100000,,,caustic,16,1247.37,ok,results_water-caustic_n100000_c100000.txt
+RTX 4070,water-caustic,100000,100000,,,caustic,64,1266.44,ok,results_water-caustic_n100000_c100000.txt
+RTX 4070,water-caustic,100000,100000,,,caustic,128,1277.98,ok,results_water-caustic_n100000_c100000.txt
+RTX 4070,water-caustic,100000,100000,,,caustic,256,,dnf,results_water-caustic_n100000_c100000.txt
+RTX 4070,water-caustic,100000,100000,,,global,4,1163.91,ok,results_water-caustic_n100000_c100000.txt
+RTX 4070,water-caustic,100000,100000,,,global,16,1215.79,ok,results_water-caustic_n100000_c100000.txt
+RTX 4070,water-caustic,100000,100000,,,global,64,1404.97,ok,results_water-caustic_n100000_c100000.txt
+RTX 4070,water-caustic,100000,100000,,,global,128,1633.87,ok,results_water-caustic_n100000_c100000.txt
+RTX 4070,water-caustic,100000,100000,,,global,256,,dnf,results_water-caustic_n100000_c100000.txt
+RTX 4070,water-caustic,500000,500000,,,caustic,4,5945.03,ok,results_water-caustic_n500000_c500000.txt
+RTX 4070,water-caustic,500000,500000,,,caustic,16,5951.96,ok,results_water-caustic_n500000_c500000.txt
+RTX 4070,water-caustic,500000,500000,,,caustic,64,5983.7,ok,results_water-caustic_n500000_c500000.txt
+RTX 4070,water-caustic,500000,500000,,,caustic,128,5967.38,ok,results_water-caustic_n500000_c500000.txt
+RTX 4070,water-caustic,500000,500000,,,caustic,256,,dnf,results_water-caustic_n500000_c500000.txt
+RTX 4070,water-caustic,500000,500000,,,global,4,5827.96,ok,results_water-caustic_n500000_c500000.txt
+RTX 4070,water-caustic,500000,500000,,,global,16,5879.19,ok,results_water-caustic_n500000_c500000.txt
+RTX 4070,water-caustic,500000,500000,,,global,64,6177.34,ok,results_water-caustic_n500000_c500000.txt
+RTX 4070,water-caustic,500000,500000,,,global,128,6535.32,ok,results_water-caustic_n500000_c500000.txt
+RTX 4070,water-caustic,500000,500000,,,global,256,,dnf,results_water-caustic_n500000_c500000.txt
+RTX 4070,water-caustic,1000000,1000000,1184684,183015,caustic,4,11650.9,ok,results_water-caustic_n1000000_c1000000.txt
+RTX 4070,water-caustic,1000000,1000000,1184684,183015,caustic,16,11679.8,ok,results_water-caustic_n1000000_c1000000.txt
+RTX 4070,water-caustic,1000000,1000000,1184684,183015,caustic,64,11681.2,ok,results_water-caustic_n1000000_c1000000.txt
+RTX 4070,water-caustic,1000000,1000000,1184684,183015,caustic,128,11695.7,ok,results_water-caustic_n1000000_c1000000.txt
+RTX 4070,water-caustic,1000000,1000000,1184684,183015,caustic,256,,dnf,results_water-caustic_n1000000_c1000000.txt
+RTX 4070,water-caustic,5000000,5000000,5929434,918717,caustic,128,61145.4,ok,results_water-caustic_n5000000_c5000000.txt
+RTX 4070,water-caustic,5000000,5000000,5929434,918717,caustic,256,,dnf,results_water-caustic_n5000000_c5000000.txt

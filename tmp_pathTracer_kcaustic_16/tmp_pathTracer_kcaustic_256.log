@@ -1,0 +1,16 @@
+Start!
+Scene: water-caustic
+Loading scene from: scenes\water-caustic\scene_v3.xml
+OBJ 'scenes\water-caustic\models/Mesh001.obj': 1 shapes, 0 .mtl materials
+OBJ 'scenes\water-caustic\models/Mesh001.obj': 1 usemtl buckets
+OBJ 'scenes\water-caustic\models/Mesh000.obj': 1 shapes, 0 .mtl materials
+OBJ 'scenes\water-caustic\models/Mesh000.obj': 1 usemtl buckets
+Loading normal photons from: photon_maps/water-caustic_normal_5000000.kdt
+Loading caustic photons from: photon_maps/water-caustic_caustic_5000000.kdt
+Loaded prebuilt kd-tree (5929434 photons) from: photon_maps/water-caustic_normal_5000000.kdt
+Loaded prebuilt kd-tree (918717 photons) from: photon_maps/water-caustic_caustic_5000000.kdt
+Benchmark: ON, Visible: ON
+Building geometries...
+  [benchmark] frame 1/10: 25.8028 ms
+CUDA call (cudaGraphicsMapResources(1, &cuDisplayTexture)) failed with code 718 (line 235): invalid program counter
+fatal cuda error

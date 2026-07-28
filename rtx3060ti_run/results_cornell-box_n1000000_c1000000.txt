@@ -1,0 +1,17 @@
+Benchmark: scene=cornell-box normal=1000000 caustic=1000000 
+ 
+Executable                Time(ms) 
+------------------------- -------- 
+pathTracer_kglobal_4 466.036 
+pathTracer_kglobal_16 1025.25 
+pathTracer_kglobal_64 4228.26 
+pathTracer_kglobal_128 8551.89 
+pathTracer_kglobal_256 DNF 
+pathTracer_kcaustic_4 1520.24 
+pathTracer_kcaustic_16 1526.69 
+pathTracer_kcaustic_64 1547 
+pathTracer_kcaustic_128 1575.86 
+pathTracer_kcaustic_256 DNF 
+ 
+Summary Table 
+------------------------- -------- 
