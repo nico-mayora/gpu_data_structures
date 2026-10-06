@@ -19,8 +19,15 @@ struct PhotonMapperRGD
 struct PointLightRGD: public PhotonMapperRGD
 {
     owl::vec3f position;
-    owl::vec3f color;
-    float intensity;
+    owl::vec3f color;       // total emitted flux Phi (power x emission factor), RGB
+    float intensity;        // legacy, unused
+    // Phase 2.2: light-type-aware emission.
+    int lightType;          // LightType (point / spot / directional)
+    owl::vec3f direction;   // spot/directional propagation axis (unit)
+    float cosOuter;         // spot outer cone (cos)
+    float cosInner;         // spot inner cone (cos)
+    owl::vec3f diskCenter;  // directional: scene bounding-sphere center
+    float diskRadius;       // directional: scene bounding-sphere radius
 };
 
 struct PhotonMapperPRD
@@ -37,23 +44,8 @@ struct PhotonMapperPRD
     bool debug;
 };
 
-enum LightType {
-    POINT_LIGHT,
-    SQUARE_LIGHT,
-};
-
-struct LightSource {
-    LightType source_type;
-    owl::vec3f pos;
-    double power;
-    owl::vec3f rgb;
-    /* for emission surface */
-    owl::vec3f normal;
-    double side_length;
-
-    /* calculated values */
-    int num_photons;
-};
+// (Legacy LightType/LightSource removed — unused; the live light type is `Light`
+//  in common/data/world.cuh, introduced in Phase 2.1.)
 
 /* This holds all the state required for the path tracer to function.
  * As we use the STL, this is code in C++ land that needs a bit of
@@ -87,6 +79,13 @@ struct Program {
     int maxDepth;
     int castedCausticsPhotons;
     int castedDiffusePhotons;
-    int photonsPerWatt;
-    int causticsPhotonsPerWatt;
+    // Photons-per-watt must be float: casted/totalWatts truncates to 0 as an int
+    // whenever the casted count is below the total wattage (e.g. a small caustic
+    // budget against Sponza's ~675000 W), which zeroes the launch width.
+    float photonsPerWatt;
+    float causticsPhotonsPerWatt;
+
+    // Scene bounding sphere (for directional-light disk emission). Computed once at load.
+    owl::vec3f sceneCenter;
+    float sceneRadius;
 };

@@ -22,10 +22,6 @@ struct BaseQueryResult {
         return __uint_as_float(static_cast<uint32_t>(photonData[pos] >> 32));
     }
 
-    __device__ float getQueryRadiusSqr() const {
-        return getDistance(0);
-    }
-
     __device__ size_t getIndex(const size_t pos) const {
         return static_cast<uint32_t>(photonData[pos]);
     }
@@ -41,9 +37,15 @@ struct BaseQueryResult {
 
 template<int K>
 struct FixedQueryResult : BaseQueryResult<K> {
+    __device__ float getQueryRadiusSqr() const {
+        return this->getDistance(K-1);
+    }
+
     // Returns max distance for points to be considered.
     __device__ float addNode(float dist, size_t node_id) {
-        this->foundPoints = (this->foundPoints < K) ? this->foundPoints + 1 : K;
+        if (dist > getQueryRadiusSqr()) return getQueryRadiusSqr();
+
+        this->foundPoints = (this->isFull()) ? K : this->foundPoints + 1;
         uint64_t packed_data = this->packData(node_id, dist);
 #pragma unroll
         for (int i = 0; i < K; ++i) {
@@ -54,7 +56,7 @@ struct FixedQueryResult : BaseQueryResult<K> {
             }
         }
 
-        return (this->foundPoints < K) ? 0.f : this->getDistance(K - 1);
+        return (this->isFull()) ? getQueryRadiusSqr() : INFTY;
     }
 };
 
@@ -63,6 +65,10 @@ struct FixedQueryResult : BaseQueryResult<K> {
 // Trade-off: Results distance to query point not in ascending order.
 template<int K>
 struct HeapQueryResult : BaseQueryResult<K>{
+    __device__ float getQueryRadiusSqr() const {
+        return this->getDistance(0);
+    }
+
     __device__ void percolateUp(size_t idx) const {
         const uint64_t movingData = this->photonData[idx];
 
@@ -119,7 +125,7 @@ struct HeapQueryResult : BaseQueryResult<K>{
             ++this->foundPoints;
         }
 
-        return this->getQueryRadiusSqr();
+        return (this->isFull()) ? getQueryRadiusSqr() : INFTY;
     }
 };
 
@@ -156,7 +162,10 @@ __device__ void get_closest_k_points_in_range(const float *query_pos, const P *t
         const bool from_parent = prev < curr;
         if (from_parent) {
             const float dist2 = tree_buf[curr].dist2(query_pos);
-            max_search_radius = result->addNode(dist2, curr);
+            // Only offer points within the current pruning radius, so a finite query_range
+            // also bounds the result (not just the traversal).
+            if (dist2 <= max_search_radius)
+                max_search_radius = fminf(max_search_radius, result->addNode(dist2, curr));
         }
 
         const int level = 31 - __clz(curr + 1);

@@ -10,7 +10,8 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
                           const Photon *photon_map,
                           const PhotonCoord *coord_map,
                           const int num_photons,
-                          const PerRayData &prd) {
+                          const PerRayData &prd,
+                          const float max_radius = INFTY) {
     constexpr float k_filter = 1.f;
     constexpr float inv_k = 1.f / k_filter;
 #if defined(CUBIC)
@@ -32,7 +33,12 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
     result.initialize(heap);
     // Traverse the coords-only array (12 bytes/node) — full photons (48 bytes)
     // are only loaded for the K survivors below.
-    get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, 0.01,&result);
+    // max_radius caps the search. The global map passes INFTY (adaptive): photons cover
+    // every surface, so a query always finds K neighbors quickly and the kd-tree self-prunes
+    // once the heap fills. The CAUSTIC map must pass a bounded radius — caustic photons are
+    // localized, so an INFTY query from a pixel far from any caustic explores ~the whole tree
+    // (O(N) per pixel), which on a caustic-heavy scene makes a frame effectively never finish.
+    get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, max_radius, &result);
 
     const float radiusSqr = result.getQueryRadiusSqr();
     const float inv_radius = 1.f / sqrtf(radiusSqr);
@@ -50,6 +56,9 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
 inline __device__
 owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
     owl::vec3f colour_acum = 0.f;
+    // Product of albedos along the specular prefix of the path, so radiance seen
+    // through mirrors/glass is tinted by them (e.g. steel reflects ~58% gray).
+    owl::vec3f throughput = 1.f;
 
     for (int32_t i = 0; i < self.depth; ++i) {
         uint32_t p0, p1;
@@ -69,7 +78,15 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
             p0, p1
         );
 
-        if (prd.event == MISS || prd.event == ABSORBED)
+        if (prd.event == MISS) {
+            // Sky backdrop: cosmetic radiance for camera/specular paths that escape
+            // the scene (e.g. out a window). It is NOT a light source — final-gather
+            // rays ignore it and the photon maps never see it; scene lights (like the
+            // kitchen's WindowLight) carry the actual energy.
+            colour_acum += throughput * prd.missColour;
+            return colour_acum;
+        }
+        if (prd.event == ABSORBED)
             return colour_acum;
 
         if (prd.event == SCATTER_SPECULAR) {
@@ -77,12 +94,13 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
                 *prd.hpMaterial, ray.direction, prd.normalAtHp, prd.random
             );
 
+            throughput *= prd.albedo;
             ray = owl::Ray(prd.hitPoint, new_ray_dir, EPS, INFTY);
             continue;
         }
 
         auto direct_illumination_fact = calculateDirectIllumination(self, prd);
-        colour_acum += direct_illumination_fact;
+        colour_acum += throughput * direct_illumination_fact;
 
         owl::vec3f diffuse_contrib = 0.f;
         // "Reach out" into the scene and perform gathers, this gives us global lighting with less local variance.
@@ -109,20 +127,37 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
             );
 
             // Skip MISS: the miss program only sets `event`, leaving sprd.hpMaterial
-            // dangling. The final-gather evaluates the photon density / BRDF at the
-            // SECONDARY hit, so pass sprd (not prd) for its hitPoint/normal/material.
+            // dangling. The final-gather evaluates radiance leaving the SECONDARY hit
+            // toward the primary, so pass sprd (not prd) for its hitPoint/normal/material.
             if (sprd.event != MISS) {
+                // Design B: the global map includes the first (directly-lit) bounce,
+                // so a single gather at the secondary hit already yields its full
+                // radiance (direct + indirect) — this is the term that carries colour
+                // bleeding. Adding analytic direct here would double-count.
                 diffuse_contrib += gather_photons<K_GLOBAL_PHOTONS>(
                     sprd.hitPoint, self.photon_map, self.photon_coords, self.num_photons, sprd);
             }
         }
 
+        // Caustics use a BOUNDED gather radius (unlike the adaptive global gather): caustic
+        // photons are localized, so an unbounded query from a pixel far from any caustic would
+        // scan ~the whole tree. The radius suits the unit-scale caustic scenes (cornell/water);
+        // it's world-space, so a much larger caustic scene would want a bigger value.
+        constexpr float CAUSTIC_GATHER_RADIUS = 0.1f;
         const owl::vec3f caustic_term = gather_photons<K_CAUSTIC_PHOTONS>(
-            prd.hitPoint, self.caustic_map, self.caustic_coords, self.num_caustic, prd);
+            prd.hitPoint, self.caustic_map, self.caustic_coords, self.num_caustic, prd,
+            CAUSTIC_GATHER_RADIUS);
 
-        // Having this would be physically correct, but looks worse:
-        // const float inv_N = 1.f / float(self.num_diffuse_scattered);
-        colour_acum += diffuse_contrib /* * inv_N*/ * prd.hpMaterial->albedo + caustic_term;
+        // Cosine-weighted MC of the Lambertian hemisphere integral: L_indirect =
+        // rho_x * (1/M) * sum_j L(y_j). The cos/pdf cancels to give rho_x (prd.albedo);
+        // the 1/M is the sample average over the M final-gather rays.
+        const float inv_M = (self.num_diffuse_scattered > 0)
+                          ? 1.f / float(self.num_diffuse_scattered) : 0.f;
+        // indirect_intensity is an artistic gain (1.0 = physically correct); it lets a
+        // scene exaggerate colour bleeding where it is geometrically faint (e.g. Sponza).
+        colour_acum += throughput
+                     * (diffuse_contrib * inv_M * prd.albedo * self.indirect_intensity
+                        + caustic_term * self.caustic_intensity);
         break;
     }
 
@@ -132,12 +167,19 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
 OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
     const RayGenData &self = owl::getProgramData<RayGenData>();
     const owl::vec2i pixelID = owl::getLaunchIndex();
+    const int fbOfs = pixelID.x + self.resolution.x * pixelID.y;
+
+    // Progressive accumulation: each launch contributes SAMPLES_PER_FRAME samples and
+    // is averaged into accumBuffer. The viewer launches one of these per displayed
+    // frame, so the window stays responsive and the image refines over time. The RNG
+    // is seeded with accumID so successive launches draw different (decorrelated) samples.
+    constexpr int SAMPLES_PER_FRAME = 1;
 
     PerRayData prd;
-    prd.random.init(pixelID.x,pixelID.y);
+    prd.random.init(fbOfs, self.accumID);
     owl::vec3f colour = 0.f;
 
-    for (int sampleID=0; sampleID < self.pixel_samples; sampleID++) {
+    for (int sampleID = 0; sampleID < SAMPLES_PER_FRAME; sampleID++) {
         owl::Ray ray;
 
         const owl::vec2f pixelSample(prd.random(),prd.random());
@@ -155,19 +197,27 @@ OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
 
         colour += trace_path(self, ray, prd);
     }
+    colour *= 1.f / float(SAMPLES_PER_FRAME);   // this launch's mean radiance (linear)
 
-    colour *= 1.f / self.pixel_samples;
-    colour = filter_colour(colour);
+    // accumID == 0 starts a fresh accumulation (camera moved / resized); otherwise add on.
+    const owl::vec3f accum = (self.accumID == 0)
+                           ? colour
+                           : self.accumBuffer[fbOfs] + colour;
+    self.accumBuffer[fbOfs] = accum;
 
-    const int fbOfs = pixelID.x+self.resolution.x*pixelID.y;
-    self.fbPtr[fbOfs] = owl::make_rgba(colour);
+    // Display the running mean, tonemapped. Tonemapping happens here (not in the accum
+    // buffer) so accumulation stays in linear radiance.
+    const owl::vec3f mean = accum / float(self.accumID + 1);
+    self.fbPtr[fbOfs] = owl::make_rgba(filter_colour(mean));
 }
 
 
 OPTIX_MISS_PROGRAM(miss)()
 {
+    const auto &self = owl::getProgramData<MissProgData>();
     auto &prd = owl::getPRD<PerRayData>();
     prd.event = MISS;
+    prd.missColour = self.sky_colour;
 }
 
 OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
@@ -183,6 +233,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
     const owl::vec3f rayOrg = optixGetWorldRayOrigin();
 
     prd.hpMaterial = self.material;
+    prd.albedo = get_albedo_at_hp(self, u, v, primID);
     prd.event = (self.material->matType == LAMBERTIAN) ? SCATTER_DIFFUSE : SCATTER_SPECULAR;
     prd.hitPoint = rayOrg + tMax * rayDir;
     prd.normalAtHp = (dot(Ng, rayDir) > 0.f) ? -Ng : Ng;

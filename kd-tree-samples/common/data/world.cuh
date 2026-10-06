@@ -1,17 +1,17 @@
 #pragma once
 #include <vector>
+#include <string>
+#include <cuda_runtime.h>
 
 #include "owl/common/math/vec.h"
 #include "owl/include/owl/common/math/random.h"
 #include "pt-math.cuh"
 
-#include "tiny_obj_loader.h"
-#define TINYOBJLOADER_IMPLEMENTATION
-
 struct Mesh {
     std::vector<owl::vec3i> indices;
     std::vector<owl::vec3f> vertices;
     std::vector<owl::vec3f> normals;
+    std::vector<owl::vec2f> uvs; // Aligned with `vertices`. Empty when the source has no UVs.
     bool faceted = true; // True -> face normals. False -> vertex normals.
 
     static Mesh *makeBaseRectangle() {
@@ -51,97 +51,6 @@ struct Mesh {
         return mesh;
     }
 
-    static Mesh *loadObj(std::string obj_path, bool faceted) {
-        tinyobj::attrib_t attrib;
-        std::vector<tinyobj::shape_t> shapes;
-        std::vector<tinyobj::material_t> materials;
-        std::string warn, err;
-
-        if (!LoadObj(&attrib, &shapes, &materials, &warn, &err, obj_path.c_str())) {
-            throw std::runtime_error("Failed to load OBJ: " + warn + err);
-        }
-
-        auto mesh = new Mesh();
-        mesh->faceted = faceted;
-
-        if (faceted) {
-            // Copy all unique vertices
-            for (size_t i = 0; i < attrib.vertices.size() / 3; i++) {
-                mesh->vertices.push_back(owl::vec3f(
-                    attrib.vertices[3 * i + 0],
-                    attrib.vertices[3 * i + 1],
-                    attrib.vertices[3 * i + 2]
-                ));
-            }
-
-            for (const auto &shape : shapes) {
-                size_t indexOffset = 0;
-                for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
-                    int fv = shape.mesh.num_face_vertices[f];
-                    assert(fv == 3);
-
-                    tinyobj::index_t i0 = shape.mesh.indices[indexOffset + 0];
-                    tinyobj::index_t i1 = shape.mesh.indices[indexOffset + 1];
-                    tinyobj::index_t i2 = shape.mesh.indices[indexOffset + 2];
-
-                    owl::vec3i tri(i0.vertex_index, i1.vertex_index, i2.vertex_index);
-                    mesh->indices.push_back(tri);
-
-                    owl::vec3f v0 = mesh->vertices[tri.x];
-                    owl::vec3f v1 = mesh->vertices[tri.y];
-                    owl::vec3f v2 = mesh->vertices[tri.z];
-                    owl::vec3f normal = owl::normalize(owl::cross(v1 - v0, v2 - v0));
-                    mesh->normals.push_back(normal); // One normal per face
-
-                    indexOffset += fv;
-                }
-            }
-        } else {
-            // Shared vertices with smooth (vertex) normals
-            // Copy all vertices
-            for (size_t i = 0; i < attrib.vertices.size() / 3; i++) {
-                mesh->vertices.push_back(owl::vec3f(
-                    attrib.vertices[3 * i + 0],
-                    attrib.vertices[3 * i + 1],
-                    attrib.vertices[3 * i + 2]
-                ));
-            }
-
-            // Collect indices
-            for (const auto &shape : shapes) {
-                size_t indexOffset = 0;
-                for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
-                    int fv = shape.mesh.num_face_vertices[f];
-                    assert(fv == 3 && "Only triangular faces supported");
-
-                    tinyobj::index_t i0 = shape.mesh.indices[indexOffset + 0];
-                    tinyobj::index_t i1 = shape.mesh.indices[indexOffset + 1];
-                    tinyobj::index_t i2 = shape.mesh.indices[indexOffset + 2];
-
-                    mesh->indices.push_back(owl::vec3i(i0.vertex_index, i1.vertex_index, i2.vertex_index));
-                    indexOffset += fv;
-                }
-            }
-
-            // Compute vertex normals by averaging adjacent face normals
-            mesh->normals.resize(mesh->vertices.size(), owl::vec3f(0.f));
-            for (const auto &tri : mesh->indices) {
-                owl::vec3f v0 = mesh->vertices[tri.x];
-                owl::vec3f v1 = mesh->vertices[tri.y];
-                owl::vec3f v2 = mesh->vertices[tri.z];
-                owl::vec3f n = owl::cross(v1 - v0, v2 - v0);
-                mesh->normals[tri.x] = mesh->normals[tri.x] + n;
-                mesh->normals[tri.y] = mesh->normals[tri.y] + n;
-                mesh->normals[tri.z] = mesh->normals[tri.z] + n;
-            }
-            for (auto &n : mesh->normals) {
-                n = normalize(n);
-            }
-        }
-
-        return mesh;
-    }
-
     void applyTransform(const Mat4f& tf) {
         for (auto &v: vertices) {
             auto transformed_vtx = tf * owl::vec4f(v, 1);
@@ -170,11 +79,18 @@ struct Material {
     float diffuse;
     float specular;
     float ior;
+    // Microfacet alpha for CONDUCTOR, approximated at scatter time as a "fuzzy
+    // mirror" (reflection dir perturbed proportionally). 0 = perfect mirror.
+    float roughness = 0.f;
 };
 
 struct Model {
     Mesh *mesh;
     Material *material;
+    // Host-only: filesystem path to the albedo (diffuse) texture, resolved
+    // absolute. Empty = untextured (fall back to material->albedo). Consumed at
+    // geometry-upload time to create the per-geom OWL texture; never uploaded.
+    std::string albedo_texture_path;
 };
 
 struct Camera {
@@ -186,16 +102,35 @@ struct Camera {
         int depth;
         int pixel_samples;
         int num_diffuse_scattered;
+        float indirect_intensity; // artistic gain on indirect term (1.0 = physical)
+        float caustic_intensity;  // artistic gain on caustic term (1.0 = physical)
         owl::vec2i resolution;
         float fov;
     } image;
 };
 
 
-struct PointLight {
-    owl::vec3f position;
-    owl::vec3f power;
+enum LightType {
+    LIGHT_POINT,
+    LIGHT_SPOT,        // reserved for Phase 2.2
+    LIGHT_DIRECTIONAL, // reserved for Phase 2.2
 };
+
+// Tagged AoS light record, uploaded as an OWL_USER_TYPE buffer. POD so it copies
+// straight to the device. Only LIGHT_POINT is consumed in Phase 2.1; the spot/
+// directional fields are present so the layout is stable when 2.2 lands.
+struct Light {
+    LightType type;
+    owl::vec3f position;   // point / spot
+    owl::vec3f direction;  // spot / directional (unit)
+    owl::vec3f power;      // RGB radiant intensity (point/spot) or irradiance (directional)
+    float cos_inner;       // spot inner cone (cos), unused otherwise
+    float cos_outer;       // spot outer cone (cos), unused otherwise
+};
+
+// Back-compat alias: the photon emitter's per-launch point-light path still calls
+// this a "point light". It now carries a `Light`.
+using PointLight = Light;
 
 // TODO: Remove this, deprecated
 struct EmittedPhoton
@@ -255,7 +190,7 @@ struct PhotonCoord {
 
 struct World {
     std::vector<Model*> models;
-    PointLight *scene_light;
+    std::vector<Light*> lights;
 
     Photon *photon_map;
     PhotonCoord *photon_coords;
@@ -263,6 +198,17 @@ struct World {
     Photon *caustic_map;
     PhotonCoord *caustic_coords;
     int num_caustic;
+
+    // Photon-emitter budget, set from the scene XML (<default name="casted_*_photons">).
+    // Consumed by photon-mapper/main.cu; ignored by the path tracer. Defaults apply when
+    // the scene omits them.
+    int casted_diffuse_photons = 750'000;
+    int casted_caustic_photons = 100;
+
+    // Backdrop radiance for rays that escape the scene (<default name="sky_colour">).
+    // Cosmetic only: shown to camera/specular paths by the path tracer's miss program,
+    // never sampled as a light. Black when the scene omits it.
+    owl::vec3f sky_colour = 0.f;
 
     Camera *cam;
 };
@@ -274,6 +220,8 @@ struct TrianglesGeomData {
     owl::vec3f *vertex;
     owl::vec3i *index;
     owl::vec3f *normal;
+    owl::vec2f *texCoord;          // null when the mesh has no UVs
+    cudaTextureObject_t albedoTexture; // 0 when no albedo texture is bound
     bool faceted;
 };
 
