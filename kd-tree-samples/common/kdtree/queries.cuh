@@ -142,7 +142,10 @@ template<int K, typename P, typename ResultType>
 __device__ void get_closest_k_points_in_range(const float *query_pos, const P *tree_buf, const size_t N,
                                               const float query_range, ResultType *result) {
     if (N == 0) {
+#ifdef DEBUG_QUERIES
+        // Conditionally compiled; sponza's caustic maps are empty.
         printf("WARNING! No photons in tree buffer. Aborting query...\n");
+#endif
         return;
     }
 
@@ -164,7 +167,7 @@ __device__ void get_closest_k_points_in_range(const float *query_pos, const P *t
             const float dist2 = tree_buf[curr].dist2(query_pos);
             // Only offer points within the current pruning radius, so a finite query_range
             // also bounds the result (not just the traversal).
-            if (dist2 <= max_search_radius)
+            if (dist2 < max_search_radius)
                 max_search_radius = fminf(max_search_radius, result->addNode(dist2, curr));
         }
 
