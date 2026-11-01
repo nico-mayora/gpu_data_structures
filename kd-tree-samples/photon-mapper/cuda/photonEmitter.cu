@@ -31,12 +31,15 @@ inline __device__ void updateScatteredRay(Ray &ray, PhotonMapperPRD &prd) {
 }
 
 inline __device__ void shootPhoton(const PhotonMapperRGD &self, Ray &ray, PhotonMapperPRD &prd) {
-  // Design B: store EVERY diffuse interaction, including the first (directly-lit)
-  // hit. The global map then represents the full incident radiance (direct +
-  // indirect) at each surface, so the path tracer's final gather reads complete
-  // radiance at gather points and must NOT add analytic direct there. The eye's
-  // primary hit still computes direct analytically (the map is only read at the
-  // gather points, never at the primary, so there is no double-counting).
+  // Global map: store a photon on EVERY arrival at a diffuse surface, including the
+  // first (directly-lit) hit, as in Jensen's global map (paths L{S|D}*D). The map then
+  // represents the full incident radiance at each surface, so the path tracer's final
+  // gather reads complete radiance at gather points and must NOT add analytic direct
+  // there. The eye's primary hit still computes direct analytically (the map is only
+  // read at the gather points, never at the primary, so there is no double-counting).
+  //
+  // The photon is stored on arrival, before Russian roulette decides whether it is
+  // reflected or absorbed, and never on specular surfaces.
   for (int i = 0; i < self.maxDepth; i++) {
     owl::traceRay(self.world, ray, prd);
 
@@ -44,26 +47,23 @@ inline __device__ void shootPhoton(const PhotonMapperRGD &self, Ray &ray, Photon
       break;
     }
 
-    if (prd.event == SCATTER_SPECULAR || prd.event == SCATTER_REFRACT) {
-      updateScatteredRay(ray, prd);
-      continue;
-    }
-
-    if (prd.event == SCATTER_DIFFUSE) {
+    if (prd.hitDiffuse) {
       savePhoton(self, prd);
-      updateScatteredRay(ray, prd);
-      continue;
     }
 
     if (prd.event == ABSORBED) {
-      savePhoton(self, prd);
       break;
     }
+
+    updateScatteredRay(ray, prd);
   }
 }
 
 inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray, PhotonMapperPRD &prd) {
-  // Caustic mode: Only save diffuse bounces that occur AFTER at least one caustic bounce.
+  // Caustic map: store only the first diffuse arrival that follows at least one specular
+  // interaction (paths LS+D). The path ends there, so whether Russian roulette would have
+  // reflected or absorbed the photon at that diffuse surface does not matter: it is stored
+  // either way. A diffuse arrival at i == 0 is direct illumination and is not stored.
   for (int i = 0; i < self.maxDepth; i++) {
     owl::traceRay(self.world, ray, prd);
 
@@ -71,12 +71,7 @@ inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray
       break;
     }
 
-    if (prd.event == SCATTER_SPECULAR || prd.event == SCATTER_REFRACT) {
-      updateScatteredRay(ray, prd);
-      continue;
-    }
-
-    if (prd.event == SCATTER_DIFFUSE) {
+    if (prd.hitDiffuse) {
       if (i > 0) {
         savePhoton(self, prd);
       }
@@ -86,6 +81,8 @@ inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray
     if (prd.event == ABSORBED) {
       break;
     }
+
+    updateScatteredRay(ray, prd);
   }
 }
 
@@ -184,7 +181,9 @@ inline __device__ void scatterSpecular(PhotonMapperPRD &prd, const TrianglesGeom
       reflected = fuzzed;
   }
   prd.scattered.direction = reflected;
-  prd.scattered.color = multiplyColor(albedo, prd.color);
+  // Divide by the survival probability (as in scatterDiffuse) so Russian roulette stays
+  // unbiased: multiplying by the albedo alone would attenuate the photon twice.
+  prd.scattered.color = calculatePhotonColor(prd.color, albedo, prd.debug);
 }
 
 inline __device__ void scatterRefract(PhotonMapperPRD &prd, const TrianglesGeomData &self, const vec3f &albedo) {
@@ -199,7 +198,7 @@ inline __device__ void scatterRefract(PhotonMapperPRD &prd, const TrianglesGeomD
   prd.event = SCATTER_REFRACT;
   prd.scattered.origin = hitPoint;
   prd.scattered.direction = refract(rayDir, normal, self.material->ior);
-  prd.scattered.color = multiplyColor(albedo, prd.color);
+  prd.scattered.color = calculatePhotonColor(prd.color, albedo, prd.debug);
 }
 
 inline __device__
@@ -240,6 +239,8 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
   const int primID0 = optixGetPrimitiveIndex();
   const vec3f surfaceAlbedo = get_albedo_at_hp(self, u0, v0, primID0);
 
+  prd.hitDiffuse = (self.material->matType == LAMBERTIAN);
+
   const auto p_index = pIndex(prd.color, surfaceAlbedo, prd.debug);
   float randomProb = prd.random();
 
@@ -272,4 +273,5 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
 OPTIX_MISS_PROGRAM(miss)(){
   auto &prd = owl::getPRD<PhotonMapperPRD>();
   prd.event = MISS;
+  prd.hitDiffuse = false;
 }
