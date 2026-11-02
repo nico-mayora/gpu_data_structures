@@ -140,6 +140,7 @@ photonEmitter.exe sponza 10000000 1000000
 photonEmitter.exe sponza 10000000 5000000
 photonEmitter.exe sponza 10000000 10000000
 
+photonEmitter.exe water-caustic 100000 100000
 photonEmitter.exe water-caustic 1000000 1000000
 photonEmitter.exe water-caustic 1000000 5000000
 photonEmitter.exe water-caustic 1000000 10000000
