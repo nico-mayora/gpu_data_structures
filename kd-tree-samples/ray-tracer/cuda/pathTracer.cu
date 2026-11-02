@@ -53,6 +53,58 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
     return illumination;
 }
 
+// Radiance arriving at a final-gather origin along `dir`. The global map is only valid
+// on diffuse surfaces (photons are never stored on specular ones), so a gather ray that
+// hits a mirror or glass is continued specularly, tinted by the albedos it crosses, until
+// it reaches a diffuse surface where the global map is read. Paths LDS+D reached this way
+// are not in the caustic map (which only holds LS+D), so nothing is counted twice.
+inline __device__
+owl::vec3f final_gather_ray(const RayGenData &self, owl::vec3f origin, owl::vec3f dir,
+                            Random &random) {
+    owl::vec3f throughput = 1.f;
+
+    for (int32_t i = 0; i < self.depth; ++i) {
+        uint32_t q0, q1;
+        PerRayData sprd;
+        owl::packPointer(&sprd, q0, q1);
+        optixTrace(
+            self.world,
+            origin,
+            dir,
+            EPS,
+            INFTY,
+            0.f,
+            OptixVisibilityMask(255),
+            OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+            PRIMARY,
+            RAY_TYPES_COUNT,
+            PRIMARY,
+            q0, q1
+        );
+
+        // MISS: the sky backdrop is not a light source, so it contributes nothing. The miss
+        // program only sets `event`, leaving sprd.hpMaterial dangling, so stop here.
+        if (sprd.event == MISS)
+            return 0.f;
+
+        if (sprd.event == SCATTER_DIFFUSE) {
+            // The global map includes the first (directly-lit) bounce, so a single gather
+            // at this hit already yields its full outgoing radiance (direct + indirect).
+            // Adding analytic direct here would double-count. Pass sprd (not the primary
+            // prd) for this hit's position, normal and material.
+            return throughput * gather_photons<K_GLOBAL_PHOTONS>(
+                sprd.hitPoint, self.photon_map, self.photon_coords, self.num_photons, sprd);
+        }
+
+        // Specular hit: continue the gather ray through the mirror / glass.
+        dir = reflect_or_refract_ray(*sprd.hpMaterial, dir, sprd.normalAtHp, random);
+        throughput *= sprd.albedo;
+        origin = sprd.hitPoint;
+    }
+
+    return 0.f;
+}
+
 inline __device__
 owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
     owl::vec3f colour_acum = 0.f;
@@ -108,35 +160,8 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
             const owl::vec3f diffuse_vector_dir =
                 cosine_weighted_hemisphere(prd.normalAtHp, prd.random);
 
-            uint32_t q0, q1;
-            PerRayData sprd;
-            owl::packPointer(&sprd, q0, q1);
-            optixTrace(
-                self.world,
-                prd.hitPoint,
-                diffuse_vector_dir,
-                EPS,
-                INFTY,
-                0.f,
-                OptixVisibilityMask(255),
-                OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-                PRIMARY,
-                RAY_TYPES_COUNT,
-                PRIMARY,
-                q0, q1
-            );
-
-            // Skip MISS: the miss program only sets `event`, leaving sprd.hpMaterial
-            // dangling. The final-gather evaluates radiance leaving the SECONDARY hit
-            // toward the primary, so pass sprd (not prd) for its hitPoint/normal/material.
-            if (sprd.event != MISS && self.num_photons > 0) {
-                // Design B: the global map includes the first (directly-lit) bounce,
-                // so a single gather at the secondary hit already yields its full
-                // radiance (direct + indirect) — this is the term that carries colour
-                // bleeding. Adding analytic direct here would double-count.
-                diffuse_contrib += gather_photons<K_GLOBAL_PHOTONS>(
-                    sprd.hitPoint, self.photon_map, self.photon_coords, self.num_photons, sprd);
-            }
+            if (self.num_photons > 0)
+                diffuse_contrib += final_gather_ray(self, prd.hitPoint, diffuse_vector_dir, prd.random);
         }
 
         // Caustics use a BOUNDED gather radius (unlike the adaptive global gather): caustic

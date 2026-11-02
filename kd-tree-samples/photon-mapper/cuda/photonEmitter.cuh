@@ -36,6 +36,10 @@ struct PhotonMapperPRD
     owl::vec3f color;
     owl::vec3f direction;
     RayEvent event;
+    // True when the last hit surface is diffuse (Lambertian), independently of whether
+    // Russian roulette then scattered or absorbed the photon. Photons are stored on
+    // arrival at diffuse surfaces, so storage must not depend on the roulette outcome.
+    bool hitDiffuse;
     struct {
         owl::vec3f origin;
         owl::vec3f direction;
