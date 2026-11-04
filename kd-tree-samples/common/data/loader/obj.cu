@@ -9,16 +9,12 @@
 
 namespace {
 
-// Bundle a tinyobj face reference so we can group across multiple shapes by usemtl.
 struct FaceRef {
     const tinyobj::shape_t *shape;
     size_t face_index;     // index into shape->mesh.num_face_vertices
     size_t index_offset;   // running offset into shape->mesh.indices
 };
 
-// Build a Mesh from a list of FaceRefs that all share the same usemtl. Vertices
-// are compacted: only positions referenced by this group are copied, and indices
-// are remapped to the local range.
 Mesh *build_submesh(const tinyobj::attrib_t &attrib,
                     const std::vector<FaceRef> &faces,
                     bool faceted,
@@ -74,9 +70,6 @@ Mesh *build_submesh(const tinyobj::attrib_t &attrib,
                 auto &slot = mesh->uvs[local];
                 if (!uv_seam_warned && (slot.x != 0.f || slot.y != 0.f) &&
                     (slot.x != uv.x || slot.y != uv.y)) {
-                    // Seam: a position shared across a UV discontinuity. We keep the
-                    // last-written UV (per-face-corner dedup would be needed for a clean
-                    // seam — Phase 5.1). Reported once per OBJ by the caller, not here.
                     uv_seam_warned = true;
                     had_uv_seam = true;
                 }
@@ -111,8 +104,6 @@ Mesh *build_submesh(const tinyobj::attrib_t &attrib,
     return mesh;
 }
 
-// Lossy translation from a tinyobj .mtl entry into our Material enum.
-// Heuristic — meant to get reasonable defaults; users override per-material via XML.
 Material *translate_mtl(const tinyobj::material_t &mtl) {
     auto *m = new Material;
     m->albedo = owl::vec3f(mtl.diffuse[0], mtl.diffuse[1], mtl.diffuse[2]);
@@ -142,7 +133,7 @@ Material *translate_mtl(const tinyobj::material_t &mtl) {
     return m;
 }
 
-} // namespace
+}
 
 std::vector<ObjSubmesh> load_obj_submeshes(
     const std::string &obj_path,
@@ -153,9 +144,6 @@ std::vector<ObjSubmesh> load_obj_submeshes(
     std::vector<tinyobj::material_t> mtl_materials;
     std::string warn, err;
 
-    // Compute mtl_basedir explicitly: tinyobj's auto-derivation from the .obj path
-    // misbehaves on Windows mixed-separator paths, leaving basedir empty and silently
-    // failing to find the .mtl. Trailing separator required.
     std::string basedir;
     if (const auto pos = obj_path.find_last_of("/\\"); pos != std::string::npos) {
         basedir = obj_path.substr(0, pos + 1);
@@ -171,9 +159,6 @@ std::vector<ObjSubmesh> load_obj_submeshes(
               << shapes.size() << " shapes, "
               << mtl_materials.size() << " .mtl materials" << std::endl;
 
-    // Bucket faces by usemtl name. material_id == -1 lands in the "" bucket.
-    // The bucket-order vector preserves the order in which usemtl groups first
-    // appear, so the caller sees them in a stable, file-driven sequence.
     std::vector<std::string> bucket_order;
     std::unordered_map<std::string, std::vector<FaceRef>> buckets;
 
@@ -203,13 +188,13 @@ std::vector<ObjSubmesh> load_obj_submeshes(
         bool had_uv_seam = false;
         Mesh *m = build_submesh(attrib, buckets[name], faceted, obj_path, name, had_uv_seam);
         if (had_uv_seam) submeshes_with_seams++;
-        out.push_back({ m, name, /*mtl_material=*/nullptr });
+        out.push_back({ m, name });
     }
     if (submeshes_with_seams > 0) {
         std::cerr << "WARNING: UV seams in '" << obj_path << "' ("
                   << submeshes_with_seams << " of " << bucket_order.size()
-                  << " submeshes have positions with multiple UVs; keeping last-written). "
-                  << "Per-face-corner vertex dedup needed for clean seams (Phase 5.1)." << std::endl;
+                  << " submeshes have positions with multiple UVs; keeping last-written)."
+                  << std::endl;
     }
 
     if (load_material_files) {
@@ -218,8 +203,6 @@ std::vector<ObjSubmesh> load_obj_submeshes(
         for (const auto &mtl : mtl_materials) {
             by_name.emplace(mtl.name, translate_mtl(mtl));
             if (!mtl.diffuse_texname.empty()) {
-                // map_Kd is relative to the .mtl (same dir as the .obj here). Build an
-                // absolute path and normalize separators so it loads on Windows.
                 std::string tex = basedir + mtl.diffuse_texname;
                 std::replace(tex.begin(), tex.end(), '\\', '/');
                 tex_by_name.emplace(mtl.name, tex);

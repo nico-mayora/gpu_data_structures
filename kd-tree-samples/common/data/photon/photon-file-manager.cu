@@ -24,16 +24,6 @@ namespace {
 
     constexpr char     KDTREE_MAGIC[4] = {'K', 'D', 'P', 'M'};
     constexpr uint32_t KDTREE_VERSION  = 1;
-
-    Photon emittedToPhoton(const EmittedPhoton& e) {
-        Photon p;
-        p.coords[0] = e.pos.x; p.coords[1] = e.pos.y; p.coords[2] = e.pos.z;
-        p.colour[0] = e.color.x; p.colour[1] = e.color.y; p.colour[2] = e.color.z;
-        // EmittedPhoton::power is a vestigial int; mirror the legacy text mapping.
-        p.power[0] = p.power[1] = p.power[2] = static_cast<float>(e.power);
-        p.dir[0] = e.dir.x; p.dir[1] = e.dir.y; p.dir[2] = e.dir.z;
-        return p;
-    }
 }
 
 struct ExtractCoords {
@@ -46,10 +36,10 @@ struct ExtractCoords {
     }
 };
 
-std::vector<Photon> PhotonFileManager::buildTreeHost(const std::vector<EmittedPhoton>& emitted) {
+std::vector<Photon> PhotonFileManager::buildTreeHost(const std::vector<Photon>& emitted) {
     std::vector<Photon> photons;
     photons.reserve(emitted.size());
-    for (const auto& e : emitted) photons.push_back(emittedToPhoton(e));
+    for (const auto& e : emitted) photons.push_back(e);
 
     const int count = static_cast<int>(photons.size());
     if (count == 0) return photons;
@@ -67,7 +57,7 @@ std::vector<Photon> PhotonFileManager::buildTreeHost(const std::vector<EmittedPh
     return photons;
 }
 
-bool PhotonFileManager::saveKdTreeToFile(const EmittedPhoton* photons, int count,
+bool PhotonFileManager::saveKdTreeToFile(const Photon* photons, int count,
                                          const std::string& filename,
                                          PhotonFileFormat format) {
     if (count < 0 || photons == nullptr) {
@@ -75,7 +65,7 @@ bool PhotonFileManager::saveKdTreeToFile(const EmittedPhoton* photons, int count
         return false;
     }
 
-    const std::vector<EmittedPhoton> photonVec(photons, photons + count);
+    const std::vector photonVec(photons, photons + count);
 
     switch (format) {
         case PhotonFileFormat::BINARY: {
@@ -135,8 +125,6 @@ bool PhotonFileManager::loadKdTreeFromFile(const std::string &filename,
         if (!already_built)
             build_kd_tree<Photon>(photon_ptr, photon_count);
 
-        // Extract the coords-only parallel array. The kd-tree traversal hits these
-        // per node — 12 bytes vs 48 bytes is ~4x less bandwidth on the hot path.
         cudaMalloc(reinterpret_cast<void**>(&coord_ptr), sizeof(PhotonCoord) * photon_count);
         thrust::transform(thrust::device, photon_ptr, photon_ptr + photon_count,
                           coord_ptr, ExtractCoords());
@@ -201,7 +189,7 @@ std::vector<Photon> PhotonFileManager::readBinary(const std::string& filename) {
     return photons;
 }
 
-bool PhotonFileManager::writeText(const std::vector<EmittedPhoton>& photons, const std::string& filename) {
+bool PhotonFileManager::writeText(const std::vector<Photon>& photons, const std::string& filename) {
     std::ofstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Error: Cannot open file for writing: " << filename << std::endl;
@@ -213,8 +201,8 @@ bool PhotonFileManager::writeText(const std::vector<EmittedPhoton>& photons, con
     file << "# Format: x y z r g b power_r power_g power_b dir_x dir_y dir_z" << std::endl;
 
     for (const auto& photon : photons) {
-        file << photon.pos[0] << " " << photon.pos[1] << " " << photon.pos[2] << " "
-             << photon.color[0] << " " << photon.color[1] << " " << photon.color[2] << " "
+        file << photon.coords[0] << " " << photon.coords[1] << " " << photon.coords[2] << " "
+             << photon.colour[0] << " " << photon.colour[1] << " " << photon.colour[2] << " "
              << photon.power << " " << photon.power << " " << photon.power << " "
              << photon.dir[0] << " " << photon.dir[1] << " " << photon.dir[2] << std::endl;
     }

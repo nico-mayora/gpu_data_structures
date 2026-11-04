@@ -3,7 +3,6 @@
 #include <bit>
 #include <thrust/sort.h>
 #include <thrust/tuple.h>
-#include "data.cuh"
 
 /* Functor that implements custom tag-major, coordinate-minor order. */
 template <typename P>
@@ -45,7 +44,6 @@ static __device__ __inline__ int num_levels(const int N) {
     return level(N - 1) + 1;
 }
 
-// N won't be an argument in the future; it should be part of the template params.
 static __device__ __inline__ int subtree_size(const int s, const int N) {
     const auto total_levels = num_levels(N);
     const auto current_level = level(s);

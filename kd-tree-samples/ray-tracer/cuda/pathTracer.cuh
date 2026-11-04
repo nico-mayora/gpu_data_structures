@@ -27,10 +27,9 @@ struct RayGenData {
     owl::vec2i resolution;
     OptixTraversableHandle world;
     int depth;
-    int pixel_samples;
     int num_diffuse_scattered;
-    float indirect_intensity; // artistic gain on the final-gather term (1.0 = physical)
-    float caustic_intensity;  // artistic gain on the caustic term (1.0 = physical)
+    float indirect_intensity;
+    float caustic_intensity;
 
     Photon *photon_map;
     PhotonCoord *photon_coords;
@@ -55,8 +54,8 @@ struct PerRayData {
     RayEvent event;
 
     const Material *hpMaterial;
-    owl::vec3f albedo;       // albedo at the hit point (texture sample or flat material albedo)
+    owl::vec3f albedo;
     owl::vec3f hitPoint;
     owl::vec3f normalAtHp;
-    owl::vec3f missColour;   // sky/backdrop radiance, set by the miss program (MISS only)
+    owl::vec3f missColour;
 };

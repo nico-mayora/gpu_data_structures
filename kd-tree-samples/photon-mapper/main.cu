@@ -31,7 +31,6 @@ void setupPointLightRayGenProgram(Program &program) {
           { "world",OWL_GROUP,OWL_OFFSETOF(PointLightRGD,world)},
           { "position",OWL_FLOAT3,OWL_OFFSETOF(PointLightRGD,position)},
           { "color",OWL_FLOAT3,OWL_OFFSETOF(PointLightRGD,color)},
-          { "intensity",OWL_FLOAT,OWL_OFFSETOF(PointLightRGD,intensity)},
           { "lightType",OWL_INT,OWL_OFFSETOF(PointLightRGD,lightType)},
           { "direction",OWL_FLOAT3,OWL_OFFSETOF(PointLightRGD,direction)},
           { "cosOuter",OWL_FLOAT,OWL_OFFSETOF(PointLightRGD,cosOuter)},
@@ -59,7 +58,7 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
           { "texCoord", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,texCoord)},
           { "albedoTexture", OWL_TEXTURE, OWL_OFFSETOF(TrianglesGeomData,albedoTexture)},
           { "material", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,material)},
-          { nullptr /* Sentinel to mark end-of-list */}
+          { /* Sentinel to mark end-of-list */ }
   };
 
   data.trianglesGeomType = owlGeomTypeCreate(owlContext,
@@ -67,15 +66,13 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
                                              sizeof(TrianglesGeomData),
                                              trianglesGeomVars,-1);
 
-//  const int numMeshes = static_cast<int>(world->meshes.size());
-
   for (const auto model : world->models) {
     auto mesh = model->mesh;
     auto vertices = mesh->vertices;
     auto indices = mesh->indices;
     auto material = model->material;
 
-    std::vector<Material> mats_vec = { *material };
+    std::vector mats_vec = { *material };
 
     OWLBuffer vertexBuffer
             = owlDeviceBufferCreate(owlContext,OWL_FLOAT3,vertices.size(), vertices.data());
@@ -100,8 +97,6 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
     owlGeomSetBuffer(trianglesGeom,"normal", normal_buffer);
     owlGeomSetBuffer(trianglesGeom,"material", materialBuffer);
 
-    // UVs + albedo texture (Phase 1.3); photons must pick up textured albedo so
-    // caustic/global colours match the textured surfaces. Unbound when absent.
     if (!mesh->uvs.empty()) {
       OWLBuffer uv_buffer
               = owlDeviceBufferCreate(owlContext, OWL_FLOAT2, mesh->uvs.size(), mesh->uvs.data());
@@ -112,20 +107,6 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
         owlGeomSetTexture(trianglesGeom, "albedoTexture", tex);
       }
     }
-
-    // std::cout << "All info about mesh: " << "\n";
-    // std::cout << " #vertices: " << vertices.size() << "\n";
-    // std::cout << " #triangles: " << indices.size() << "\n";
-    // std::cout << " #normals: " << mesh->normals.size() << "\n";
-    // for (int i = 0; i < mesh->normals.size(); i++) {
-    //   std::cout << "normal[" << i << "]: " << mesh->normals[i].x << " "
-    //             << mesh->normals[i].y << " "
-    //             << mesh->normals[i].z << "\n";
-    // }
-    // std::cout << " #material: " << material->albedo.x << " "
-    //           << material->albedo.y << " "
-    //           << material->albedo.z << "\n";
-    // std::cout << "---------------------------------------\n";
 
     data.geometry.push_back(trianglesGeom);
   }
@@ -155,8 +136,7 @@ void runPointLightRayGen(Program &program, const PointLight* light, bool caustic
   owlRayGenSet1b(program.rayGen,"causticsMode",causticsMode);
   owlRayGenSet3f(program.rayGen,"position",reinterpret_cast<const owl3f&>(light->position));
   owlRayGenSet3f(program.rayGen,"color",reinterpret_cast<const owl3f&>(flux));
-  owlRayGenSet1f(program.rayGen,"intensity",1);
-  owlRayGenSet1i(program.rayGen,"lightType",static_cast<int>(light->type));
+  owlRayGenSet1i(program.rayGen,"lightType",light->type);
   owlRayGenSet3f(program.rayGen,"direction",reinterpret_cast<const owl3f&>(light->direction));
   owlRayGenSet1f(program.rayGen,"cosOuter",light->cos_outer);
   owlRayGenSet1f(program.rayGen,"cosInner",light->cos_inner);
@@ -179,19 +159,15 @@ void runPointLightRayGen(Program &program, const PointLight* light, bool caustic
 }
 
 void initPhotonBuffers(Program &program) {
-  program.photonsBuffer = owlHostPinnedBufferCreate(program.owlContext, OWL_USER_TYPE(EmittedPhoton), program.castedDiffusePhotons * program.maxDepth);
+  program.photonsBuffer = owlHostPinnedBufferCreate(program.owlContext, OWL_USER_TYPE(Photon), program.castedDiffusePhotons * program.maxDepth);
   program.photonsCount = owlHostPinnedBufferCreate(program.owlContext, OWL_INT, 1);
   owlBufferClear(program.photonsCount);
 
-  program.causticsPhotonsBuffer = owlHostPinnedBufferCreate(program.owlContext, OWL_USER_TYPE(EmittedPhoton), program.castedCausticsPhotons * program.maxDepth);
+  program.causticsPhotonsBuffer = owlHostPinnedBufferCreate(program.owlContext, OWL_USER_TYPE(Photon), program.castedCausticsPhotons * program.maxDepth);
   program.causticsPhotonsCount = owlHostPinnedBufferCreate(program.owlContext, OWL_INT, 1);
   owlBufferClear(program.causticsPhotonsCount);
 }
 
-// Per-light emission factor: converts `power` into total emitted flux Phi.
-//   point       Phi = 4*pi * I             (full sphere)
-//   spot        Phi = 2*pi*(1-cosOuter)*I  (outer cone solid angle)
-//   directional Phi = pi * R^2 * E         (disk area; E is irradiance)
 static float emissionFactor(const Program &program, const PointLight *light) {
   constexpr float PI_F = 3.14159265358979f;
   switch (light->type) {
@@ -201,9 +177,6 @@ static float emissionFactor(const Program &program, const PointLight *light) {
   }
 }
 
-// Scalar emitted flux of a light (sum of its RGB flux). Used to split the photon budget
-// across lights in consistent units (W), which raw `power` is NOT — a directional's
-// irradiance (~units) and a point's intensity (~1e5) are different quantities.
 static float lightFluxScalar(const Program &program, const PointLight *light) {
   return emissionFactor(program, light) * (light->power.x + light->power.y + light->power.z);
 }
@@ -222,8 +195,6 @@ void computeSceneBounds(Program &program) {
 }
 
 void computePhotonsPerWatt(Program &program) {
-  // Budget split is proportional to each light's emitted flux Phi (consistent W across
-  // light types), so `photonsPerWatt` here is really "photons per unit flux".
   float totalFlux = 0.f;
   for (const auto* light : program.world->lights)
     totalFlux += lightFluxScalar(program, light);
@@ -235,13 +206,11 @@ void computePhotonsPerWatt(Program &program) {
 void runNormal(Program &program, const std::string &output_filename) {
   LOG("launching normal photons ...")
 
-  // One launch per light; each appends into the shared buffer (photonsCount is an
-  // atomic counter, cleared once in initPhotonBuffers), so totals accumulate.
   for (const auto* light : program.world->lights)
     runPointLightRayGen(program, light, false);
 
   LOG("done with launch, building + writing normal photon kd-tree ...")
-  auto *fb = static_cast<const EmittedPhoton*>(owlBufferGetPointer(program.photonsBuffer, 0));
+  auto *fb = static_cast<const Photon*>(owlBufferGetPointer(program.photonsBuffer, 0));
   auto count = *(int*)owlBufferGetPointer(program.photonsCount, 0);
 
   LOG("normal photon count: " << count)
@@ -255,7 +224,7 @@ void runCaustics(Program &program, const std::string &output_filename) {
     runPointLightRayGen(program, light, true);
 
   LOG("done with launch, building + writing caustic photon kd-tree ...")
-  auto *fb = static_cast<const EmittedPhoton*>(owlBufferGetPointer(program.causticsPhotonsBuffer, 0));
+  auto *fb = static_cast<const Photon*>(owlBufferGetPointer(program.causticsPhotonsBuffer, 0));
   auto count = *(int*)owlBufferGetPointer(program.causticsPhotonsCount, 0);
 
   LOG("caustic photon count: " << count)

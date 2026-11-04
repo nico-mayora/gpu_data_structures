@@ -7,10 +7,8 @@
 #include "stb_image.h"
 
 namespace {
-// Cache keyed by (context, path). A scene like Sponza reuses the same texture
-// across many submeshes; without this we'd decode and upload duplicates.
 std::unordered_map<OWLContext, std::unordered_map<std::string, OWLTexture>> g_cache;
-} // namespace
+}
 
 OWLTexture load_albedo_texture(OWLContext context, const std::string &path) {
     auto &per_ctx = g_cache[context];
@@ -19,8 +17,7 @@ OWLTexture load_albedo_texture(OWLContext context, const std::string &path) {
     }
 
     int w = 0, h = 0, channels = 0;
-    // Force 4 channels: OWL's RGBA8 path wants a tightly packed RGBA buffer.
-    stbi_set_flip_vertically_on_load(1); // OBJ/Mitsuba UV origin is bottom-left.
+    stbi_set_flip_vertically_on_load(1);
     unsigned char *pixels = stbi_load(path.c_str(), &w, &h, &channels, 4);
     if (pixels == nullptr) {
         std::cerr << "WARNING: failed to load texture '" << path << "': "

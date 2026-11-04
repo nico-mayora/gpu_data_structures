@@ -79,17 +79,13 @@ struct Material {
     float diffuse;
     float specular;
     float ior;
-    // Microfacet alpha for CONDUCTOR, approximated at scatter time as a "fuzzy
-    // mirror" (reflection dir perturbed proportionally). 0 = perfect mirror.
+    // Microfacet alpha for CONDUCTOR, 0 = perfect mirror.
     float roughness = 0.f;
 };
 
 struct Model {
     Mesh *mesh;
     Material *material;
-    // Host-only: filesystem path to the albedo (diffuse) texture, resolved
-    // absolute. Empty = untextured (fall back to material->albedo). Consumed at
-    // geometry-upload time to create the per-geom OWL texture; never uploaded.
     std::string albedo_texture_path;
 };
 
@@ -102,8 +98,8 @@ struct Camera {
         int depth;
         int pixel_samples;
         int num_diffuse_scattered;
-        float indirect_intensity; // artistic gain on indirect term (1.0 = physical)
-        float caustic_intensity;  // artistic gain on caustic term (1.0 = physical)
+        float indirect_intensity;
+        float caustic_intensity;
         owl::vec2i resolution;
         float fov;
     } image;
@@ -112,13 +108,10 @@ struct Camera {
 
 enum LightType {
     LIGHT_POINT,
-    LIGHT_SPOT,        // reserved for Phase 2.2
-    LIGHT_DIRECTIONAL, // reserved for Phase 2.2
+    LIGHT_SPOT,
+    LIGHT_DIRECTIONAL,
 };
 
-// Tagged AoS light record, uploaded as an OWL_USER_TYPE buffer. POD so it copies
-// straight to the device. Only LIGHT_POINT is consumed in Phase 2.1; the spot/
-// directional fields are present so the layout is stable when 2.2 lands.
 struct Light {
     LightType type;
     owl::vec3f position;   // point / spot
@@ -128,18 +121,7 @@ struct Light {
     float cos_outer;       // spot outer cone (cos), unused otherwise
 };
 
-// Back-compat alias: the photon emitter's per-launch point-light path still calls
-// this a "point light". It now carries a `Light`.
 using PointLight = Light;
-
-// TODO: Remove this, deprecated
-struct EmittedPhoton
-{
-    owl::vec3f pos;
-    owl::vec3f dir;
-    int power;
-    owl::vec3f color;
-};
 
 struct Photon {
     static constexpr int DIM = 3;
@@ -154,7 +136,6 @@ struct Photon {
      * Returns distance between this and a point buffer x.
      * We assume x's dimension is DIM.
      */
-
     __device__ __inline__ float dist2(const float *x) const {
         float acum = 0.;
 #pragma unroll
@@ -168,9 +149,6 @@ struct Photon {
     static constexpr int dimension = DIM;
 };
 
-// Parallel "coords-only" view of a photon for kd-tree traversal.
-// The traversal only needs xyz (12 bytes) per node; reading the full 48-byte
-// Photon wastes ~75% of memory bandwidth on the hot path.
 struct PhotonCoord {
     static constexpr int DIM = 3;
     float coords[DIM];
@@ -199,15 +177,9 @@ struct World {
     PhotonCoord *caustic_coords;
     int num_caustic;
 
-    // Photon-emitter budget, set from the scene XML (<default name="casted_*_photons">).
-    // Consumed by photon-mapper/main.cu; ignored by the path tracer. Defaults apply when
-    // the scene omits them.
     int casted_diffuse_photons = 750'000;
     int casted_caustic_photons = 100;
 
-    // Backdrop radiance for rays that escape the scene (<default name="sky_colour">).
-    // Cosmetic only: shown to camera/specular paths by the path tracer's miss program,
-    // never sampled as a light. Black when the scene omits it.
     owl::vec3f sky_colour = 0.f;
 
     Camera *cam;

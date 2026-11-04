@@ -60,7 +60,7 @@ struct FixedQueryResult : BaseQueryResult<K> {
     }
 };
 
-// Implementation with a max heap. Furthest point is easily accessible; if we attempt toadd a point
+// Implementation with a max heap. Furthest point is easily accessible; if we attempt to add a point
 // to an already full heap, we remove heap[0], insert the new candidate, and let it percolate down.
 // Trade-off: Results distance to query point not in ascending order.
 template<int K>

@@ -71,8 +71,6 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
         owlGeomSetBuffer(triangles_geom,"normal", normal_buffer);
         owlGeomSet1b(triangles_geom, "faceted", mesh->faceted);
 
-        // UVs + albedo texture (Phase 1.3). Both stay unbound (null / 0) when absent,
-        // and the closest-hit falls back to the material's flat albedo.
         if (!mesh->uvs.empty()) {
             OWLBuffer uv_buffer
                 = owlDeviceBufferCreate(context, OWL_FLOAT2, mesh->uvs.size(), mesh->uvs.data());
@@ -120,7 +118,6 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
         { "accumBuffer", OWL_BUFPTR, OWL_OFFSETOF(RayGenData,accumBuffer)},
         { "accumID", OWL_INT, OWL_OFFSETOF(RayGenData,accumID)},
         { "depth", OWL_INT, OWL_OFFSETOF(RayGenData,depth)},
-        { "pixel_samples", OWL_INT, OWL_OFFSETOF(RayGenData,pixel_samples)},
         { "num_diffuse_scattered", OWL_INT, OWL_OFFSETOF(RayGenData,num_diffuse_scattered)},
         { "indirect_intensity", OWL_FLOAT, OWL_OFFSETOF(RayGenData,indirect_intensity)},
         { "caustic_intensity", OWL_FLOAT, OWL_OFFSETOF(RayGenData,caustic_intensity)},
@@ -161,9 +158,6 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
                           world->cam->image.fov);
 
     // Set RayGen constant attributes
-    owlRayGenSet1i(rayGen, "pixel_samples", world->cam->image.pixel_samples);
-    // Progressive renderer accumulates one launch per displayed frame until it reaches
-    // the scene's spp ("samples to converge"), then idles. cameraChanged() resets it.
     targetSpp = world->cam->image.pixel_samples > 0 ? world->cam->image.pixel_samples : 1;
     owlRayGenSet1i(rayGen, "num_diffuse_scattered", world->cam->image.num_diffuse_scattered);
     owlRayGenSet1f(rayGen, "indirect_intensity", world->cam->image.indirect_intensity);
@@ -186,11 +180,6 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
     numPhotons = world->num_photons;
     numCaustic = world->num_caustic;
 
-    // Dear ImGui init. The OWLViewer base ctor has already created the GLFW window
-    // (`handle`). install_callbacks=false so ImGui doesn't replace OWLViewer's input
-    // callbacks (the HUD is read-only, so it doesn't need mouse/keyboard routing).
-    // Skip in benchmark mode — the HUD is invisible and ImGui teardown would warn
-    // because OWLViewer destroys the GLFW window before we can shut down backends.
     if (!benchmarkMode) {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -203,10 +192,6 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
 
 Viewer::~Viewer()
 {
-    // OWLViewer::showAndRun() destroys the window and calls glfwTerminate() before we
-    // get here, so the GLFW/GL backends are already torn down — calling their Shutdown()
-    // would hit "GLFW library is not initialized". Only the CPU-side context needs freeing;
-    // the backend resources are reclaimed as the process exits.
     if (!benchmarkMode)
         ImGui::DestroyContext();
 }
@@ -251,8 +236,6 @@ void Viewer::render()
 
 void Viewer::draw()
 {
-    // Blit the path-traced framebuffer first (makes the GL context current too), then
-    // overlay the ImGui HUD on top, before showAndRun swaps buffers.
     OWLViewer::draw();
 
     if (!hudVisible || benchmarkMode) return;
@@ -284,9 +267,8 @@ void Viewer::draw()
 
 void Viewer::resize(const owl::vec2i &newSize)
 {
-    OWLViewer::resize(newSize);   // reallocates fbPointer, updates fbSize
+    OWLViewer::resize(newSize);
 
-    // Match the accumulation buffer to the new framebuffer size.
     const size_t n = static_cast<size_t>(newSize.x) * newSize.y;
     if (!accumBuffer) {
         accumBuffer = owlDeviceBufferCreate(context, OWL_FLOAT3, n, nullptr);
@@ -295,7 +277,7 @@ void Viewer::resize(const owl::vec2i &newSize)
     }
     owlRayGenSetBuffer(rayGen, "accumBuffer", accumBuffer);
 
-    cameraChanged();   // updates camera vars + fbPtr/resolution and resets accumID
+    cameraChanged();
 }
 
 void Viewer::cameraChanged()
@@ -304,9 +286,6 @@ void Viewer::cameraChanged()
     const owl::vec3f lookAt = camera.getAt();
     const owl::vec3f lookUp = camera.getUp();
 
-    // Frustum half-extent is tan(fovy/2): it grows with FOV (wider view). OWL's
-    // getCosFovy() returns cos(fovy), which shrinks as FOV grows and flips sign
-    // past 90 deg — so a larger FOV would paradoxically zoom in.
     const float fovyRad = camera.getFovyInDegrees() * float(M_PI) / 180.f;
     const float tanHalfFovy = tanf(0.5f * fovyRad);
     // ----------- compute variable values  ------------------
@@ -329,8 +308,6 @@ void Viewer::cameraChanged()
     owlRayGenSet3f    (rayGen,"camera.dir_du",reinterpret_cast<const owl3f&>(camera_ddu));
     owlRayGenSet3f    (rayGen,"camera.dir_dv",reinterpret_cast<const owl3f&>(camera_ddv));
 
-    // Camera (or framebuffer) changed: restart accumulation from scratch so stale
-    // radiance from the previous viewpoint isn't blended in.
     accumID = 0;
     sbtDirty = true;
 }
@@ -350,11 +327,12 @@ void Viewer::takeScreenshot() {
 
 void Viewer::key(char key, const owl::vec2i &where)
 {
-    // 'P' saves the current (tonemapped, accumulated) frame to screenshots/<scene>_<ts>.png.
-    // OWLViewer::screenShot reads fbPointer, which already holds exactly what's on screen.
+    // 'P' saves a screenshot
     if (key == 'p' || key == 'P') {
         takeScreenshot();
+        return;
     }
+    // H toggles HUD
     if (key == 'h' || key == 'H') {
         hudVisible = !hudVisible;
         return;

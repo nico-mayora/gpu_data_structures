@@ -11,16 +11,25 @@
 using namespace owl;
 
 inline __device__ void savePhoton(const PhotonMapperRGD &self, PhotonMapperPRD &prd) {
-  int photonIndex = atomicAdd(self.photonsCount, 1);
+  const int photonIndex = atomicAdd(self.photonsCount, 1);
 
-  auto photon = &self.photons[photonIndex];
-  // Per-photon flux dPhi = Phi / N. The host folds the per-light emission factor (4*pi
-  // for a point's full sphere, the cone solid angle for a spot, the disk area for a
-  // directional) into prd.color's initial value, so prd.color already tracks total flux
-  // Phi * throughput; here we only divide by the launch count N.
-  photon->color = prd.color / static_cast<float>(self.totalPhotons);
-  photon->pos = prd.scattered.origin;
-  photon->dir = prd.direction;
+  const auto photon = &self.photons[photonIndex];
+  photon->power[0] = photon->power[1] = photon->power[2] = 0.f;
+
+  auto colour = prd.color / static_cast<float>(self.totalPhotons);
+  photon->colour[0] = colour[0];
+  photon->colour[1] = colour[1];
+  photon->colour[2] = colour[2];
+
+  auto coords = prd.scattered.origin;
+  photon->coords[0] = coords[0];
+  photon->coords[1] = coords[1];
+  photon->coords[2] = coords[2];
+
+  auto dir = prd.direction;
+  photon->dir[0] = dir[0];
+  photon->dir[1] = dir[1];
+  photon->dir[2] = dir[2];
 }
 
 inline __device__ void updateScatteredRay(Ray &ray, PhotonMapperPRD &prd) {
@@ -31,15 +40,6 @@ inline __device__ void updateScatteredRay(Ray &ray, PhotonMapperPRD &prd) {
 }
 
 inline __device__ void shootPhoton(const PhotonMapperRGD &self, Ray &ray, PhotonMapperPRD &prd) {
-  // Global map: store a photon on EVERY arrival at a diffuse surface, including the
-  // first (directly-lit) hit, as in Jensen's global map (paths L{S|D}*D). The map then
-  // represents the full incident radiance at each surface, so the path tracer's final
-  // gather reads complete radiance at gather points and must NOT add analytic direct
-  // there. The eye's primary hit still computes direct analytically (the map is only
-  // read at the gather points, never at the primary, so there is no double-counting).
-  //
-  // The photon is stored on arrival, before Russian roulette decides whether it is
-  // reflected or absorbed, and never on specular surfaces.
   for (int i = 0; i < self.maxDepth; i++) {
     owl::traceRay(self.world, ray, prd);
 
@@ -60,10 +60,6 @@ inline __device__ void shootPhoton(const PhotonMapperRGD &self, Ray &ray, Photon
 }
 
 inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray, PhotonMapperPRD &prd) {
-  // Caustic map: store only the first diffuse arrival that follows at least one specular
-  // interaction (paths LS+D). The path ends there, so whether Russian roulette would have
-  // reflected or absorbed the photon at that diffuse surface does not matter: it is stored
-  // either way. A diffuse arrival at i == 0 is direct illumination and is not stored.
   for (int i = 0; i < self.maxDepth; i++) {
     owl::traceRay(self.world, ray, prd);
 
@@ -170,8 +166,7 @@ inline __device__ void scatterSpecular(PhotonMapperPRD &prd, const TrianglesGeom
 
   prd.event = SCATTER_SPECULAR;
   prd.scattered.origin = hitPoint;
-  // "Fuzzy mirror" (kept in sync with the path tracer's conductor scatter):
-  // jitter the mirror direction by 2*alpha; keep it if the jitter dips below horizon.
+
   vec3f reflected = reflect(rayDir, normal);
   const float roughness = self.material->roughness;
   if (roughness > 0.f) {
@@ -181,8 +176,7 @@ inline __device__ void scatterSpecular(PhotonMapperPRD &prd, const TrianglesGeom
       reflected = fuzzed;
   }
   prd.scattered.direction = reflected;
-  // Divide by the survival probability (as in scatterDiffuse) so Russian roulette stays
-  // unbiased: multiplying by the albedo alone would attenuate the photon twice.
+
   prd.scattered.color = calculatePhotonColor(prd.color, albedo, prd.debug);
 }
 
@@ -234,7 +228,6 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
   auto &prd = owl::getPRD<PhotonMapperPRD>();
   const auto &self = owl::getProgramData<TrianglesGeomData>();
 
-  // Sample albedo once (texture or flat) so photon colours track textured surfaces.
   const auto [u0, v0] = optixGetTriangleBarycentrics();
   const int primID0 = optixGetPrimitiveIndex();
   const vec3f surfaceAlbedo = get_albedo_at_hp(self, u0, v0, primID0);

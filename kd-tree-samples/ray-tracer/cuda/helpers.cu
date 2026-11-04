@@ -14,12 +14,10 @@ owl::vec3f cosine_weighted_hemisphere(const owl::vec3f &normal, Random &rand) {
     const float sqrt_r1 = sqrtf(r1);
     const float phi = 2.f * float(M_PI) * r2;
 
-    // Local-space hemisphere direction (z-up), distribution proportional to cos(θ).
     const float lx = sqrt_r1 * cosf(phi);
     const float ly = sqrt_r1 * sinf(phi);
     const float lz = sqrtf(1.f - r1);
 
-    // Frisvad's branchless orthonormal basis around `normal`.
     owl::vec3f b1, b2;
     if (normal.z < -0.9999999f) {
         b1 = owl::vec3f(0.f, -1.f, 0.f);
@@ -34,19 +32,16 @@ owl::vec3f cosine_weighted_hemisphere(const owl::vec3f &normal, Random &rand) {
     return b1 * lx + b2 * ly + normal * lz;
 }
 
-// Contribution of a single light to the outgoing radiance at the hit point.
 inline __device__
 owl::vec3f lightContribution(const RayGenData &self, const PerRayData &prd, const Light &light) {
     const owl::vec3f hit = prd.hitPoint;
 
-    owl::vec3f light_dir;    // unit vector from the surface toward the light
-    float shadow_tmax;       // how far to trace the shadow ray
-    float attenuation;       // 1/d^2 (point/spot) or 1 (directional)
-    float spot = 1.f;        // spot cone falloff (1 for point/directional)
+    owl::vec3f light_dir;
+    float shadow_tmax;
+    float attenuation;
+    float spot = 1.f;
 
     if (light.type == LIGHT_DIRECTIONAL) {
-        // Parallel light: arrives from -direction, no distance falloff; an occluder
-        // anywhere along the ray blocks it.
         light_dir = -light.direction;
         shadow_tmax = INFTY;
         attenuation = 1.f;
@@ -58,14 +53,13 @@ owl::vec3f lightContribution(const RayGenData &self, const PerRayData &prd, cons
         attenuation = 1.f / (dist * dist);
 
         if (light.type == LIGHT_SPOT) {
-            // cos of the angle between the spot axis and the direction to this surface.
             const float cosA = dot(-light_dir, light.direction);
-            if (cosA <= light.cos_outer) return 0.f;              // outside the cone
+            if (cosA <= light.cos_outer) return 0.f;
             float t = (light.cos_inner > light.cos_outer)
                     ? (cosA - light.cos_outer) / (light.cos_inner - light.cos_outer)
                     : 1.f;
             t = fminf(fmaxf(t, 0.f), 1.f);
-            spot = t * t * (3.f - 2.f * t);                       // smoothstep penumbra
+            spot = t * t * (3.f - 2.f * t);
         }
     }
 
@@ -94,9 +88,6 @@ owl::vec3f lightContribution(const RayGenData &self, const PerRayData &prd, cons
 
     owl::vec3f diffuse_brdf = prd.albedo * PI_INV;
 
-    // L = (rho/pi) * power * attenuation * cos(theta) * spot * visibility. `power` is
-    // radiant intensity (point/spot, W/sr) or irradiance (directional, W/m^2); the
-    // attenuation term selects 1/d^2 vs none accordingly.
     return light_visibility
       * light_dot_norm
       * attenuation
@@ -105,9 +96,6 @@ owl::vec3f lightContribution(const RayGenData &self, const PerRayData &prd, cons
     ;
 }
 
-// Sum direct illumination over every light. Looping (rather than stochastically
-// sampling one light) is noise-free and fine for the handful of lights these scenes
-// carry; revisit if a many-light scene ever needs it.
 inline __device__
 owl::vec3f calculateDirectIllumination(const RayGenData &self, const PerRayData &prd) {
     owl::vec3f total = 0.f;
@@ -182,9 +170,6 @@ owl::vec3f reflect_or_refract_ray(const Material& material,
     if (material.matType == CONDUCTOR) {
         const owl::vec3f reflected = reflect(ray_dir, normal);
         if (material.roughness > 0.f) {
-            // "Fuzzy mirror" stand-in for a microfacet lobe: jitter the mirror
-            // direction inside a sphere scaled by 2*alpha (roughly matching a GGX
-            // lobe's spread). Keep the mirror dir if the jitter dips below horizon.
             const owl::vec3f fuzzed = normalize(
                 reflected + 2.f * material.roughness * random_unit_vector(rand));
             if (dot(fuzzed, normal) > 0.f)
@@ -198,7 +183,6 @@ owl::vec3f reflect_or_refract_ray(const Material& material,
         float fresnel = calculate_fresnel(material.ior, cos_theta);
 
         if (rand() < fresnel) {
-            // Use correct normal for reflection
             owl::vec3f outward_normal = (cos_theta > 0.0f) ? normal : -normal;
             return reflect(ray_dir, outward_normal);
         }
@@ -229,9 +213,6 @@ owl::vec3f calculate_photon_contrib(
     const owl::vec3f wi = -into_vec3f(photon.dir);
     const float cosTheta = max(0.f, dot(prd.normalAtHp, wi));
 
-    // Reject photons arriving from behind the surface; the basic Lambertian estimate
-    // does not weight by cos(theta) again (the photon flux already carries the
-    // incident geometry), so cosTheta is only used as a validity test here.
     if (cosTheta <= EPS) return 0.f;
 
     const float ratio = distance * inv_radius;
@@ -246,8 +227,6 @@ owl::vec3f calculate_photon_contrib(
 #endif
 
     const float cone_weight = max(0.f, 1.0f - (p_term * inv_k));
-    // L = (rho/pi) * sum_p dPhi_p * cone / (pi r^2 kf). photon.colour is the photon
-    // flux dPhi_p; prd.albedo is rho at the gather surface; inv_normalization = 1/(pi r^2 kf).
     return into_vec3f(photon.colour) * prd.albedo * PI_INV * cone_weight * inv_normalization;
 }
 

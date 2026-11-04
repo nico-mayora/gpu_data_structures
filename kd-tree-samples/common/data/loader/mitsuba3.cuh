@@ -7,26 +7,12 @@
 #include "../pt-math.cuh"
 #include "../world.cuh"
 
-/*
- * Scene XML convention: non-Mitsuba renderer parameters are carried as
- * <default name="X" value="Y" /> entries at the top of the scene. Mitsuba 3
- * accepts inert/unused defaults without error (they act as template params),
- * so the same file parses in both `mitsuba` and our loader.
- *
- * Loader-side, these values land in the `defaultValues` map alongside the
- * actual template params and are looked up with resolveValue<T> as needed.
- *
- * Tried first: a sibling <extras> block. Mitsuba 3.8 throws on unknown
- * top-level elements, so that approach does not survive dual-loading.
- */
 class Mitsuba3Loader {
     std::string sceneDir;
     tinyxml2::XMLDocument sceneDesc;
     std::unordered_map<std::string, std::string> defaultValues;
     std::unordered_map<std::string, Material*> materials;
-    // Albedo texture path for XML materials declared with a bitmap
-    // <texture name="reflectance"> instead of an <rgb>. Applied at Model
-    // creation; a submesh's own .mtl texture (if any) takes priority.
+
     std::unordered_map<const Material*, std::string> materialTextures;
 
     World *world;
