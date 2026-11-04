@@ -5,6 +5,13 @@ set(CMAKE_CUDA_STANDARD 20)
 set(CMAKE_CXX_STANDARD 20)
 include(cmake/embed_ptx.cmake)
 
+set(scenes_env_file ${CMAKE_BINARY_DIR}/.env)
+if(NOT EXISTS ${scenes_env_file})
+    file(RELATIVE_PATH scenes_dir_rel ${CMAKE_BINARY_DIR} ${PROJECT_SOURCE_DIR}/scenes)
+    file(WRITE ${scenes_env_file} "SCENES_DIR=${scenes_dir_rel}\n")
+    message(STATUS "Created ${scenes_env_file} (SCENES_DIR=${scenes_dir_rel})")
+endif()
+
 set(glfw_dir ${PROJECT_SOURCE_DIR}/common/externals/glfw)
 set(OptiX_ROOT_DIR $ENV{OptiX_INSTALL_DIR})
 set(CMAKE_PREFIX_PATH $ENV{OptiX_INSTALL_DIR})

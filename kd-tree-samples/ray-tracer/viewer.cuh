@@ -13,6 +13,7 @@ struct Viewer : owl::viewer::OWLViewer {
     void cameraChanged() override;
     void key(char key, const owl::vec2i &where) override; // 'P' screenshot, 'H' toggle HUD
 
+    bool visible = true;
     bool benchmarkMode = false;
     std::vector<float> benchmarkTimes;
 
@@ -34,4 +35,7 @@ struct Viewer : owl::viewer::OWLViewer {
     OWLBuffer accumBuffer { nullptr };
     int accumID  = 0;
     int targetSpp = 1;
+
+private:
+    void takeScreenshot();
 };

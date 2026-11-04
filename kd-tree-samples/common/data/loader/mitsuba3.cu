@@ -2,14 +2,62 @@
 #include "obj.cuh"
 #include "../world.cuh"
 
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+
+namespace {
+constexpr auto DEFAULT_SCENES_FOLDER = "scenes";
+
+std::string trim(const std::string& s) {
+    const auto first = s.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return "";
+    const auto last = s.find_last_not_of(" \t\r\n");
+    return s.substr(first, last - first + 1);
+}
+
+std::string scenesFolderFromEnvFile() {
+    std::ifstream env(".env");
+    std::string line;
+    while (std::getline(env, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#') continue;
+        const auto eq = line.find('=');
+        if (eq == std::string::npos || trim(line.substr(0, eq)) != "SCENES_DIR") continue;
+        auto value = trim(line.substr(eq + 1));
+        if (value.size() >= 2 && (value.front() == '"' || value.front() == '\'') && value.back() == value.front())
+            value = value.substr(1, value.size() - 2);
+        return value;
+    }
+    return "";
+}
+}
+
 Mitsuba3Loader::Mitsuba3Loader(const std::string& scene_name) {
-    sceneDir = scenesFolder + '\\' + scene_name;
-    auto scene_path = sceneDir + "\\scene_v3.xml";
-#ifdef __linux__
-    std::ranges::replace(scene_path, '\\', '/');
-#endif
+    const std::string envFolder = scenesFolderFromEnvFile();
+    const std::string scenesFolder = !envFolder.empty() ? envFolder : DEFAULT_SCENES_FOLDER;
+
+    namespace fs = std::filesystem;
+    const fs::path scenesPath(scenesFolder);
+    if (!fs::is_directory(scenesPath)) {
+        std::cerr << "ERROR: scenes folder not found: " << fs::absolute(scenesPath).string() << "\n";
+        std::exit(EXIT_FAILURE);
+    }
+    if (!fs::is_directory(scenesPath / scene_name)) {
+        std::cerr << "ERROR: scene '" << scene_name << "' not found in " << fs::absolute(scenesPath).string() << "\n";
+        std::exit(EXIT_FAILURE);
+    }
+
+    sceneDir = scenesFolder + '/' + scene_name;
+    const auto scene_path = sceneDir + "/scene_v3.xml";
     std::cout << "Loading scene from: " << scene_path << std::endl;
-    sceneDesc.LoadFile(scene_path.c_str());
+    const tinyxml2::XMLError status = sceneDesc.LoadFile(scene_path.c_str());
+
+    if (status != tinyxml2::XMLError::XML_SUCCESS) {
+        std::cout << "TinyXML2 error: " << status << '\n';
+        std::exit(EXIT_FAILURE);
+    }
 
     world = new World;
     world->cam = new Camera;
@@ -199,7 +247,7 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
         if (emitter_type == "area") {
             std::cerr << "WARNING: area emitter on shape '"
                       << (shape->Attribute("id") ? shape->Attribute("id") : "<unnamed>")
-                      << "' skipped; area lights land in Phase 2 (shape kept, light dropped)" << std::endl;
+                      << "' skipped" << std::endl;
         } else {
             std::cerr << "WARNING: unsupported emitter type '" << emitter_type
                       << "' inside shape; skipping" << std::endl;
@@ -227,7 +275,7 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
         std::abort();
     }
 
-    std::string obj_file_path = sceneDir + "\\";
+    std::string obj_file_path = sceneDir + "/";
     if (const auto file_name_elem = find_named_child(shape, "string", "filename")) {
         obj_file_path += file_name_elem->Attribute("value");
     }
@@ -370,7 +418,7 @@ void Mitsuba3Loader::loadReflectance(Material *material, const std::string &name
     material->albedo = owl::vec3f(0.8f);
     if (const auto texture = find_named_child(inner, "texture", prop)) {
         if (const auto file_elem = find_named_child(texture, "string", "filename")) {
-            materialTextures.emplace(material, sceneDir + "\\" + file_elem->Attribute("value"));
+            materialTextures.emplace(material, sceneDir + "/" + file_elem->Attribute("value"));
         } else {
             std::cerr << "WARNING: BSDF '" << name << "' has a texture " << prop
                       << " without a filename" << std::endl;

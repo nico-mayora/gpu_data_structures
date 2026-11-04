@@ -4,19 +4,6 @@
 	<default name="resy" value="720" />
 	<default name="resx" value="1280" />
 	<default name="max_depth" value="17" />
-	<!-- Renderer-only properties below (see common/data/loader/mitsuba3.cuh). -->
-	<default name="diffuse_scattered" value="8" />
-	<default name="indirect_intensity" value="2.0" />
-	<default name="caustic_intensity" value="5.0" />
-	<!-- Large interior: generous global budget; glass (wine glasses, kettle, radio
-	     face) warrants a real caustic budget too. -->
-	<default name="casted_diffuse_photons" value="5000000" />
-	<default name="casted_caustic_photons" value="25000000" />
-	<!-- Backdrop radiance for rays escaping the scene (the view out the window).
-	     Matches the original Tungsten window-backlight radiance so the panes glow
-	     like overcast daylight. Cosmetic only: it does not light the scene (the
-	     WindowLight spot carries that energy). -->
-	<default name="sky_colour" value="16.032, 16.032, 16.032" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>
@@ -2886,52 +2873,56 @@
 		</transform>
 		<ref id="HomeBSDF" />
 	</shape>
-	<!-- The original Tungsten/Mitsuba lights are four rectangle area emitters, which
-	     this loader drops (area lights land in Phase 2). They are re-authored below as
-	     supported point/spot lights. Intensities approximate the originals via
-	     I [W/sr] ~= radiance * emitter area. -->
-
-	<!-- Window backlight: was a 1.62x2.20 rectangle (radiance 16.032) at the window
-	     plane z=-3.12 facing +Z into the room. Re-authored as a wide flood spot,
-	     nudged to z=-3.0 so the opaque-diffuse window panes can't occlude it.
-	     I ~= 16.032 * 3.57 m^2 ~= 57 W/sr. -->
-	<emitter type="spot" id="WindowLight">
-		<rgb name="intensity" value="57, 57, 57" />
-		<float name="cutoff_angle" value="80" />
-		<float name="beam_width" value="60" />
+	<shape type="rectangle">
 		<transform name="to_world">
-			<matrix value="1 0 0 0.060314  0 1 0 1.97379  0 0 1 -3.0  0 0 0 1" />
+			<matrix value="0.811764 1.25471e-014 5.48452e-022 0.060314 -9.254e-015 1.10064 6.63724e-009 1.97379 0 5.90839e-008 0.549328 -3.1173 0 0 0 1" />
 		</transform>
-	</emitter>
-
-	<!-- Under-cabinet strips: were three small 0.058x0.489 down-facing rectangles
-	     (radiance 11.2212) along the x=-2.39 wall at y=1.61, above the worktop.
-	     I ~= 11.2212 * 0.028 m^2 ~= 0.32 W/sr each; dropped to y=1.59 to sit just
-	     below the cabinet underside. -->
-	<emitter type="point" id="CabinetStrip1">
-		<rgb name="intensity" value="0.32, 0.32, 0.32" />
-		<point name="position" x="-2.38843" y="1.59" z="-1.04852" />
-	</emitter>
-	<emitter type="point" id="CabinetStrip2">
-		<rgb name="intensity" value="0.32, 0.32, 0.32" />
-		<point name="position" x="-2.38843" y="1.59" z="-1.58497" />
-	</emitter>
-	<emitter type="point" id="CabinetStrip3">
-		<rgb name="intensity" value="0.32, 0.32, 0.32" />
-		<point name="position" x="-2.38843" y="1.59" z="-2.14209" />
-	</emitter>
-
-	<!-- Warm bulb inside the hanging lamp over the table (shade cavity spans
-	     y 2.19..2.59 around (0.186, -1.625); the opening faces down at y~2.19).
-	     Spot sits 0.11 above the opening aiming straight down; the shade rim is at
-	     ~66 deg from there, so a 65 deg cutoff just clears it and the shade itself
-	     blocks the rest, giving the lamp its light pool. -->
-	<emitter type="spot" id="TableLampBulb">
-		<rgb name="intensity" value="25, 20, 13" />
-		<float name="cutoff_angle" value="65" />
-		<float name="beam_width" value="45" />
+		<bsdf type="twosided">
+			<bsdf type="diffuse">
+				<rgb name="reflectance" value="0, 0, 0" />
+			</bsdf>
+		</bsdf>
+		<emitter type="area">
+			<rgb name="radiance" value="16.032, 16.032, 16.032" />
+		</emitter>
+	</shape>
+	<shape type="rectangle">
 		<transform name="to_world">
-			<matrix value="1 0 0 0.186  0 0 -1 2.30  0 1 0 -1.625  0 0 0 1" />
+			<matrix value="-0.0290284 3.30012e-015 -7.54979e-008 -2.38843 4.38317e-009 2.18557e-008 -0.5 1.6129 0 -0.244301 -1.06788e-008 -1.04852 0 0 0 1" />
 		</transform>
-	</emitter>
+		<bsdf type="twosided">
+			<bsdf type="diffuse">
+				<rgb name="reflectance" value="0, 0, 0" />
+			</bsdf>
+		</bsdf>
+		<emitter type="area">
+			<rgb name="radiance" value="11.2212, 11.2212, 11.2212" />
+		</emitter>
+	</shape>
+	<shape type="rectangle">
+		<transform name="to_world">
+			<matrix value="-0.0290284 3.30012e-015 -7.54979e-008 -2.38843 4.38317e-009 2.18557e-008 -0.5 1.6129 0 -0.244301 -1.06788e-008 -1.58497 0 0 0 1" />
+		</transform>
+		<bsdf type="twosided">
+			<bsdf type="diffuse">
+				<rgb name="reflectance" value="0, 0, 0" />
+			</bsdf>
+		</bsdf>
+		<emitter type="area">
+			<rgb name="radiance" value="11.2212, 11.2212, 11.2212" />
+		</emitter>
+	</shape>
+	<shape type="rectangle">
+		<transform name="to_world">
+			<matrix value="-0.0290284 3.30012e-015 -7.54979e-008 -2.38843 4.38317e-009 2.18557e-008 -0.5 1.6129 0 -0.244301 -1.06788e-008 -2.14209 0 0 0 1" />
+		</transform>
+		<bsdf type="twosided">
+			<bsdf type="diffuse">
+				<rgb name="reflectance" value="0, 0, 0" />
+			</bsdf>
+		</bsdf>
+		<emitter type="area">
+			<rgb name="radiance" value="11.2212, 11.2212, 11.2212" />
+		</emitter>
+	</shape>
 </scene>

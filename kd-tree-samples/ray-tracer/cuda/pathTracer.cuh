@@ -4,10 +4,10 @@
 #include "../../common/data/world.cuh"
 
 #ifndef K_GLOBAL_PHOTONS
-constexpr int K_GLOBAL_PHOTONS = 24;
+constexpr int K_GLOBAL_PHOTONS = 32;
 #endif
 #ifndef K_CAUSTIC_PHOTONS
-constexpr int K_CAUSTIC_PHOTONS = 1;
+constexpr int K_CAUSTIC_PHOTONS = 128;
 #endif
 
 enum RayTypes {

@@ -20,7 +20,6 @@
  * top-level elements, so that approach does not survive dual-loading.
  */
 class Mitsuba3Loader {
-    const std::string scenesFolder = "scenes";
     std::string sceneDir;
     tinyxml2::XMLDocument sceneDesc;
     std::unordered_map<std::string, std::string> defaultValues;

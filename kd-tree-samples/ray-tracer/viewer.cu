@@ -18,7 +18,8 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
                              visible,
                              false),      // vsync off
       sceneName(std::move(scene_name)),
-      benchmarkMode(benchmark)
+      benchmarkMode(benchmark),
+      visible(visible)
 {
     context = owlContextCreate(nullptr, 1);
     owlContextSetRayTypeCount(context, RAY_TYPES_COUNT);
@@ -212,16 +213,22 @@ Viewer::~Viewer()
 
 void Viewer::render()
 {
-    // Converged: the accumulation has reached the target sample count, so there is
-    // nothing new to compute. fbPtr already holds the result; let the viewer re-blit it.
-    // In benchmark mode, reset accumID so every frame does real rendering work.
-    if (accumID >= targetSpp) {
+    static bool screenShotTakenHeadless = false;
+
+    if (accumID >= targetSpp) { // converged
         if (benchmarkMode) {
             accumID = 0;
+        } else if (!visible && !screenShotTakenHeadless) {
+            std::cout << "Converged. Taking screenshot...\n";
+            takeScreenshot();
+            screenShotTakenHeadless = true;
+            return;
         } else {
             return;
         }
     }
+
+    screenShotTakenHeadless = false;
 
     // accumID is a per-launch uniform, so the SBT must be rebuilt before each launch.
     owlRayGenSet1i(rayGen, "accumID", accumID);
@@ -328,22 +335,25 @@ void Viewer::cameraChanged()
     sbtDirty = true;
 }
 
+void Viewer::takeScreenshot() {
+    std::error_code ec;
+    std::filesystem::create_directories("screenshots", ec);
+
+    char ts[32];
+    const std::time_t t = std::time(nullptr);
+    std::strftime(ts, sizeof(ts), "%Y%m%d_%H%M%S", std::localtime(&t));
+
+    const std::string path = "screenshots/" + sceneName + "_" + ts + ".png";
+    screenShot(path);
+    lastScreenshotPath = path;
+}
+
 void Viewer::key(char key, const owl::vec2i &where)
 {
     // 'P' saves the current (tonemapped, accumulated) frame to screenshots/<scene>_<ts>.png.
     // OWLViewer::screenShot reads fbPointer, which already holds exactly what's on screen.
     if (key == 'p' || key == 'P') {
-        std::error_code ec;
-        std::filesystem::create_directories("screenshots", ec);
-
-        char ts[32];
-        const std::time_t t = std::time(nullptr);
-        std::strftime(ts, sizeof(ts), "%Y%m%d_%H%M%S", std::localtime(&t));
-
-        const std::string path = "screenshots/" + sceneName + "_" + ts + ".png";
-        screenShot(path);
-        lastScreenshotPath = path;
-        return;
+        takeScreenshot();
     }
     if (key == 'h' || key == 'H') {
         hudVisible = !hudVisible;

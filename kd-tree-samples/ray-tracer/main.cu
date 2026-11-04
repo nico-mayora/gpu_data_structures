@@ -11,13 +11,11 @@ int main(int ac, char **av)
     const std::string scene_name = (ac > 1) ? av[1] : "sponza";
     std::cout << "Scene: " << scene_name << "\n";
 
-    int normal_photons = 0;
-    int caustic_photons = 0;
+    int normal_photons =  (ac > 2) ? std::stoi(av[2]) : -1;
+    int caustic_photons = (ac > 3) ? std::stoi(av[3]) : -1;
     bool benchmark = false;
     bool visible = true;
 
-    if (ac > 2) normal_photons = std::stoi(av[2]);
-    if (ac > 3) caustic_photons = std::stoi(av[3]);
     // Remaining args are flags: "benchmark" and/or "visible"
     for (int i = 4; i < ac; ++i) {
         std::string arg(av[i]);
@@ -36,9 +34,15 @@ int main(int ac, char **av)
 
     const auto loader = new Mitsuba3Loader(scene_name);
     const auto world = loader->load();
+    const std::string global_map_path_fragment = (normal_photons < 0)
+                                                     ? std::to_string(world->casted_diffuse_photons)
+                                                     : std::to_string(normal_photons);
+    const std::string caustic_map_path_fragment = (caustic_photons < 0)
+                                                      ? std::to_string(world->casted_caustic_photons)
+                                                      : std::to_string(caustic_photons);
 
-    std::string normal_file = "photon_maps/" + scene_name + "_normal_" + std::to_string(normal_photons) + ".kdt";
-    std::string caustic_file = "photon_maps/" + scene_name + "_caustic_" + std::to_string(caustic_photons) + ".kdt";
+    const std::string normal_file = "photon_maps/" + scene_name + "_normal_" + global_map_path_fragment + ".kdt";
+    const std::string caustic_file = "photon_maps/" + scene_name + "_caustic_" + caustic_map_path_fragment + ".kdt";
 
     std::cout << "Loading normal photons from: " << normal_file << "\n";
     std::cout << "Loading caustic photons from: " << caustic_file << "\n";
