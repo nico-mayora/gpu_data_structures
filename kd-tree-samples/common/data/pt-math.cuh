@@ -10,7 +10,7 @@ class  Mat4f {
 
 public:
     Mat4f() : data{0} {}
-    Mat4f(const std::array<float, 16>& init_data) : data(init_data) {}
+    explicit Mat4f(const std::array<float, 16>& init_data) : data(init_data) {}
 
     /* Create the matrix from 16 column-major numbers separated by spaces. */
     explicit Mat4f(const std::string& str) {

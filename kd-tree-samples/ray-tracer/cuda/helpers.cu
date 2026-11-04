@@ -14,12 +14,10 @@ owl::vec3f cosine_weighted_hemisphere(const owl::vec3f &normal, Random &rand) {
     const float sqrt_r1 = sqrtf(r1);
     const float phi = 2.f * float(M_PI) * r2;
 
-    // Local-space hemisphere direction (z-up), distribution proportional to cos(θ).
     const float lx = sqrt_r1 * cosf(phi);
     const float ly = sqrt_r1 * sinf(phi);
     const float lz = sqrtf(1.f - r1);
 
-    // Frisvad's branchless orthonormal basis around `normal`.
     owl::vec3f b1, b2;
     if (normal.z < -0.9999999f) {
         b1 = owl::vec3f(0.f, -1.f, 0.f);
@@ -35,14 +33,37 @@ owl::vec3f cosine_weighted_hemisphere(const owl::vec3f &normal, Random &rand) {
 }
 
 inline __device__
-owl::vec3f calculateDirectIllumination(const RayGenData &self, const PerRayData &prd) {
-    auto light = self.scene_light;
-    auto shadow_ray_org = prd.hitPoint;
-    auto light_dir = light->position - shadow_ray_org;
-    auto distance_to_light = sqrt(norm_squared(light_dir));
-    light_dir = normalize(light_dir);
+owl::vec3f lightContribution(const RayGenData &self, const PerRayData &prd, const Light &light) {
+    const owl::vec3f hit = prd.hitPoint;
 
-    auto light_dot_norm = dot(light_dir, prd.normalAtHp);
+    owl::vec3f light_dir;
+    float shadow_tmax;
+    float attenuation;
+    float spot = 1.f;
+
+    if (light.type == LIGHT_DIRECTIONAL) {
+        light_dir = -light.direction;
+        shadow_tmax = INFTY;
+        attenuation = 1.f;
+    } else {
+        owl::vec3f to_light = light.position - hit;
+        const float dist = sqrtf(norm_squared(to_light));
+        light_dir = to_light / dist;
+        shadow_tmax = dist * (1.f - EPS);
+        attenuation = 1.f / (dist * dist);
+
+        if (light.type == LIGHT_SPOT) {
+            const float cosA = dot(-light_dir, light.direction);
+            if (cosA <= light.cos_outer) return 0.f;
+            float t = (light.cos_inner > light.cos_outer)
+                    ? (cosA - light.cos_outer) / (light.cos_inner - light.cos_outer)
+                    : 1.f;
+            t = fminf(fmaxf(t, 0.f), 1.f);
+            spot = t * t * (3.f - 2.f * t);
+        }
+    }
+
+    const float light_dot_norm = dot(light_dir, prd.normalAtHp);
     if (light_dot_norm < 0.f) return 0.f;
 
     owl::vec3f light_visibility = 0.f;
@@ -50,10 +71,10 @@ owl::vec3f calculateDirectIllumination(const RayGenData &self, const PerRayData 
     owl::packPointer(&light_visibility, u0, u1);
     optixTrace(
         self.world,
-        shadow_ray_org,
+        hit,
         light_dir,
         EPS,
-        distance_to_light * (1.f - EPS),
+        shadow_tmax,
         0.f,
         OptixVisibilityMask(255),
         OPTIX_RAY_FLAG_DISABLE_ANYHIT
@@ -65,13 +86,23 @@ owl::vec3f calculateDirectIllumination(const RayGenData &self, const PerRayData 
         u0, u1
     );
 
-    owl::vec3f diffuse_brdf = prd.hpMaterial->albedo * PI_INV;
+    owl::vec3f diffuse_brdf = prd.albedo * PI_INV;
 
     return light_visibility
       * light_dot_norm
-      * (1.f / (distance_to_light * distance_to_light))
-      * diffuse_brdf * 2.f
+      * attenuation
+      * spot
+      * diffuse_brdf * light.power
     ;
+}
+
+inline __device__
+owl::vec3f calculateDirectIllumination(const RayGenData &self, const PerRayData &prd) {
+    owl::vec3f total = 0.f;
+    for (int i = 0; i < self.num_lights; ++i) {
+        total += lightContribution(self, prd, self.lights[i]);
+    }
+    return total;
 }
 
 inline __device__
@@ -124,13 +155,27 @@ owl::vec3f calculate_refracted(const Material& material,
 }
 
 inline __device__
+owl::vec3f random_unit_vector(Random &rand) {
+    const float theta = 2.f * float(M_PI) * rand();
+    const float phi = acosf(2.f * rand() - 1.f);
+    return owl::vec3f(sinf(phi) * cosf(theta), sinf(phi) * sinf(theta), cosf(phi));
+}
+
+inline __device__
 owl::vec3f reflect_or_refract_ray(const Material& material,
                                   const owl::vec3f& ray_dir,
                                   const owl::vec3f& normal,
                                   Random& rand)
 {
     if (material.matType == CONDUCTOR) {
-        return reflect(ray_dir, normal);
+        const owl::vec3f reflected = reflect(ray_dir, normal);
+        if (material.roughness > 0.f) {
+            const owl::vec3f fuzzed = normalize(
+                reflected + 2.f * material.roughness * random_unit_vector(rand));
+            if (dot(fuzzed, normal) > 0.f)
+                return fuzzed;
+        }
+        return reflected;
     }
 
     if (material.matType == DIELECTRIC) {
@@ -138,7 +183,6 @@ owl::vec3f reflect_or_refract_ray(const Material& material,
         float fresnel = calculate_fresnel(material.ior, cos_theta);
 
         if (rand() < fresnel) {
-            // Use correct normal for reflection
             owl::vec3f outward_normal = (cos_theta > 0.0f) ? normal : -normal;
             return reflect(ray_dir, outward_normal);
         }
@@ -168,7 +212,7 @@ owl::vec3f calculate_photon_contrib(
 
     const owl::vec3f wi = -into_vec3f(photon.dir);
     const float cosTheta = max(0.f, dot(prd.normalAtHp, wi));
-    
+
     if (cosTheta <= EPS) return 0.f;
 
     const float ratio = distance * inv_radius;
@@ -183,7 +227,7 @@ owl::vec3f calculate_photon_contrib(
 #endif
 
     const float cone_weight = max(0.f, 1.0f - (p_term * inv_k));
-    return into_vec3f(photon.colour) * prd.hpMaterial->albedo * (4.f * cosTheta * cone_weight * inv_normalization);
+    return into_vec3f(photon.colour) * prd.albedo * PI_INV * cone_weight * inv_normalization;
 }
 
 constexpr __device__
@@ -195,7 +239,7 @@ float hable(const float x) {
 
 inline __device__
 owl::vec3f filter_colour(owl::vec3f colour) {
-    constexpr float exposure = 0.7f;
+    constexpr float exposure = .7f;
     constexpr float W = 11.2f;
     constexpr float inv_white = 1.0f / hable(W);
 

@@ -11,12 +11,25 @@
 using namespace owl;
 
 inline __device__ void savePhoton(const PhotonMapperRGD &self, PhotonMapperPRD &prd) {
-  int photonIndex = atomicAdd(self.photonsCount, 1);
+  const int photonIndex = atomicAdd(self.photonsCount, 1);
 
-  auto photon = &self.photons[photonIndex];
-  photon->color = prd.color / static_cast<float>(self.totalPhotons);
-  photon->pos = prd.scattered.origin;
-  photon->dir = prd.direction;
+  const auto photon = &self.photons[photonIndex];
+  photon->power[0] = photon->power[1] = photon->power[2] = 0.f;
+
+  auto colour = prd.color / static_cast<float>(self.totalPhotons);
+  photon->colour[0] = colour[0];
+  photon->colour[1] = colour[1];
+  photon->colour[2] = colour[2];
+
+  auto coords = prd.scattered.origin;
+  photon->coords[0] = coords[0];
+  photon->coords[1] = coords[1];
+  photon->coords[2] = coords[2];
+
+  auto dir = prd.direction;
+  photon->dir[0] = dir[0];
+  photon->dir[1] = dir[1];
+  photon->dir[2] = dir[2];
 }
 
 inline __device__ void updateScatteredRay(Ray &ray, PhotonMapperPRD &prd) {
@@ -27,8 +40,6 @@ inline __device__ void updateScatteredRay(Ray &ray, PhotonMapperPRD &prd) {
 }
 
 inline __device__ void shootPhoton(const PhotonMapperRGD &self, Ray &ray, PhotonMapperPRD &prd) {
-  bool skipNextSave = true;
-
   for (int i = 0; i < self.maxDepth; i++) {
     owl::traceRay(self.world, ray, prd);
 
@@ -36,28 +47,19 @@ inline __device__ void shootPhoton(const PhotonMapperRGD &self, Ray &ray, Photon
       break;
     }
 
-    if (prd.event == SCATTER_SPECULAR || prd.event == SCATTER_REFRACT) {
-      skipNextSave = true;
-      updateScatteredRay(ray, prd);
-      continue;
-    }
-
-    if (prd.event == SCATTER_DIFFUSE) {
-      if (!skipNextSave) savePhoton(self, prd);
-      skipNextSave = false;
-      updateScatteredRay(ray, prd);
-      continue;
+    if (prd.hitDiffuse) {
+      savePhoton(self, prd);
     }
 
     if (prd.event == ABSORBED) {
-      if (!skipNextSave) savePhoton(self, prd);
       break;
     }
+
+    updateScatteredRay(ray, prd);
   }
 }
 
 inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray, PhotonMapperPRD &prd) {
-  // Caustic mode: Only save diffuse bounces that occur AFTER at least one caustic bounce.
   for (int i = 0; i < self.maxDepth; i++) {
     owl::traceRay(self.world, ray, prd);
 
@@ -65,12 +67,7 @@ inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray
       break;
     }
 
-    if (prd.event == SCATTER_SPECULAR || prd.event == SCATTER_REFRACT) {
-      updateScatteredRay(ray, prd);
-      continue;
-    }
-
-    if (prd.event == SCATTER_DIFFUSE) {
+    if (prd.hitDiffuse) {
       if (i > 0) {
         savePhoton(self, prd);
       }
@@ -80,7 +77,16 @@ inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray
     if (prd.event == ABSORBED) {
       break;
     }
+
+    updateScatteredRay(ray, prd);
   }
+}
+
+// Orthonormal basis (t, b) spanning the plane perpendicular to unit vector n.
+inline __device__ void orthoBasis(const vec3f &n, vec3f &t, vec3f &b) {
+  if (fabsf(n.x) > fabsf(n.z)) t = normalize(vec3f(-n.y, n.x, 0.f));
+  else                         t = normalize(vec3f(0.f, -n.z, n.y));
+  b = cross(n, t);
 }
 
 OPTIX_RAYGEN_PROGRAM(pointLightRayGen)(){
@@ -91,14 +97,41 @@ OPTIX_RAYGEN_PROGRAM(pointLightRayGen)(){
   prd.random.init(id.x, id.y);
   prd.color = self.color;
 
-  auto direction = randomPointInUnitSphere(prd.random);
-
-  prd.direction = direction;
-
   Ray ray;
-  ray.origin = self.position;
-  ray.direction = direction;
   ray.tmin = EPS;
+
+  if (self.lightType == LIGHT_DIRECTIONAL) {
+    // Parallel rays along `direction`, launched from a disk (perpendicular to it,
+    // sized to the scene bounding sphere) backed off behind the scene.
+    vec3f t, b; orthoBasis(self.direction, t, b);
+    const float r = self.diskRadius * sqrtf(prd.random());
+    const float phi = 2.f * PI * prd.random();
+    const vec3f offset = (cosf(phi) * t + sinf(phi) * b) * r;
+    ray.origin = self.diskCenter - self.direction * (2.f * self.diskRadius) + offset;
+    ray.direction = self.direction;
+    prd.direction = self.direction;
+  } else if (self.lightType == LIGHT_SPOT) {
+    // Sample uniformly within the outer cone around `direction`.
+    vec3f t, b; orthoBasis(self.direction, t, b);
+    const float cosT = 1.f - prd.random() * (1.f - self.cosOuter);
+    const float sinT = sqrtf(fmaxf(0.f, 1.f - cosT * cosT));
+    const float phi = 2.f * PI * prd.random();
+    const vec3f dir = normalize(t * (sinT * cosf(phi)) + b * (sinT * sinf(phi))
+                                + self.direction * cosT);
+    ray.origin = self.position;
+    ray.direction = dir;
+    prd.direction = dir;
+    // Soften the penumbra: weight photon energy by the spot falloff at this angle.
+    float cw = (self.cosInner > self.cosOuter)
+             ? (cosT - self.cosOuter) / (self.cosInner - self.cosOuter) : 1.f;
+    cw = fminf(fmaxf(cw, 0.f), 1.f);
+    prd.color = self.color * (cw * cw * (3.f - 2.f * cw));
+  } else { // LIGHT_POINT
+    const vec3f dir = randomPointInUnitSphere(prd.random);
+    ray.origin = self.position;
+    ray.direction = dir;
+    prd.direction = dir;
+  }
 
   if (self.causticsMode) {
     shootCausticsPhoton(self, ray, prd);
@@ -107,7 +140,7 @@ OPTIX_RAYGEN_PROGRAM(pointLightRayGen)(){
   }
 }
 
-inline __device__ void scatterDiffuse(PhotonMapperPRD &prd, const TrianglesGeomData &self) {
+inline __device__ void scatterDiffuse(PhotonMapperPRD &prd, const TrianglesGeomData &self, const vec3f &albedo) {
   const vec3f rayDir = optixGetWorldRayDirection();
   const vec3f rayOrg = optixGetWorldRayOrigin();
   const vec3f hitPoint = rayOrg + optixGetRayTmax() * rayDir;
@@ -119,10 +152,10 @@ inline __device__ void scatterDiffuse(PhotonMapperPRD &prd, const TrianglesGeomD
   prd.event = SCATTER_DIFFUSE;
   prd.scattered.origin = hitPoint;
   prd.scattered.direction = reflectDiffuse(normal, prd.random);
-  prd.scattered.color = calculatePhotonColor(prd.color, self.material->albedo, prd.debug);
+  prd.scattered.color = calculatePhotonColor(prd.color, albedo, prd.debug);
 }
 
-inline __device__ void scatterSpecular(PhotonMapperPRD &prd, const TrianglesGeomData &self) {
+inline __device__ void scatterSpecular(PhotonMapperPRD &prd, const TrianglesGeomData &self, const vec3f &albedo) {
   const vec3f rayDir = optixGetWorldRayDirection();
   const vec3f rayOrg = optixGetWorldRayOrigin();
   const vec3f hitPoint = rayOrg + optixGetRayTmax() * rayDir;
@@ -133,11 +166,21 @@ inline __device__ void scatterSpecular(PhotonMapperPRD &prd, const TrianglesGeom
 
   prd.event = SCATTER_SPECULAR;
   prd.scattered.origin = hitPoint;
-  prd.scattered.direction = reflect(rayDir, normal);
-  prd.scattered.color = multiplyColor(self.material->albedo, prd.color);
+
+  vec3f reflected = reflect(rayDir, normal);
+  const float roughness = self.material->roughness;
+  if (roughness > 0.f) {
+    const vec3f fuzzed = normalize(
+        reflected + 2.f * roughness * randomPointInUnitSphere(prd.random));
+    if (dot(fuzzed, normal) > 0.f)
+      reflected = fuzzed;
+  }
+  prd.scattered.direction = reflected;
+
+  prd.scattered.color = calculatePhotonColor(prd.color, albedo, prd.debug);
 }
 
-inline __device__ void scatterRefract(PhotonMapperPRD &prd, const TrianglesGeomData &self) {
+inline __device__ void scatterRefract(PhotonMapperPRD &prd, const TrianglesGeomData &self, const vec3f &albedo) {
   const vec3f rayDir = optixGetWorldRayDirection();
   const vec3f rayOrg = optixGetWorldRayOrigin();
   const vec3f hitPoint = rayOrg + optixGetRayTmax() * rayDir;
@@ -149,7 +192,7 @@ inline __device__ void scatterRefract(PhotonMapperPRD &prd, const TrianglesGeomD
   prd.event = SCATTER_REFRACT;
   prd.scattered.origin = hitPoint;
   prd.scattered.direction = refract(rayDir, normal, self.material->ior);
-  prd.scattered.color = multiplyColor(self.material->albedo, prd.color);
+  prd.scattered.color = calculatePhotonColor(prd.color, albedo, prd.debug);
 }
 
 inline __device__
@@ -185,27 +228,30 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
   auto &prd = owl::getPRD<PhotonMapperPRD>();
   const auto &self = owl::getProgramData<TrianglesGeomData>();
 
-  const auto p_index = pIndex(prd.color, self.material->albedo, prd.debug);
+  const auto [u0, v0] = optixGetTriangleBarycentrics();
+  const int primID0 = optixGetPrimitiveIndex();
+  const vec3f surfaceAlbedo = get_albedo_at_hp(self, u0, v0, primID0);
+
+  prd.hitDiffuse = (self.material->matType == LAMBERTIAN);
+
+  const auto p_index = pIndex(prd.color, surfaceAlbedo, prd.debug);
   float randomProb = prd.random();
 
   if (randomProb < p_index) {
     switch (self.material->matType) {
       case LAMBERTIAN:
-        scatterDiffuse(prd, self);
+        scatterDiffuse(prd, self, surfaceAlbedo);
         break;
       case CONDUCTOR:
-        scatterSpecular(prd, self);
+        scatterSpecular(prd, self, surfaceAlbedo);
         break;
       case DIELECTRIC: {
-        const auto [u, v] = optixGetTriangleBarycentrics();
-        const int primID = optixGetPrimitiveIndex();
-
-        const vec3f Ng = get_normal_at_hp(self, u, v, primID);
+        const vec3f Ng = get_normal_at_hp(self, u0, v0, primID0);
         auto event = reflect_or_refract_ray(self.material->ior,  optixGetWorldRayDirection(), Ng, prd.random);
         if (event == SCATTER_SPECULAR)
-          scatterSpecular(prd, self);
+          scatterSpecular(prd, self, surfaceAlbedo);
         else
-          scatterRefract(prd, self);
+          scatterRefract(prd, self, surfaceAlbedo);
         break;
       }
     }
@@ -220,4 +266,5 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
 OPTIX_MISS_PROGRAM(miss)(){
   auto &prd = owl::getPRD<PhotonMapperPRD>();
   prd.event = MISS;
+  prd.hitDiffuse = false;
 }

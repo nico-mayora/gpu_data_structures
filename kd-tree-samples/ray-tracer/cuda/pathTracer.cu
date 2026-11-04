@@ -10,7 +10,8 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
                           const Photon *photon_map,
                           const PhotonCoord *coord_map,
                           const int num_photons,
-                          const PerRayData &prd) {
+                          const PerRayData &prd,
+                          const float max_radius = INFTY) {
     constexpr float k_filter = 1.f;
     constexpr float inv_k = 1.f / k_filter;
 #if defined(CUBIC)
@@ -24,15 +25,10 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
 
     const float query[] = { query_pos.x, query_pos.y, query_pos.z };
 
-    // Heap lives in per-thread local memory: CUDA interleaves it across the warp,
-    // so warp accesses to result.photonData[i] coalesce into 1 cache line instead
-    // of 32 (which is what the previous threadID*K layout in global memory caused).
     uint64_t heap[K];
     HeapQueryResult<K> result;
     result.initialize(heap);
-    // Traverse the coords-only array (12 bytes/node) — full photons (48 bytes)
-    // are only loaded for the K survivors below.
-    get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, 0.01,&result);
+    get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, max_radius, &result);
 
     const float radiusSqr = result.getQueryRadiusSqr();
     const float inv_radius = 1.f / sqrtf(radiusSqr);
@@ -48,8 +44,49 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
 }
 
 inline __device__
+owl::vec3f final_gather_ray(const RayGenData &self, owl::vec3f origin, owl::vec3f dir,
+                            Random &random) {
+    owl::vec3f throughput = 1.f;
+
+    for (int32_t i = 0; i < self.depth; ++i) {
+        uint32_t q0, q1;
+        PerRayData sprd;
+        owl::packPointer(&sprd, q0, q1);
+        optixTrace(
+            self.world,
+            origin,
+            dir,
+            EPS,
+            INFTY,
+            0.f,
+            OptixVisibilityMask(255),
+            OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+            PRIMARY,
+            RAY_TYPES_COUNT,
+            PRIMARY,
+            q0, q1
+        );
+
+        if (sprd.event == MISS)
+            return 0.f;
+
+        if (sprd.event == SCATTER_DIFFUSE) {
+            return throughput * gather_photons<K_GLOBAL_PHOTONS>(
+                sprd.hitPoint, self.photon_map, self.photon_coords, self.num_photons, sprd);
+        }
+
+        dir = reflect_or_refract_ray(*sprd.hpMaterial, dir, sprd.normalAtHp, random);
+        throughput *= sprd.albedo;
+        origin = sprd.hitPoint;
+    }
+
+    return 0.f;
+}
+
+inline __device__
 owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
     owl::vec3f colour_acum = 0.f;
+    owl::vec3f throughput = 1.f;
 
     for (int32_t i = 0; i < self.depth; ++i) {
         uint32_t p0, p1;
@@ -69,7 +106,11 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
             p0, p1
         );
 
-        if (prd.event == MISS || prd.event == ABSORBED)
+        if (prd.event == MISS) {
+            colour_acum += throughput * prd.missColour;
+            return colour_acum;
+        }
+        if (prd.event == ABSORBED)
             return colour_acum;
 
         if (prd.event == SCATTER_SPECULAR) {
@@ -77,12 +118,13 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
                 *prd.hpMaterial, ray.direction, prd.normalAtHp, prd.random
             );
 
+            throughput *= prd.albedo;
             ray = owl::Ray(prd.hitPoint, new_ray_dir, EPS, INFTY);
             continue;
         }
 
         auto direct_illumination_fact = calculateDirectIllumination(self, prd);
-        colour_acum += direct_illumination_fact;
+        colour_acum += throughput * direct_illumination_fact;
 
         owl::vec3f diffuse_contrib = 0.f;
         // "Reach out" into the scene and perform gathers, this gives us global lighting with less local variance.
@@ -90,39 +132,23 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
             const owl::vec3f diffuse_vector_dir =
                 cosine_weighted_hemisphere(prd.normalAtHp, prd.random);
 
-            uint32_t q0, q1;
-            PerRayData sprd;
-            owl::packPointer(&sprd, q0, q1);
-            optixTrace(
-                self.world,
-                prd.hitPoint,
-                diffuse_vector_dir,
-                EPS,
-                INFTY,
-                0.f,
-                OptixVisibilityMask(255),
-                OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-                PRIMARY,
-                RAY_TYPES_COUNT,
-                PRIMARY,
-                q0, q1
-            );
-
-            // Skip MISS: the miss program only sets `event`, leaving sprd.hpMaterial
-            // dangling. The final-gather evaluates the photon density / BRDF at the
-            // SECONDARY hit, so pass sprd (not prd) for its hitPoint/normal/material.
-            if (sprd.event != MISS) {
-                diffuse_contrib += gather_photons<K_GLOBAL_PHOTONS>(
-                    sprd.hitPoint, self.photon_map, self.photon_coords, self.num_photons, sprd);
-            }
+            if (self.num_photons > 0)
+                diffuse_contrib += final_gather_ray(self, prd.hitPoint, diffuse_vector_dir, prd.random);
         }
 
-        const owl::vec3f caustic_term = gather_photons<K_CAUSTIC_PHOTONS>(
-            prd.hitPoint, self.caustic_map, self.caustic_coords, self.num_caustic, prd);
+        constexpr float CAUSTIC_GATHER_RADIUS = 0.1f;
+        owl::vec3f caustic_term = 0.f;
+        if (self.num_caustic > 0) {
+            caustic_term = gather_photons<K_CAUSTIC_PHOTONS>(
+                prd.hitPoint, self.caustic_map, self.caustic_coords, self.num_caustic, prd,
+                CAUSTIC_GATHER_RADIUS);
+        }
 
-        // Having this would be physically correct, but looks worse:
-        // const float inv_N = 1.f / float(self.num_diffuse_scattered);
-        colour_acum += diffuse_contrib /* * inv_N*/ * prd.hpMaterial->albedo + caustic_term;
+        const float inv_M = (self.num_diffuse_scattered > 0)
+                          ? 1.f / float(self.num_diffuse_scattered) : 0.f;
+        colour_acum += throughput
+                     * (diffuse_contrib * inv_M * prd.albedo * self.indirect_intensity
+                        + caustic_term * self.caustic_intensity);
         break;
     }
 
@@ -132,42 +158,44 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
 OPTIX_RAYGEN_PROGRAM(ptRayGen)()  {
     const RayGenData &self = owl::getProgramData<RayGenData>();
     const owl::vec2i pixelID = owl::getLaunchIndex();
+    const int fbOfs = pixelID.x + self.resolution.x * pixelID.y;
 
     PerRayData prd;
-    prd.random.init(pixelID.x,pixelID.y);
+    prd.random.init(fbOfs, self.accumID);
     owl::vec3f colour = 0.f;
 
-    for (int sampleID=0; sampleID < self.pixel_samples; sampleID++) {
-        owl::Ray ray;
+    owl::Ray ray;
+    const owl::vec2f pixelSample(prd.random(),prd.random());
+    const owl::vec2f screen
+      = (owl::vec2f(pixelID)+pixelSample)
+      / owl::vec2f(self.resolution);
+    const owl::vec3f origin = self.camera.pos;
+    const owl::vec3f direction
+        = normalize(self.camera.dir_00
+            + screen.u * self.camera.dir_du
+            + screen.v * self.camera.dir_dv);
 
-        const owl::vec2f pixelSample(prd.random(),prd.random());
-        const owl::vec2f screen
-          = (owl::vec2f(pixelID)+pixelSample)
-          / owl::vec2f(self.resolution);
-        const owl::vec3f origin = self.camera.pos;
-        const owl::vec3f direction
-            = normalize(self.camera.dir_00
-                + screen.u * self.camera.dir_du
-                + screen.v * self.camera.dir_dv);
+    ray.origin = origin;
+    ray.direction = direction;
 
-        ray.origin = origin;
-        ray.direction = direction;
+    colour += trace_path(self, ray, prd);
 
-        colour += trace_path(self, ray, prd);
-    }
+    const owl::vec3f accum = (self.accumID == 0)
+                           ? colour
+                           : self.accumBuffer[fbOfs] + colour;
+    self.accumBuffer[fbOfs] = accum;
 
-    colour *= 1.f / self.pixel_samples;
-    colour = filter_colour(colour);
-
-    const int fbOfs = pixelID.x+self.resolution.x*pixelID.y;
-    self.fbPtr[fbOfs] = owl::make_rgba(colour);
+    const owl::vec3f mean = accum / static_cast<float>(self.accumID + 1);
+    self.fbPtr[fbOfs] = owl::make_rgba(filter_colour(mean));
 }
 
 
 OPTIX_MISS_PROGRAM(miss)()
 {
+    const auto &self = owl::getProgramData<MissProgData>();
     auto &prd = owl::getPRD<PerRayData>();
     prd.event = MISS;
+    prd.missColour = self.sky_colour;
 }
 
 OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
@@ -183,6 +211,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
     const owl::vec3f rayOrg = optixGetWorldRayOrigin();
 
     prd.hpMaterial = self.material;
+    prd.albedo = get_albedo_at_hp(self, u, v, primID);
     prd.event = (self.material->matType == LAMBERTIAN) ? SCATTER_DIFFUSE : SCATTER_SPECULAR;
     prd.hitPoint = rayOrg + tMax * rayDir;
     prd.normalAtHp = (dot(Ng, rayDir) > 0.f) ? -Ng : Ng;

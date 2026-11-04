@@ -4,3 +4,11 @@ kdtree_cpu/cmake-build-debug
 kdtree_cpu/cmake-build-release
 kd-tree-samples/cmake-build-debug
 kd-tree-samples/cmake-build-release
+kd-tree-samples/cmake-build-test
+kd-tree-samples/photon_maps
+kd-tree-samples/*.exe
+kd-tree-samples/*.obj
+kd-tree-samples/*.log
+kd-tree-samples/*.txt
+kd-tree-samples/*.ini
+kd-tree-samples/*.dll
