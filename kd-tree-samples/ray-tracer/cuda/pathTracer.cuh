@@ -56,6 +56,7 @@ struct PerRayData {
     const Material *hpMaterial;
     owl::vec3f albedo;
     owl::vec3f hitPoint;
-    owl::vec3f normalAtHp;
+    owl::vec3f normalAtHp;   // faces the incoming ray
+    bool frontFace;          // ray hit the side the stored normal points to
     owl::vec3f missColour;
 };

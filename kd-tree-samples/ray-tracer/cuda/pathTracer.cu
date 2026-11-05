@@ -75,7 +75,7 @@ owl::vec3f final_gather_ray(const RayGenData &self, owl::vec3f origin, owl::vec3
                 sprd.hitPoint, self.photon_map, self.photon_coords, self.num_photons, sprd);
         }
 
-        dir = reflect_or_refract_ray(*sprd.hpMaterial, dir, sprd.normalAtHp, random);
+        dir = reflect_or_refract_ray(*sprd.hpMaterial, dir, sprd.normalAtHp, sprd.frontFace, random);
         throughput *= sprd.albedo;
         origin = sprd.hitPoint;
     }
@@ -115,7 +115,7 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
 
         if (prd.event == SCATTER_SPECULAR) {
             owl::vec3f new_ray_dir = reflect_or_refract_ray(
-                *prd.hpMaterial, ray.direction, prd.normalAtHp, prd.random
+                *prd.hpMaterial, ray.direction, prd.normalAtHp, prd.frontFace, prd.random
             );
 
             throughput *= prd.albedo;
@@ -214,7 +214,8 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleMesh)()
     prd.albedo = get_albedo_at_hp(self, u, v, primID);
     prd.event = (self.material->matType == LAMBERTIAN) ? SCATTER_DIFFUSE : SCATTER_SPECULAR;
     prd.hitPoint = rayOrg + tMax * rayDir;
-    prd.normalAtHp = (dot(Ng, rayDir) > 0.f) ? -Ng : Ng;
+    prd.frontFace = dot(Ng, rayDir) < 0.f;
+    prd.normalAtHp = prd.frontFace ? Ng : -Ng;
 }
 
 OPTIX_MISS_PROGRAM(shadow)()
