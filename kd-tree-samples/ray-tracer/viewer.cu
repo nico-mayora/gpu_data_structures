@@ -192,7 +192,9 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
 
 Viewer::~Viewer()
 {
-    if (!benchmarkMode)
+    // Headless runs shut ImGui down in render(); OWLViewer::showAndRun has already
+    // terminated GLFW by the time we get here, so the backends can't be shut down now.
+    if (!benchmarkMode && ImGui::GetCurrentContext())
         ImGui::DestroyContext();
 }
 
@@ -209,6 +211,10 @@ void Viewer::render()
             takeScreenshot();
             screenShotTakenHeadless = true;
             headlessDone = true;
+            // The run loop exits (and terminates GLFW) next: shut ImGui down while GLFW is alive.
+            ImGui_ImplOpenGL3_Shutdown();
+            ImGui_ImplGlfw_Shutdown();
+            ImGui::DestroyContext();
             return;
         } else {
             return;
@@ -241,7 +247,7 @@ void Viewer::draw()
 {
     OWLViewer::draw();
 
-    if (!hudVisible || benchmarkMode) return;
+    if (!hudVisible || benchmarkMode || headlessDone) return;
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
