@@ -3,6 +3,7 @@
 #include "owl/owl_host.h"
 #include "owlViewer/OWLViewer.h"
 #include "../common/data/world.cuh"
+#include <chrono>
 
 struct Viewer : owl::viewer::OWLViewer {
     explicit Viewer(const World *world, std::string scene_name = "frame", bool benchmark = false, bool visible = true);
@@ -31,6 +32,8 @@ struct Viewer : owl::viewer::OWLViewer {
     OWLBuffer accumBuffer { nullptr };
     int accumID  = 0;
     int targetSpp = 1;
+    bool headlessDone = false;  // nowindow mode: converged and screenshot written
+    std::chrono::steady_clock::time_point renderStart;
 
 private:
     void takeScreenshot();

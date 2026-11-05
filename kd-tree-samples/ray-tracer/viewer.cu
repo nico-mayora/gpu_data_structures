@@ -204,9 +204,11 @@ void Viewer::render()
         if (benchmarkMode) {
             accumID = 0;
         } else if (!visible && !screenShotTakenHeadless) {
-            std::cout << "Converged. Taking screenshot...\n";
+            const float secs = std::chrono::duration<float>(std::chrono::steady_clock::now() - renderStart).count();
+            std::cout << "Converged after " << accumID << " spp in " << secs << " s. Taking screenshot...\n";
             takeScreenshot();
             screenShotTakenHeadless = true;
+            headlessDone = true;
             return;
         } else {
             return;
@@ -214,6 +216,7 @@ void Viewer::render()
     }
 
     screenShotTakenHeadless = false;
+    if (accumID == 0) renderStart = std::chrono::steady_clock::now();
 
     // accumID is a per-launch uniform, so the SBT must be rebuilt before each launch.
     owlRayGenSet1i(rayGen, "accumID", accumID);

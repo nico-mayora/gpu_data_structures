@@ -76,6 +76,10 @@ int main(int ac, char **av)
         } else {
             std::cout << "BENCHMARK_RESULT: 0 ms" << std::endl;
         }
+    } else if (!visible) {
+        // Headless: render to convergence, save the screenshot, and exit.
+        std::cout << "Launching...\n";
+        viewer.showAndRun([&viewer]() { return !viewer.headlessDone; });
     } else {
         viewer.enableFlyMode();
         std::cout << "Launching...\n";
