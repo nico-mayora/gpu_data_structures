@@ -302,10 +302,12 @@ void Viewer::cameraChanged()
     owl::vec3f camera_d00
       = normalize(lookAt-lookFrom);
     float aspect = fbSize.x / float(fbSize.y);
+    // dir_du / dir_dv span the whole image (screen coords in [0,1]), so each is the full
+    // extent of the image plane at unit distance: 2 * tan(fovy/2) (times aspect for x).
     owl::vec3f camera_ddu
-      = tanHalfFovy * aspect * normalize(cross(camera_d00,lookUp));
+      = 2.f * tanHalfFovy * aspect * normalize(cross(camera_d00,lookUp));
     owl::vec3f camera_ddv
-      = tanHalfFovy * normalize(cross(camera_ddu,camera_d00));
+      = 2.f * tanHalfFovy * normalize(cross(camera_ddu,camera_d00));
     camera_d00 -= 0.5f * camera_ddu;
     camera_d00 -= 0.5f * camera_ddv;
 

@@ -15,7 +15,9 @@
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>
 	<sensor type="perspective">
-		<float name="fov" value="100" />
+		<!-- True FOV. Before the viewer FOV fix (2026-11-05) this read 100, which the viewer
+		     rendered as 61.5795 degrees; this value keeps that framing. -->
+		<float name="fov" value="61.5795" />
 		<!-- Camera at (900, 150, 0), inside the open courtyard, looking down -X along the atrium.
 		     Cam +Z → world -X; cam +Y → world +Y. (x>~1000 sits inside the solid end-wall masonry.) -->
 		<transform name="to_world">
