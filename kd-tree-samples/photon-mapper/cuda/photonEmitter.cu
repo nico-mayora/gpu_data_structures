@@ -2,6 +2,7 @@
 #include "./helpers.cu"
 #include "owl/common/math/vec.h"
 #include "../../common/helpers.cuh"
+#include "../../common/microfacet.cuh"
 
 #define PHOTON_ATTENUATION_FACTOR 150
 #define ATTENUATE_PHOTONS false
@@ -60,6 +61,7 @@ inline __device__ void shootPhoton(const PhotonMapperRGD &self, Ray &ray, Photon
 }
 
 inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray, PhotonMapperPRD &prd) {
+  bool hadSpecular = false;
   for (int i = 0; i < self.maxDepth; i++) {
     owl::traceRay(self.world, ray, prd);
 
@@ -68,11 +70,14 @@ inline __device__ void shootCausticsPhoton(const PhotonMapperRGD &self, Ray &ray
     }
 
     if (prd.hitDiffuse) {
-      if (i > 0) {
+      if (hadSpecular) {
         savePhoton(self, prd);
       }
-      break;
+      // A coated (plastic) surface may have reflected the photon off its clear coat:
+      // keep following it, the reflected light is a caustic for whatever it lands on.
+      if (!prd.hitSpecular || prd.event != SCATTER_SPECULAR) break;
     }
+    hadSpecular |= prd.hitSpecular;
 
     if (prd.event == ABSORBED) {
       break;
@@ -126,6 +131,15 @@ OPTIX_RAYGEN_PROGRAM(pointLightRayGen)(){
              ? (cosT - self.cosOuter) / (self.cosInner - self.cosOuter) : 1.f;
     cw = fminf(fmaxf(cw, 0.f), 1.f);
     prd.color = self.color * (cw * cw * (3.f - 2.f * cw));
+  } else if (self.lightType == LIGHT_AREA) {
+    // Uniform point on the rectangle, cosine-distributed direction about its normal:
+    // every photon then carries the same share of the emitter's flux.
+    const float a = 2.f * prd.random() - 1.f;
+    const float b = 2.f * prd.random() - 1.f;
+    const vec3f dir = cosineSampleHemisphere(self.direction, prd.random);
+    ray.origin = self.position + a * self.edgeU + b * self.edgeV;
+    ray.direction = dir;
+    prd.direction = dir;
   } else { // LIGHT_POINT
     const vec3f dir = randomPointInUnitSphere(prd.random);
     ray.origin = self.position;
@@ -140,130 +154,138 @@ OPTIX_RAYGEN_PROGRAM(pointLightRayGen)(){
   }
 }
 
-inline __device__ void scatterDiffuse(PhotonMapperPRD &prd, const TrianglesGeomData &self, const vec3f &albedo) {
-  const vec3f rayDir = optixGetWorldRayDirection();
-  const vec3f rayOrg = optixGetWorldRayOrigin();
-  const vec3f hitPoint = rayOrg + optixGetRayTmax() * rayDir;
-  const auto [u, v] = optixGetTriangleBarycentrics();
-  const int primID = optixGetPrimitiveIndex();
+// Unpolarised Fresnel reflectance; eta = n_incident / n_transmitted. 1 on total internal reflection.
+inline __device__ float fresnelDielectric(const float cos_i, const float eta, float &cos_t) {
+  const float sin2_t = eta * eta * fmaxf(0.f, 1.f - cos_i * cos_i);
+  if (sin2_t >= 1.f) { cos_t = 0.f; return 1.f; }
+  cos_t = sqrtf(1.f - sin2_t);
+  const float rs = (eta * cos_i - cos_t) / (eta * cos_i + cos_t);
+  const float rp = (cos_i - eta * cos_t) / (cos_i + eta * cos_t);
+  return 0.5f * (rs * rs + rp * rp);
+}
 
-  // Face the incoming photon so back-side hits on two-sided surfaces bounce back, not through.
-  const vec3f Ng = get_normal_at_hp(self, u, v, primID);
-  const vec3f normal = (dot(Ng, rayDir) > 0.f) ? -Ng : Ng;
-
-  prd.event = SCATTER_DIFFUSE;
+inline __device__ void absorb(PhotonMapperPRD &prd, const vec3f &hitPoint) {
+  prd.event = ABSORBED;
   prd.scattered.origin = hitPoint;
-  prd.scattered.direction = reflectDiffuse(normal, prd.random);
-  prd.scattered.color = calculatePhotonColor(prd.color, albedo, prd.debug);
-}
-
-inline __device__ void scatterSpecular(PhotonMapperPRD &prd, const TrianglesGeomData &self, const vec3f &albedo) {
-  const vec3f rayDir = optixGetWorldRayDirection();
-  const vec3f rayOrg = optixGetWorldRayOrigin();
-  const vec3f hitPoint = rayOrg + optixGetRayTmax() * rayDir;
-  const auto [u, v] = optixGetTriangleBarycentrics();
-  const int primID = optixGetPrimitiveIndex();
-
-  // Face the incoming photon (the fuzzed lobe below is tested against this side).
-  const vec3f Ng = get_normal_at_hp(self, u, v, primID);
-  const vec3f normal = (dot(Ng, rayDir) > 0.f) ? -Ng : Ng;
-
-  prd.event = SCATTER_SPECULAR;
-  prd.scattered.origin = hitPoint;
-
-  vec3f reflected = reflect(rayDir, normal);
-  const float roughness = self.material->roughness;
-  if (roughness > 0.f) {
-    const vec3f fuzzed = normalize(
-        reflected + 2.f * roughness * randomPointInUnitSphere(prd.random));
-    if (dot(fuzzed, normal) > 0.f)
-      reflected = fuzzed;
-  }
-  prd.scattered.direction = reflected;
-
-  prd.scattered.color = calculatePhotonColor(prd.color, albedo, prd.debug);
-}
-
-inline __device__ void scatterRefract(PhotonMapperPRD &prd, const TrianglesGeomData &self, const vec3f &albedo) {
-  const vec3f rayDir = optixGetWorldRayDirection();
-  const vec3f rayOrg = optixGetWorldRayOrigin();
-  const vec3f hitPoint = rayOrg + optixGetRayTmax() * rayDir;
-  const auto [u, v] = optixGetTriangleBarycentrics();
-  const int primID = optixGetPrimitiveIndex();
-
-  const vec3f normal = get_normal_at_hp(self, u, v, primID);
-
-  prd.event = SCATTER_REFRACT;
-  prd.scattered.origin = hitPoint;
-  prd.scattered.direction = refract(rayDir, normal, self.material->ior);
-  prd.scattered.color = calculatePhotonColor(prd.color, albedo, prd.debug);
-}
-
-inline __device__
-float calculate_fresnel(float ior, float cos_theta) {
-  cos_theta = fabsf(cos_theta);
-
-  // Schlick
-  float r0 = (1.0f - ior) / (1.0f + ior);
-  r0 = r0 * r0;
-  float one_minus_cos = 1.0f - cos_theta;
-  float one_minus_cos5 = one_minus_cos * one_minus_cos * one_minus_cos * one_minus_cos * one_minus_cos;
-
-  return r0 + (1.0f - r0) * one_minus_cos5;
-}
-
-inline __device__
-RayEvent reflect_or_refract_ray(float index_of_refraction,
-                                  const owl::vec3f& ray_dir,
-                                  const owl::vec3f& normal,
-                                  Random& rand)
-{
-  float cos_theta = dot(-ray_dir, normal);
-  float fresnel = calculate_fresnel(index_of_refraction, cos_theta);
-
-  if (rand() < fresnel) { // Reflect
-    return SCATTER_SPECULAR;
-  }
-
-  return SCATTER_REFRACT;
 }
 
 OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshClosestHit)(){
   auto &prd = owl::getPRD<PhotonMapperPRD>();
   const auto &self = owl::getProgramData<TrianglesGeomData>();
+  const Material &mat = *self.material;
 
-  const auto [u0, v0] = optixGetTriangleBarycentrics();
-  const int primID0 = optixGetPrimitiveIndex();
-  const vec3f surfaceAlbedo = get_albedo_at_hp(self, u0, v0, primID0);
+  const auto [u, v] = optixGetTriangleBarycentrics();
+  const int primID = optixGetPrimitiveIndex();
+  const vec3f surfaceAlbedo = get_albedo_at_hp(self, u, v, primID);
+  const vec3f rayDir = optixGetWorldRayDirection();
+  const vec3f rayOrg = optixGetWorldRayOrigin();
+  const vec3f hitPoint = rayOrg + optixGetRayTmax() * rayDir;
 
-  prd.hitDiffuse = (self.material->matType == LAMBERTIAN);
+  // Shading normal, flipped to face the incoming photon (surfaces are two-sided).
+  const vec3f Ns = get_normal_at_hp(self, u, v, primID);
+  const bool frontFace = dot(Ns, rayDir) < 0.f;
+  const vec3f n = frontFace ? Ns : -Ns;
 
-  const auto p_index = pIndex(prd.color, surfaceAlbedo, prd.debug);
-  float randomProb = prd.random();
+  prd.hitSpecular = false;
+  prd.scattered.origin = hitPoint;
 
-  if (randomProb < p_index) {
-    switch (self.material->matType) {
-      case LAMBERTIAN:
-        scatterDiffuse(prd, self, surfaceAlbedo);
-        break;
-      case CONDUCTOR:
-        scatterSpecular(prd, self, surfaceAlbedo);
-        break;
-      case DIELECTRIC: {
-        const vec3f Ng = get_normal_at_hp(self, u0, v0, primID0);
-        auto event = reflect_or_refract_ray(self.material->ior,  optixGetWorldRayDirection(), Ng, prd.random);
-        if (event == SCATTER_SPECULAR)
-          scatterSpecular(prd, self, surfaceAlbedo);
-        else
-          scatterRefract(prd, self, surfaceAlbedo);
-        break;
+  // Masked surface letting the photon through untouched.
+  if (mat.opacity < 1.f && prd.random() >= mat.opacity) {
+    prd.hitDiffuse = false;
+    prd.event = SCATTER_SPECULAR;
+    prd.scattered.direction = rayDir;
+    prd.scattered.color = prd.color;
+    return;
+  }
+
+  // Photons are stored on diffuse surfaces, except emitters (they absorb, and photons
+  // stored there would only leak into density estimates on nearby surfaces).
+  const bool emissive = mat.emission.x > 0.f || mat.emission.y > 0.f || mat.emission.z > 0.f;
+  prd.hitDiffuse = (mat.matType == LAMBERTIAN) && !emissive;
+
+  // Clear coat (plastics): Fresnel-weighted glossy reflection before the diffuse base.
+  // Decided before the albedo roulette: the coat reflects regardless of the base colour.
+  // Conditional on not being reflected, the base's albedo is exactly get_albedo_at_hp's
+  // coated albedo (it already divides out the average incident Fresnel loss).
+  // Reflected photons count as specular, so light mirrored by e.g. a glossy floor lands in
+  // the caustic map (the tracer's gathers only see diffuse radiance at the gather point).
+  if (mat.matType == LAMBERTIAN && mat.coat_r0 > 0.f) {
+    const vec3f wo = -rayDir;
+    const float cos_i = fmaxf(0.f, dot(wo, n));
+    const float F = mat.coat_r0 + (1.f - mat.coat_r0) * powf(1.f - cos_i, 5.f);
+    if (prd.random() < F) {
+      vec3f reflected = reflect(rayDir, n);
+      if (mat.coat_roughness >= GGX_MIN_ALPHA) {
+        vec3f h;
+        const float u1 = prd.random(), u2 = prd.random();
+        const float w = ggx_sample(n, wo, mat.coat_roughness, u1, u2, reflected, h);
+        if (w <= 0.f || prd.random() >= w) { absorb(prd, hitPoint); return; }
       }
+      prd.event = SCATTER_SPECULAR;
+      prd.hitSpecular = true;
+      prd.scattered.direction = reflected;
+      prd.scattered.color = prd.color;   // coat reflection is untinted
+      return;
     }
-  } else {
-    prd.event = ABSORBED;
-    const vec3f rayDir = optixGetWorldRayDirection();
-    const vec3f rayOrg = optixGetWorldRayOrigin();
-    prd.scattered.origin = rayOrg + optixGetRayTmax() * rayDir;
+  }
+
+  // Russian roulette on the surface albedo.
+  if (prd.random() >= pIndex(prd.color, surfaceAlbedo, prd.debug)) {
+    absorb(prd, hitPoint);
+    return;
+  }
+  const vec3f survivingColor = calculatePhotonColor(prd.color, surfaceAlbedo, prd.debug);
+
+  switch (mat.matType) {
+    case LAMBERTIAN:
+      prd.event = SCATTER_DIFFUSE;
+      prd.scattered.direction = reflectDiffuse(n, prd.random);
+      prd.scattered.color = survivingColor;
+      return;
+    case CONDUCTOR: {
+      vec3f reflected = reflect(rayDir, n);
+      vec3f color = survivingColor;
+      if (mat.roughness >= GGX_MIN_ALPHA) {
+        // GGX lobe; roulette on the sample weight (shadowing/masking losses).
+        vec3f h;
+        const float u1 = prd.random(), u2 = prd.random();
+        const float w = ggx_sample(n, -rayDir, mat.roughness, u1, u2, reflected, h);
+        if (w <= 0.f || prd.random() >= fminf(w, 1.f)) {
+          absorb(prd, hitPoint);
+          return;
+        }
+        if (w > 1.f) color *= w;
+      }
+      prd.event = SCATTER_SPECULAR;
+      prd.hitSpecular = true;
+      prd.scattered.direction = reflected;
+      prd.scattered.color = color;
+      return;
+    }
+    case DIELECTRIC: {
+      const float cos_i = fminf(fmaxf(-dot(rayDir, n), 0.f), 1.f);
+      const float ior = mat.ior > 0.f ? mat.ior : 1.5f;
+      const float eta = (frontFace || mat.thin) ? 1.f / ior : ior;
+      float cos_t;
+      float F = fresnelDielectric(cos_i, eta, cos_t);
+      if (mat.thin && F < 1.f) F = 2.f * F / (1.f + F);
+
+      prd.hitSpecular = true;
+      prd.scattered.color = survivingColor;
+      if (prd.random() < F) {
+        prd.event = SCATTER_SPECULAR;
+        prd.scattered.direction = reflect(rayDir, n);
+        return;
+      }
+      // Transmitted lobe, scaled by specular_transmittance via roulette.
+      if (prd.random() >= mat.transmittance) {
+        absorb(prd, hitPoint);
+        return;
+      }
+      prd.event = SCATTER_REFRACT;
+      prd.scattered.direction = mat.thin ? rayDir : normalize(eta * rayDir + (eta * cos_i - cos_t) * n);
+      return;
+    }
   }
 }
 
@@ -271,4 +293,5 @@ OPTIX_MISS_PROGRAM(miss)(){
   auto &prd = owl::getPRD<PhotonMapperPRD>();
   prd.event = MISS;
   prd.hitDiffuse = false;
+  prd.hitSpecular = false;
 }

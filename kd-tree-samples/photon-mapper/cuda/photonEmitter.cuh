@@ -26,6 +26,8 @@ struct PointLightRGD: public PhotonMapperRGD
     float cosInner;         // spot inner cone (cos)
     owl::vec3f diskCenter;  // directional: scene bounding-sphere center
     float diskRadius;       // directional: scene bounding-sphere radius
+    owl::vec3f edgeU;       // area: rectangle half-edge vectors (centre = position,
+    owl::vec3f edgeV;       //       emitting along `direction`)
 };
 
 struct PhotonMapperPRD
@@ -35,6 +37,7 @@ struct PhotonMapperPRD
     owl::vec3f direction;
     RayEvent event;
     bool hitDiffuse;
+    bool hitSpecular;       // this hit was a true specular interaction (not a mask pass-through)
     struct {
         owl::vec3f origin;
         owl::vec3f direction;

@@ -109,8 +109,29 @@ World *Mitsuba3Loader::load() {
         world->cam->image.caustic_intensity = 1.0f;
     }
 
+    if (const auto it = defaultValues.find("exposure"); it != defaultValues.end()) {
+        world->cam->image.exposure = resolveValue<float>(it->second);
+    }
+    if (const auto it = defaultValues.find("denoise"); it != defaultValues.end()) {
+        world->cam->image.denoise = it->second == "true";
+    }
+    if (const auto it = defaultValues.find("tonemap"); it != defaultValues.end()) {
+        if (it->second == "filmic") world->cam->image.tonemap = TONEMAP_FILMIC;
+        else if (it->second == "hable") world->cam->image.tonemap = TONEMAP_HABLE;
+        else std::cerr << "WARNING: unknown tonemap '" << it->second << "'; using hable" << std::endl;
+    }
+    if (const auto it = defaultValues.find("global_gather_radius"); it != defaultValues.end()) {
+        world->cam->image.global_gather_radius = resolveValue<float>(it->second);
+    }
+    if (const auto it = defaultValues.find("area_light_samples"); it != defaultValues.end()) {
+        world->cam->image.area_light_samples = resolveValue<int>(it->second);
+    }
+
     if (const auto it = defaultValues.find("casted_diffuse_photons"); it != defaultValues.end()) {
         world->casted_diffuse_photons = resolveValue<int>(it->second);
+    }
+    if (const auto it = defaultValues.find("photon_max_depth"); it != defaultValues.end()) {
+        world->photon_max_depth = resolveValue<int>(it->second);
     }
     if (const auto it = defaultValues.find("casted_caustic_photons"); it != defaultValues.end()) {
         world->casted_caustic_photons = resolveValue<int>(it->second);
@@ -197,6 +218,19 @@ static const tinyxml2::XMLElement *find_named_child(
     return nullptr;
 }
 
+// Reads a colour-ish property that may be given as <rgb> or <float>.
+static bool read_spectrum(const tinyxml2::XMLElement *parent, const char *prop, owl::vec3f &out) {
+    if (const auto rgb = find_named_child(parent, "rgb", prop)) {
+        out = parseVec3f(rgb->Attribute("value"));
+        return true;
+    }
+    if (const auto f = find_named_child(parent, "float", prop)) {
+        out = owl::vec3f(std::stof(f->Attribute("value")));
+        return true;
+    }
+    return false;
+}
+
 Material *Mitsuba3Loader::resolveSubmeshMaterial(
     const ObjSubmesh &sub, const tinyxml2::XMLElement *shape) {
     if (!sub.usemtl_name.empty()) {
@@ -238,13 +272,51 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
         }
     }
 
+    owl::vec3f emitted_radiance(0.f);
     if (const auto emitter = shape->FirstChildElement("emitter")) {
         const std::string emitter_type = emitter->Attribute("type") ? emitter->Attribute("type") : "";
         if (emitter_type == "area") {
-            std::cerr << "WARNING: area emitter on shape '" << shape_id << "' skipped" << std::endl;
+            if (!read_spectrum(emitter, "radiance", emitted_radiance)) {
+                std::cerr << "WARNING: area emitter on shape '" << shape_id << "' has no radiance" << std::endl;
+            }
         } else {
             std::cerr << "WARNING: unsupported emitter type '" << emitter_type
                       << "' inside shape; skipping" << std::endl;
+        }
+    }
+    const bool is_emitter = emitted_radiance.x > 0.f || emitted_radiance.y > 0.f || emitted_radiance.z > 0.f;
+    if (is_emitter) {
+        // Emitters get their own material copy so the emission doesn't leak to other shapes.
+        auto *m = new Material(shape_material ? *shape_material : Material{});
+        if (!shape_material) {
+            m->matType = LAMBERTIAN;
+            m->albedo = owl::vec3f(0.f);
+            m->diffuse = 1.f;
+            m->specular = 0.f;
+            m->ior = 0.f;
+        }
+        m->emission = emitted_radiance;
+        shape_material = m;
+
+        if (type == "rectangle") {
+            // Sampled area light. Mitsuba rectangles span [-1,1]^2 in local xy, emitting along +z
+            // (normals transform with the inverse transpose, i.e. cross(edge_u, edge_v) / det).
+            auto *l = new Light;
+            l->type = LIGHT_AREA;
+            l->position = owl::vec3f(tf * owl::vec4f(0, 0, 0, 1));
+            l->edge_u = owl::vec3f(tf * owl::vec4f(1, 0, 0, 0));
+            l->edge_v = owl::vec3f(tf * owl::vec4f(0, 1, 0, 0));
+            const owl::vec3f edge_w = owl::vec3f(tf * owl::vec4f(0, 0, 1, 0));
+            const owl::vec3f n = cross(l->edge_u, l->edge_v);
+            l->direction = normalize(dot(n, edge_w) < 0.f ? -n : n);
+            l->area = 4.f * length(n);
+            l->power = emitted_radiance;
+            l->cos_inner = l->cos_outer = 0.f;
+            world->lights.push_back(l);
+            m->emitter_area = l->area;
+        } else {
+            std::cerr << "WARNING: area emitter on '" << type << "' shape '" << shape_id
+                      << "' is visible but not sampled as a light (only rectangles are)" << std::endl;
         }
     }
 
@@ -256,7 +328,7 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
                       << "' has no material" << std::endl;
             std::abort();
         }
-        auto *model = new Model{ mesh, shape_material, xmlTexturePath(shape_material) };
+        auto *model = new Model{ mesh, shape_material, xmlTexturePath(shape_material), xmlBumpPath(shape_material) };
         world->models.emplace_back(model);
         return;
     }
@@ -285,14 +357,20 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
     }
 
     auto submeshes = load_obj_submeshes(obj_file_path, faceted, load_material_files);
-    const bool shape_overrides = shape->FirstChildElement("bsdf") != nullptr;
+    const bool shape_overrides = is_emitter || shape->FirstChildElement("bsdf");
     for (auto &sub : submeshes) {
         sub.mesh->applyTransform(tf);
         Material *material = shape_overrides ? shape_material : resolveSubmeshMaterial(sub, shape);
         const std::string &tex = sub.albedo_texture_path.empty()
             ? xmlTexturePath(material) : sub.albedo_texture_path;
-        world->models.emplace_back(new Model{ sub.mesh, material, tex });
+        world->models.emplace_back(new Model{ sub.mesh, material, tex, xmlBumpPath(material) });
     }
+}
+
+const std::string &Mitsuba3Loader::xmlBumpPath(const Material *material) const {
+    static const std::string kNoTexture;
+    const auto it = materialBumpTextures.find(material);
+    return it != materialBumpTextures.end() ? it->second : kNoTexture;
 }
 
 const std::string &Mitsuba3Loader::xmlTexturePath(const Material *material) const {
@@ -350,6 +428,27 @@ float Mitsuba3Loader::getTransmissionCoeff(const Material* mat, const tinyxml2::
     std::abort();
 }
 
+// Exact unpolarised Fresnel reflectance; eta = n_transmitted / n_incident.
+static float fresnel_dielectric_host(const float cos_i, const float eta) {
+    const float sin2_t = (1.f - cos_i * cos_i) / (eta * eta);
+    if (sin2_t >= 1.f) return 1.f;
+    const float cos_t = std::sqrt(1.f - sin2_t);
+    const float rs = (cos_i - eta * cos_t) / (cos_i + eta * cos_t);
+    const float rp = (eta * cos_i - cos_t) / (eta * cos_i + cos_t);
+    return 0.5f * (rs * rs + rp * rp);
+}
+
+// Cosine-weighted hemispherical average of the Fresnel reflectance.
+static float fresnel_diffuse_reflectance(const float eta) {
+    constexpr int N = 2048;
+    double sum = 0.0;
+    for (int i = 0; i < N; ++i) {
+        const float mu2 = (float(i) + 0.5f) / float(N); // uniform in cos^2 => cosine-weighted
+        sum += fresnel_dielectric_host(std::sqrt(mu2), eta);
+    }
+    return float(sum / N);
+}
+
 static const tinyxml2::XMLElement *unwrap_twosided(const tinyxml2::XMLElement *bsdf) {
     while (bsdf) {
         const auto type = bsdf->Attribute("type");
@@ -402,10 +501,18 @@ void Mitsuba3Loader::loadReflectance(Material *material, const std::string &name
 void Mitsuba3Loader::loadMaterial(const tinyxml2::XMLElement *bsdf) {
     if (const auto type_attr = bsdf->Attribute("type"); type_attr && std::string(type_attr) == "bumpmap") {
         if (const auto wrapped = bsdf->FirstChildElement("bsdf")) {
-            std::cerr << "WARNING: bumpmap wrapper dropped; loading wrapped BSDF '"
-                      << (wrapped->Attribute("id") ? wrapped->Attribute("id") : "<unnamed>")
-                      << "' without bump mapping" << std::endl;
             loadMaterial(wrapped);
+            const char *wid = wrapped->Attribute("id");
+            const auto it = wid ? materials.find(wid) : materials.end();
+            const auto map = find_named_child(bsdf, "texture", "map");
+            const auto file = map ? find_named_child(map, "string", "filename") : nullptr;
+            if (it != materials.end() && file) {
+                materialBumpTextures[it->second] = sceneDir + "/" + file->Attribute("value");
+                if (const auto scale = find_named_child(bsdf, "float", "scale"))
+                    it->second->bump_scale = resolveValue<float>(scale->Attribute("value"));
+            } else {
+                std::cerr << "WARNING: bumpmap without a usable bitmap 'map' dropped" << std::endl;
+            }
         }
         return;
     }
@@ -419,8 +526,20 @@ void Mitsuba3Loader::loadMaterial(const tinyxml2::XMLElement *bsdf) {
 }
 
 Material *Mitsuba3Loader::parseMaterial(const tinyxml2::XMLElement *bsdf, const std::string &name) {
+    // Mask: remember the opacity, then parse the wrapped BSDF as usual.
+    float opacity = 1.f;
+    for (auto b = bsdf; b; b = b->FirstChildElement("bsdf")) {
+        const auto t = b->Attribute("type");
+        if (!t || (std::string(t) != "twosided" && std::string(t) != "mask")) break;
+        if (std::string(t) == "mask") {
+            owl::vec3f op(1.f);
+            if (read_spectrum(b, "opacity", op)) opacity = (op.x + op.y + op.z) / 3.f;
+        }
+    }
+
     const auto inner = unwrap_twosided(bsdf);
     auto material = new Material;
+    material->opacity = opacity;
 
     const std::string type = inner->Attribute("type");
 
@@ -431,19 +550,42 @@ Material *Mitsuba3Loader::parseMaterial(const tinyxml2::XMLElement *bsdf, const 
         material->specular = getSpecularCoeff(material, inner);
         material->ior = getTransmissionCoeff(material, inner);
     } else if (type == "roughplastic" || type == "plastic") {
+        // Diffuse base under a dielectric clear coat. The coat is handled as a
+        // Fresnel-weighted (optionally fuzzed) mirror lobe on top of the Lambertian.
         material->matType = LAMBERTIAN;
         loadReflectance(material, name, inner, "diffuse_reflectance");
         material->diffuse = 1.f;
         material->specular = 0.f;
         material->ior = 0.f;
-        std::cerr << "WARNING: " << type << " '" << name
-                  << "' collapsed to LAMBERTIAN; specular coat dropped" << std::endl;
-    } else if (type == "dielectric") {
+        float int_ior = 1.49f; // Mitsuba default (polypropylene)
+        if (const auto e = find_named_child(inner, "float", "int_ior")) int_ior = resolveValue<float>(e->Attribute("value"));
+        float ext_ior = 1.f;
+        if (const auto e = find_named_child(inner, "float", "ext_ior")) ext_ior = resolveValue<float>(e->Attribute("value"));
+        const float eta = int_ior / ext_ior;
+        material->coat_r0 = ((eta - 1.f) / (eta + 1.f)) * ((eta - 1.f) / (eta + 1.f));
+        // Light enters through the coat (avg. transmission 1 - Fdr_ext), bounces between the
+        // base and the coat (1 / (1 - rho * Fdr_int)) and is spread over a smaller solid angle
+        // on exit (1 / eta^2). The exit-side (1 - F) is applied per view direction by the tracer.
+        material->coat_diffuse_scale = (1.f - fresnel_diffuse_reflectance(eta)) / (eta * eta);
+        material->coat_fdr_int = fresnel_diffuse_reflectance(1.f / eta);
+        material->coat_nonlinear = true; // Tungsten's behaviour; Mitsuba defaults to false
+        if (const auto nl = find_named_child(inner, "boolean", "nonlinear"))
+            material->coat_nonlinear = std::string(nl->Attribute("value")) == "true";
+        if (type == "roughplastic") {
+            material->coat_roughness = 0.1f; // Mitsuba default alpha
+            if (const auto a = find_named_child(inner, "float", "alpha")) material->coat_roughness = resolveValue<float>(a->Attribute("value"));
+        }
+    } else if (type == "dielectric" || type == "thindielectric") {
         material->matType = DIELECTRIC;
         material->albedo = 1.f;
         material->diffuse = getDiffuseCoeff(material, inner);
         material->specular = getSpecularCoeff(material, inner);
         material->ior = getTransmissionCoeff(material, inner);
+        material->thin = (type == "thindielectric");
+        owl::vec3f trans(1.f);
+        if (read_spectrum(inner, "specular_transmittance", trans)) {
+            material->transmittance = (trans.x + trans.y + trans.z) / 3.f;
+        }
     } else if (type == "conductor") {
         material->matType = CONDUCTOR;
         material->albedo = conductorAlbedo(inner);
@@ -518,6 +660,24 @@ void Mitsuba3Loader::loadSensor(const tinyxml2::XMLElement *sensor) {
             }
         }
     }
+
+    // The viewer takes a vertical FOV; Mitsuba's `fov` is measured along `fov_axis`
+    // (default "x"). Convert so the framing matches Mitsuba for any aspect ratio.
+    std::string axis = "x";
+    if (const auto axis_elem = find_named_child(sensor, "string", "fov_axis"))
+        axis = axis_elem->Attribute("value");
+    const owl::vec2i res = world->cam->image.resolution;
+    const float aspect = (res.y > 0) ? float(res.x) / float(res.y) : 1.f;
+    constexpr float DEG2RAD = 0.01745329252f;
+    float tan_half = std::tan(0.5f * world->cam->image.fov * DEG2RAD);
+    if (axis == "x" || (axis == "smaller" && aspect < 1.f) || (axis == "larger" && aspect > 1.f)) {
+        tan_half /= aspect;
+    } else if (axis == "diagonal") {
+        tan_half /= std::sqrt(aspect * aspect + 1.f);
+    } else if (axis != "y" && axis != "smaller" && axis != "larger") {
+        std::cerr << "WARNING: unknown fov_axis '" << axis << "'; treating fov as vertical" << std::endl;
+    }
+    world->cam->image.fov = 2.f * std::atan(tan_half) / DEG2RAD;
 }
 
 Mat4f load_transform(const tinyxml2::XMLElement* transform) {

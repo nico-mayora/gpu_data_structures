@@ -81,12 +81,35 @@ struct Material {
     float ior;
     // Microfacet alpha for CONDUCTOR, 0 = perfect mirror.
     float roughness = 0.f;
+    // Radiance emitted from the front face (area emitters). Zero for non-emitters.
+    owl::vec3f emission = 0.f;
+    // Area of the emitter when it is also sampled as a light (for MIS); 0 otherwise.
+    float emitter_area = 0.f;
+    // DIELECTRIC only: scale on the refracted lobe. 0 = reflect-only (black glass).
+    float transmittance = 1.f;
+    // DIELECTRIC only: infinitely thin slab (no bending, light passes straight through).
+    bool thin = false;
+    // LAMBERTIAN only: Fresnel reflectance at normal incidence of a clear coat on top
+    // of the diffuse base (Mitsuba plastic/roughplastic). 0 = no coat.
+    float coat_r0 = 0.f;
+    float coat_roughness = 0.f;
+    // Diffuse base under the coat (Tungsten/Mitsuba plastic): the effective albedo is
+    // rho * coat_diffuse_scale / (1 - (coat_nonlinear ? rho : 1) * coat_fdr_int).
+    float coat_diffuse_scale = 1.f;
+    float coat_fdr_int = 0.f;
+    bool coat_nonlinear = false;
+    // Probability that a ray hitting the surface is stopped (Mitsuba mask). 1 = opaque.
+    float opacity = 1.f;
+    // Multiplier on the bump-map height gradient (Mitsuba bumpmap `scale`); used only when
+    // the model has a bump texture.
+    float bump_scale = 1.f;
 };
 
 struct Model {
     Mesh *mesh;
     Material *material;
     std::string albedo_texture_path;
+    std::string bump_texture_path = {};  // height map for bump mapping; empty = none
 };
 
 struct Camera {
@@ -100,25 +123,40 @@ struct Camera {
         int num_diffuse_scattered;
         float indirect_intensity;
         float caustic_intensity;
+        float exposure = 0.7f;
+        int tonemap = 0;            // TonemapType
+        bool denoise = false;       // OptiX denoiser on the displayed/saved image
+        int area_light_samples = 1;
+        float global_gather_radius = 0.f;   // 0 = unbounded k-NN search
         owl::vec2i resolution;
         float fov;
     } image;
 };
 
 
+enum TonemapType {
+    TONEMAP_HABLE = 0,   // Hable/Uncharted2 curve + sqrt gamma (default)
+    TONEMAP_FILMIC = 1,  // Hejl/Burgess-Dawson filmic, as used by Tungsten
+};
+
 enum LightType {
     LIGHT_POINT,
     LIGHT_SPOT,
     LIGHT_DIRECTIONAL,
+    LIGHT_AREA,
 };
 
 struct Light {
     LightType type;
-    owl::vec3f position;   // point / spot
-    owl::vec3f direction;  // spot / directional (unit)
-    owl::vec3f power;      // RGB radiant intensity (point/spot) or irradiance (directional)
+    owl::vec3f position;   // point / spot; area: rectangle centre
+    owl::vec3f direction;  // spot / directional (unit); area: emitting-side normal (unit)
+    owl::vec3f power;      // RGB radiant intensity (point/spot), irradiance (directional) or radiance (area)
     float cos_inner;       // spot inner cone (cos), unused otherwise
     float cos_outer;       // spot outer cone (cos), unused otherwise
+    // Area (rectangle) lights: points are centre + s*edge_u + t*edge_v, s,t in [-1,1].
+    owl::vec3f edge_u = 0.f;
+    owl::vec3f edge_v = 0.f;
+    float area = 0.f;
 };
 
 using PointLight = Light;
@@ -179,6 +217,7 @@ struct World {
 
     int casted_diffuse_photons = 750'000;
     int casted_caustic_photons = 100;
+    int photon_max_depth = 10;   // max surface interactions per photon path
 
     owl::vec3f sky_colour = 0.f;
 
@@ -194,6 +233,7 @@ struct TrianglesGeomData {
     owl::vec3f *normal;
     owl::vec2f *texCoord;          // null when the mesh has no UVs
     cudaTextureObject_t albedoTexture; // 0 when no albedo texture is bound
+    cudaTextureObject_t bumpTexture;   // 0 when no bump map is bound (path tracer only)
     bool faceted;
 };
 

@@ -37,6 +37,8 @@ void setupPointLightRayGenProgram(Program &program) {
           { "cosInner",OWL_FLOAT,OWL_OFFSETOF(PointLightRGD,cosInner)},
           { "diskCenter",OWL_FLOAT3,OWL_OFFSETOF(PointLightRGD,diskCenter)},
           { "diskRadius",OWL_FLOAT,OWL_OFFSETOF(PointLightRGD,diskRadius)},
+          { "edgeU",OWL_FLOAT3,OWL_OFFSETOF(PointLightRGD,edgeU)},
+          { "edgeV",OWL_FLOAT3,OWL_OFFSETOF(PointLightRGD,edgeV)},
           { /* sentinel to mark end of list */ }
   };
 
@@ -144,6 +146,8 @@ void runPointLightRayGen(Program &program, const PointLight* light, bool caustic
   owlRayGenSet1f(program.rayGen,"cosInner",light->cos_inner);
   owlRayGenSet3f(program.rayGen,"diskCenter",reinterpret_cast<const owl3f&>(program.sceneCenter));
   owlRayGenSet1f(program.rayGen,"diskRadius",program.sceneRadius);
+  owlRayGenSet3f(program.rayGen,"edgeU",reinterpret_cast<const owl3f&>(light->edge_u));
+  owlRayGenSet3f(program.rayGen,"edgeV",reinterpret_cast<const owl3f&>(light->edge_v));
 
   if (causticsMode) {
     owlRayGenSetBuffer(program.rayGen,"photons",program.causticsPhotonsBuffer);
@@ -175,6 +179,7 @@ static float emissionFactor(const Program &program, const PointLight *light) {
   switch (light->type) {
     case LIGHT_SPOT:        return 2.f * PI_F * (1.f - light->cos_outer);
     case LIGHT_DIRECTIONAL: return PI_F * program.sceneRadius * program.sceneRadius;
+    case LIGHT_AREA:        return PI_F * light->area; // Lambertian emitter: Phi = pi * A * L
     default:                return 4.f * PI_F; // point
   }
 }
@@ -268,7 +273,7 @@ int main(int ac, char **av)
   std::filesystem::create_directories("photon_maps");
   auto normal_photons_filename = "photon_maps/" + scene_name + "_normal_" + std::to_string(program.castedDiffusePhotons) + ".kdt";
   auto caustic_photons_filename = "photon_maps/" + scene_name + "_caustic_" + std::to_string(program.castedCausticsPhotons) + ".kdt";
-  program.maxDepth = 10;
+  program.maxDepth = program.world->photon_max_depth;
 
   LOG_OK("Loaded world in "
     << std::chrono::duration_cast<std::chrono::milliseconds>(t_load_end - t_load_start).count()

@@ -23,6 +23,7 @@ set(pathTracer_sources
         common/data/loader/texture.cu
         common/data/pt-math.cu
         ray-tracer/viewer.cu
+        ray-tracer/denoiser.cu
         common/data/photon/photon-file-manager.cu
 )
 

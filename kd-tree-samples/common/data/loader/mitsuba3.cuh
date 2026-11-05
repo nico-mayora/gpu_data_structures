@@ -14,6 +14,7 @@ class Mitsuba3Loader {
     std::unordered_map<std::string, Material*> materials;
 
     std::unordered_map<const Material*, std::string> materialTextures;
+    std::unordered_map<const Material*, std::string> materialBumpTextures;
 
     World *world;
 
@@ -32,6 +33,7 @@ class Mitsuba3Loader {
     void loadShape(const tinyxml2::XMLElement *shape);
     Material *resolveSubmeshMaterial(const ObjSubmesh &sub, const tinyxml2::XMLElement *shape);
     const std::string &xmlTexturePath(const Material *material) const;
+    const std::string &xmlBumpPath(const Material *material) const;
 
     float getDiffuseCoeff(const Material* mat, const tinyxml2::XMLElement *bsdf);
     float getSpecularCoeff(const Material* mat, const tinyxml2::XMLElement *bsdf);

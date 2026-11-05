@@ -23,6 +23,8 @@ struct MissProgData {
 struct RayGenData {
     uint32_t *fbPtr;
     owl::vec3f *accumBuffer;   // linear radiance accumulated across launches (one vec3f/pixel)
+    owl::vec3f *albedoBuffer;  // denoiser guides, accumulated like accumBuffer (null = off)
+    owl::vec3f *normalBuffer;
     int accumID;               // launches since last reset; 0 overwrites instead of accumulating
     owl::vec2i resolution;
     OptixTraversableHandle world;
@@ -30,6 +32,10 @@ struct RayGenData {
     int num_diffuse_scattered;
     float indirect_intensity;
     float caustic_intensity;
+    float exposure;
+    int tonemap;
+    int area_light_samples;
+    float global_gather_radius;   // <= 0: unbounded
 
     Photon *photon_map;
     PhotonCoord *photon_coords;
@@ -56,7 +62,12 @@ struct PerRayData {
     const Material *hpMaterial;
     owl::vec3f albedo;
     owl::vec3f hitPoint;
-    owl::vec3f normalAtHp;   // faces the incoming ray
-    bool frontFace;          // ray hit the side the stored normal points to
+    owl::vec3f normalAtHp;   // shading normal, flipped to face the incoming ray
     owl::vec3f missColour;
+    owl::vec3f emission;     // radiance emitted towards the ray origin (0 unless an emitter's front face)
+    bool frontFace;          // ray hit the side the stored normal points to
+    // Low-discrepancy sampling state of the camera path (see qmc2): a per-pixel seed and
+    // the index of the current sample (accumID).
+    uint32_t pixelSeed;
+    int sampleIndex;
 };

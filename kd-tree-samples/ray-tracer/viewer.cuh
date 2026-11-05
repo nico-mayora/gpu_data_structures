@@ -3,6 +3,7 @@
 #include "owl/owl_host.h"
 #include "owlViewer/OWLViewer.h"
 #include "../common/data/world.cuh"
+#include "denoiser.cuh"
 #include <chrono>
 
 struct Viewer : owl::viewer::OWLViewer {
@@ -30,11 +31,19 @@ struct Viewer : owl::viewer::OWLViewer {
     int numCaustic = 0;
 
     OWLBuffer accumBuffer { nullptr };
+    // Denoiser (opt-in per scene): guide buffers accumulated alongside accumBuffer.
+    bool denoiseEnabled = false;
+    Denoiser *denoiser = nullptr;
+    OWLBuffer albedoAccumBuffer { nullptr };
+    OWLBuffer normalAccumBuffer { nullptr };
+    float exposure = 0.7f;
+    int tonemap = 0;
     int accumID  = 0;
     int targetSpp = 1;
     bool headlessDone = false;  // nowindow mode: converged and screenshot written
     std::chrono::steady_clock::time_point renderStart;
 
 private:
-    void takeScreenshot();
+    void takeScreenshot(const std::string &suffix = "");
+    void runDenoiser();
 };

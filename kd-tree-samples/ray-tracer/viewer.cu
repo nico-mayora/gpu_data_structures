@@ -32,6 +32,7 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
         { "normal",  OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,normal)},
         { "texCoord", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,texCoord)},
         { "albedoTexture", OWL_TEXTURE, OWL_OFFSETOF(TrianglesGeomData,albedoTexture)},
+        { "bumpTexture", OWL_TEXTURE, OWL_OFFSETOF(TrianglesGeomData,bumpTexture)},
         { "faceted", OWL_BOOL, OWL_OFFSETOF(TrianglesGeomData, faceted)},
         { nullptr /* Sentinel to mark end-of-list */}
     };
@@ -81,6 +82,11 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
                 owlGeomSetTexture(triangles_geom, "albedoTexture", tex);
             }
         }
+        if (!model->bump_texture_path.empty() && !mesh->uvs.empty()) {
+            if (const OWLTexture tex = load_albedo_texture(context, model->bump_texture_path)) {
+                owlGeomSetTexture(triangles_geom, "bumpTexture", tex);
+            }
+        }
 
         // Copy material to device memory.
         Material *mat_ptr;
@@ -116,11 +122,17 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
     OWLVarDecl rayGenVars[] = {
         { "fbPtr",         OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,fbPtr)},
         { "accumBuffer", OWL_BUFPTR, OWL_OFFSETOF(RayGenData,accumBuffer)},
+        { "albedoBuffer", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,albedoBuffer)},
+        { "normalBuffer", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,normalBuffer)},
         { "accumID", OWL_INT, OWL_OFFSETOF(RayGenData,accumID)},
         { "depth", OWL_INT, OWL_OFFSETOF(RayGenData,depth)},
         { "num_diffuse_scattered", OWL_INT, OWL_OFFSETOF(RayGenData,num_diffuse_scattered)},
         { "indirect_intensity", OWL_FLOAT, OWL_OFFSETOF(RayGenData,indirect_intensity)},
         { "caustic_intensity", OWL_FLOAT, OWL_OFFSETOF(RayGenData,caustic_intensity)},
+        { "exposure", OWL_FLOAT, OWL_OFFSETOF(RayGenData,exposure)},
+        { "tonemap", OWL_INT, OWL_OFFSETOF(RayGenData,tonemap)},
+        { "area_light_samples", OWL_INT, OWL_OFFSETOF(RayGenData,area_light_samples)},
+        { "global_gather_radius", OWL_FLOAT, OWL_OFFSETOF(RayGenData,global_gather_radius)},
         { "photon_map", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,photon_map)},
         { "photon_coords", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData,photon_coords)},
         { "num_photons", OWL_INT, OWL_OFFSETOF(RayGenData,num_photons)},
@@ -162,6 +174,10 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
     owlRayGenSet1i(rayGen, "num_diffuse_scattered", world->cam->image.num_diffuse_scattered);
     owlRayGenSet1f(rayGen, "indirect_intensity", world->cam->image.indirect_intensity);
     owlRayGenSet1f(rayGen, "caustic_intensity", world->cam->image.caustic_intensity);
+    owlRayGenSet1f(rayGen, "exposure", world->cam->image.exposure);
+    owlRayGenSet1i(rayGen, "tonemap", world->cam->image.tonemap);
+    owlRayGenSet1i(rayGen, "area_light_samples", world->cam->image.area_light_samples);
+    owlRayGenSet1f(rayGen, "global_gather_radius", world->cam->image.global_gather_radius);
     owlRayGenSetPointer(rayGen, "photon_map", world->photon_map);
     owlRayGenSetPointer(rayGen, "photon_coords", world->photon_coords);
     owlRayGenSet1i(rayGen, "num_photons", world->num_photons);
@@ -175,6 +191,16 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
     owlBuildPrograms(context);
     owlBuildPipeline(context);
     owlBuildSBT(context);
+
+    exposure = world->cam->image.exposure;
+    tonemap = world->cam->image.tonemap;
+    denoiseEnabled = world->cam->image.denoise && !benchmarkMode;
+    if (denoiseEnabled) {
+        std::cout << "Denoiser: ON (OptiX, albedo + normal guides)\n";
+        denoiser = new Denoiser(owlContextGetOptixContext(context, 0));
+    }
+    owlRayGenSetPointer(rayGen, "albedoBuffer", nullptr);
+    owlRayGenSetPointer(rayGen, "normalBuffer", nullptr);
 
     // HUD stats (read-only): photon counts captured once at load.
     numPhotons = world->num_photons;
@@ -196,6 +222,7 @@ Viewer::~Viewer()
     // terminated GLFW by the time we get here, so the backends can't be shut down now.
     if (!benchmarkMode && ImGui::GetCurrentContext())
         ImGui::DestroyContext();
+    delete denoiser;
 }
 
 void Viewer::render()
@@ -208,6 +235,12 @@ void Viewer::render()
         } else if (!visible && !screenShotTakenHeadless) {
             const float secs = std::chrono::duration<float>(std::chrono::steady_clock::now() - renderStart).count();
             std::cout << "Converged after " << accumID << " spp in " << secs << " s. Taking screenshot...\n";
+            if (denoiseEnabled) {
+                takeScreenshot("_raw");
+                const auto t0 = std::chrono::steady_clock::now();
+                runDenoiser();
+                std::cout << "Denoised in " << std::chrono::duration<float>(std::chrono::steady_clock::now() - t0).count() << " s\n";
+            }
             takeScreenshot();
             screenShotTakenHeadless = true;
             headlessDone = true;
@@ -236,6 +269,7 @@ void Viewer::render()
 
     accumID++;
     lastFrameMs = std::chrono::duration<float, std::milli>(end - start).count();
+    if (denoiseEnabled && visible) runDenoiser();
     if (benchmarkMode) {
         benchmarkTimes.push_back(lastFrameMs);
         std::cout << "  [benchmark] frame " << benchmarkTimes.size()
@@ -285,6 +319,14 @@ void Viewer::resize(const owl::vec2i &newSize)
         owlBufferResize(accumBuffer, n);
     }
     owlRayGenSetBuffer(rayGen, "accumBuffer", accumBuffer);
+    if (denoiseEnabled) {
+        for (OWLBuffer *b : { &albedoAccumBuffer, &normalAccumBuffer }) {
+            if (!*b) *b = owlDeviceBufferCreate(context, OWL_FLOAT3, n, nullptr);
+            else owlBufferResize(*b, n);
+        }
+        owlRayGenSetPointer(rayGen, "albedoBuffer", owlBufferGetPointer(albedoAccumBuffer, 0));
+        owlRayGenSetPointer(rayGen, "normalBuffer", owlBufferGetPointer(normalAccumBuffer, 0));
+    }
 
     cameraChanged();
 }
@@ -323,7 +365,14 @@ void Viewer::cameraChanged()
     sbtDirty = true;
 }
 
-void Viewer::takeScreenshot() {
+void Viewer::runDenoiser() {
+    denoiser->run(static_cast<const owl::vec3f*>(owlBufferGetPointer(accumBuffer, 0)),
+                  static_cast<const owl::vec3f*>(owlBufferGetPointer(albedoAccumBuffer, 0)),
+                  static_cast<const owl::vec3f*>(owlBufferGetPointer(normalAccumBuffer, 0)),
+                  accumID, fbSize, exposure, tonemap, fbPointer);
+}
+
+void Viewer::takeScreenshot(const std::string &suffix) {
     std::error_code ec;
     std::filesystem::create_directories("screenshots", ec);
 
@@ -331,7 +380,7 @@ void Viewer::takeScreenshot() {
     const std::time_t t = std::time(nullptr);
     std::strftime(ts, sizeof(ts), "%Y%m%d_%H%M%S", std::localtime(&t));
 
-    const std::string path = "screenshots/" + sceneName + "_" + ts + ".png";
+    const std::string path = "screenshots/" + sceneName + "_" + ts + suffix + ".png";
     screenShot(path);
     lastScreenshotPath = path;
 }
