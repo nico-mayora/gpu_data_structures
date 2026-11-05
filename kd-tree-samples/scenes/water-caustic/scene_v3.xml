@@ -10,6 +10,7 @@
 	<default name="caustic_intensity" value="1.0" />
 	<default name="casted_diffuse_photons" value="100000" />
 	<default name="casted_caustic_photons" value="10000000" />
+	<default name="denoise" value="true"/>
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>

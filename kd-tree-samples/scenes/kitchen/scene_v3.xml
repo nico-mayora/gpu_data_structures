@@ -1,9 +1,23 @@
 <scene version="3.0.0">
 	<default name="integrator" value="path" />
-	<default name="spp" value="64" />
+	<default name="spp" value="192" />
 	<default name="resy" value="720" />
 	<default name="resx" value="1280" />
 	<default name="max_depth" value="17" />
+	<!-- Photon-mapper / path-tracer settings (ignored by Mitsuba) -->
+	<default name="diffuse_scattered" value="2" />
+	<default name="indirect_intensity" value="1.0" />
+	<default name="caustic_intensity" value="1.0" />
+	<default name="casted_diffuse_photons" value="1000000" />
+	<default name="casted_caustic_photons" value="2000000" />
+	<default name="photon_max_depth" value="16" />
+	<default name="area_light_samples" value="4" />
+	<default name="bump_scale" value="0.002" />
+	<default name="bread_bump_scale" value="0.01" />
+	<default name="global_gather_radius" value="0.08" />
+	<default name="tonemap" value="filmic" />
+	<default name="denoise" value="false" />
+	<default name="exposure" value="1.0" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>
@@ -459,6 +473,8 @@
 		</bsdf>
 	</bsdf>
 	<bsdf type="bumpmap">
+		<!-- Gradient is per UV unit; a small scale gives Tungsten's subtle relief. -->
+		<float name="scale" value="$bump_scale" />
 		<texture name="map" type="bitmap">
 			<string name="filename" value="textures/cushion-bump.jpg" />
 			<string name="filter_type" value="bilinear" />
@@ -540,6 +556,8 @@
 		</bsdf>
 	</bsdf>
 	<bsdf type="bumpmap">
+		<!-- Gradient is per UV unit; a small scale gives Tungsten's subtle relief. -->
+		<float name="scale" value="$bread_bump_scale" />
 		<texture name="map" type="bitmap">
 			<string name="filename" value="textures/bread-bin-front-bump.png" />
 			<string name="filter_type" value="bilinear" />
