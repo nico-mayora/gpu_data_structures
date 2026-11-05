@@ -30,7 +30,12 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
     result.initialize(heap);
     get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, max_radius, &result);
 
-    const float radiusSqr = result.getQueryRadiusSqr();
+    // With a bounded search that found fewer than K photons, the farthest photon's distance
+    // can be arbitrarily small (1-2 photons right next to the query) and blow the density
+    // up into fireflies; normalise by the search radius instead (fixed-radius estimate).
+    const float radiusSqr = (max_radius < INFTY && !result.isFull())
+                          ? max_radius * max_radius
+                          : result.getQueryRadiusSqr();
     const float inv_radius = 1.f / sqrtf(radiusSqr);
     const float inv_normalization = 1.0f / (M_PI * radiusSqr * kernel_factor);
 
