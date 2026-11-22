@@ -5,7 +5,7 @@
 #include <optix_device.h>
 
 template <int K>
-inline __device__
+__device__
 owl::vec3f gather_photons(const owl::vec3f &query_pos,
                           const Photon *photon_map,
                           const PhotonCoord *coord_map,
@@ -29,12 +29,6 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
     HeapQueryResult<K> result(heap);
     get_closest_k_points_in_range<PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, max_radius, &result);
 
-    // Density-estimate radius. Only photons inside max_radius are ever admitted, so once the heap
-    // is full getQueryRadiusSqr() <= max_radius^2; while it isn't, the root is still an empty slot
-    // at INFTY. The min is therefore the farthest photon when K were found, and the search radius
-    // when fewer were (fixed-radius estimate: 1-2 photons right next to the query would otherwise
-    // blow the density up into fireflies). Unbounded queries (INFTY * INFTY = INFTY) use the
-    // farthest photon.
     const float radiusSqr = fminf(max_radius * max_radius, result.getQueryRadiusSqr());
     const float inv_radius = 1.f / sqrtf(radiusSqr);
     const float inv_normalization = 1.0f / (M_PI * radiusSqr * kernel_factor);
@@ -47,7 +41,6 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
     });
 #else
     for (int p = 0; p < K; p++) {
-        // Empty slots (index 0xFFFFFFFF) end up scattered through the heap: skip, don't stop.
         if (result.getIndex(p) == 0xFFFFFFFFu) continue;
         const Photon &photon = photon_map[result.getIndex(p)];
         illumination += calculate_photon_contrib(photon, prd, inv_radius, inv_k, inv_normalization);
@@ -149,16 +142,16 @@ owl::vec3f trace_path(const RayGenData &self, owl::Ray &ray, PerRayData &prd) {
                 diffuse_contrib += final_gather_ray(self, prd.hitPoint, diffuse_vector_dir, prd.random);
         }
 
-        constexpr float CAUSTIC_GATHER_RADIUS = 0.1f;
         owl::vec3f caustic_term = 0.f;
         if (self.num_caustic > 0) {
+            constexpr float CAUSTIC_GATHER_RADIUS = 0.1f;
             caustic_term = gather_photons<K_CAUSTIC_PHOTONS>(
                 prd.hitPoint, self.caustic_map, self.caustic_coords, self.num_caustic, prd,
                 CAUSTIC_GATHER_RADIUS);
         }
 
         const float inv_M = (self.num_diffuse_scattered > 0)
-                          ? 1.f / float(self.num_diffuse_scattered) : 0.f;
+                          ? 1.f / static_cast<float>(self.num_diffuse_scattered) : 0.f;
         colour_acum += throughput
                      * (diffuse_contrib * inv_M * prd.albedo * self.indirect_intensity
                         + caustic_term * self.caustic_intensity);

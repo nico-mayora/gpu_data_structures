@@ -192,8 +192,6 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
 
 Viewer::~Viewer()
 {
-    // Headless runs shut ImGui down in render(); OWLViewer::showAndRun has already
-    // terminated GLFW by the time we get here, so the backends can't be shut down now.
     if (!benchmarkMode && ImGui::GetCurrentContext())
         ImGui::DestroyContext();
 }
@@ -211,7 +209,7 @@ void Viewer::render()
             takeScreenshot();
             screenShotTakenHeadless = true;
             headlessDone = true;
-            // The run loop exits (and terminates GLFW) next: shut ImGui down while GLFW is alive.
+
             ImGui_ImplOpenGL3_Shutdown();
             ImGui_ImplGlfw_Shutdown();
             ImGui::DestroyContext();
@@ -302,8 +300,7 @@ void Viewer::cameraChanged()
     owl::vec3f camera_d00
       = normalize(lookAt-lookFrom);
     float aspect = fbSize.x / float(fbSize.y);
-    // dir_du / dir_dv span the whole image (screen coords in [0,1]), so each is the full
-    // extent of the image plane at unit distance: 2 * tan(fovy/2) (times aspect for x).
+
     owl::vec3f camera_ddu
       = 2.f * tanHalfFovy * aspect * normalize(cross(camera_d00,lookUp));
     owl::vec3f camera_ddv

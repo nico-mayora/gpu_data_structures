@@ -29,8 +29,6 @@ struct BaseQueryResult {
         return (static_cast<uint64_t>(__float_as_uint(dist)) << 32) | idx;
     }
 
-    // Calls f(index, dist2) for every filled slot, in slot order (not sorted by distance).
-    // All K slots are read before the first call, so loads inside f don't each wait on a slot read.
     template<typename F>
     __device__ void forEach(F &&f) const {
         uint64_t preloaded[K];
@@ -197,7 +195,7 @@ __device__ __inline__ void fcp(const float *query_pos, const P *tree_buf, const 
     get_closest_k_points_in_range<P, FcpResult>(query_pos, tree_buf, N, INFTY, result);
 }
 
-template<int K, typename P, typename ResultType>
+template<typename P, typename ResultType>
 __device__ __inline__ void knn(const float *query_pos, const P *tree_buf, const uint32_t N, ResultType *result) {
     get_closest_k_points_in_range<P, ResultType>(query_pos, tree_buf, N, INFTY, result);
 }

@@ -4,7 +4,7 @@
 	<default name="resx" value="800" />
 	<default name="resy" value="800" />
 	<default name="max_depth" value="1" />
-	<!-- Renderer-only properties below (see common/data/loader/mitsuba3.cuh). -->
+	<!-- Custom props -->
 	<default name="diffuse_scattered" value="8" />
 	<default name="load_material_files" value="true" />
 	<default name="indirect_intensity" value="10.0" />
@@ -15,11 +15,7 @@
 		<integer name="max_depth" value="$max_depth" />
 	</integrator>
 	<sensor type="perspective">
-		<!-- True FOV. Before the viewer FOV fix (2026-11-05) this read 100, which the viewer
-		     rendered as 61.5795 degrees; this value keeps that framing. -->
 		<float name="fov" value="61.5795" />
-		<!-- Camera at (900, 150, 0), inside the open courtyard, looking down -X along the atrium.
-		     Cam +Z → world -X; cam +Y → world +Y. (x>~1000 sits inside the solid end-wall masonry.) -->
 		<transform name="to_world">
 			<matrix value="0 0 -1 900  0 1 0 150  1 0 0 0  0 0 0 1" />
 		</transform>
@@ -40,27 +36,16 @@
 			<matrix value="1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1" />
 		</transform>
 	</shape>
-	<!-- Key light: warm directional "sun" raking down into the open atrium. Directional
-	     power is irradiance (W/m^2, no distance falloff), so values are small unlike the
-	     point light's W/sr intensity. The slight tilt casts parallel column shadows. -->
 	<emitter type="directional" id="Sun">
 		<rgb name="irradiance" value="3.5, 3.2, 2.6" />
 		<vector name="direction" value="0.25, -1.0, 0.05" />
 	</emitter>
 
-	<!-- Warm interior fill so the shadowed arcades the sun can't reach aren't pitch black.
-	     Intensity is W/sr with 1/d^2 falloff: over Sponza's ~700-unit throw these must be
-	     large (~1e6) to register against the directional sun, which has no falloff. -->
 	<emitter type="point" id="InteriorFill">
 		<rgb name="intensity" value="1500000, 1410000, 1140000" />
 		<point name="position" x="0" y="600" z="0" />
 	</emitter>
 
-	<!-- Accent spotlight aimed at a colored fabric drape (fabric_c, hanging at ~(677,142,201))
-	     to bleed its colour onto the floor at its base. Sits in the open courtyard at
-	     (677,500,-100), aiming +Z/down toward the drape (~470-unit throw). Near-white so the
-	     drape's own texture colour is what bleeds, not the spot's tint. The matrix's +Z column
-	     is the (normalized) aim direction (0,-0.764,0.643). -->
 	<emitter type="spot" id="DrapeSpot">
 		<rgb name="intensity" value="700000, 690000, 640000" />
 		<float name="cutoff_angle" value="26" />
