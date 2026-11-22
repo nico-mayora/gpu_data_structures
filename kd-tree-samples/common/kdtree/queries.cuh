@@ -9,8 +9,7 @@ struct BaseQueryResult {
     uint64_t *photonData;
     size_t foundPoints = 0; /* <= K */
 
-    __device__ void initialize(uint64_t *dataBufAddr) {
-        this->photonData = dataBufAddr;
+    explicit __device__ BaseQueryResult(uint64_t *photonBuffer) : photonData(photonBuffer) {
         const uint64_t defaultValue = packData(0, INFTY);
 #pragma unroll
         for (int i = 0; i < K; i++) {
@@ -37,6 +36,8 @@ struct BaseQueryResult {
 
 template<int K>
 struct FixedQueryResult : BaseQueryResult<K> {
+    using BaseQueryResult<K>::BaseQueryResult;
+
     __device__ float getQueryRadiusSqr() const {
         return this->getDistance(K-1);
     }
@@ -65,6 +66,8 @@ struct FixedQueryResult : BaseQueryResult<K> {
 // Trade-off: Results distance to query point not in ascending order.
 template<int K>
 struct HeapQueryResult : BaseQueryResult<K>{
+    using BaseQueryResult<K>::BaseQueryResult;
+
     __device__ float getQueryRadiusSqr() const {
         return this->getDistance(0);
     }

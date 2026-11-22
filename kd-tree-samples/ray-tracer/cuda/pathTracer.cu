@@ -26,8 +26,7 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
     const float query[] = { query_pos.x, query_pos.y, query_pos.z };
 
     uint64_t heap[K];
-    HeapQueryResult<K> result;
-    result.initialize(heap);
+    HeapQueryResult<K> result(heap);
     get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, max_radius, &result);
 
     // With a bounded search that found fewer than K photons, the farthest photon's distance
