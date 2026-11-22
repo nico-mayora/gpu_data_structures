@@ -27,7 +27,7 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
 
     uint64_t heap[K];
     HeapQueryResult<K> result(heap);
-    get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, max_radius, &result);
+    get_closest_k_points_in_range<PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, max_radius, &result);
 
     // Density-estimate radius. Only photons inside max_radius are ever admitted, so once the heap
     // is full getQueryRadiusSqr() <= max_radius^2; while it isn't, the root is still an empty slot
