@@ -147,7 +147,9 @@ inline __device__ void scatterDiffuse(PhotonMapperPRD &prd, const TrianglesGeomD
   const auto [u, v] = optixGetTriangleBarycentrics();
   const int primID = optixGetPrimitiveIndex();
 
-  const vec3f normal = get_normal_at_hp(self, u, v, primID);
+  // Face the incoming photon so back-side hits on two-sided surfaces bounce back, not through.
+  const vec3f Ng = get_normal_at_hp(self, u, v, primID);
+  const vec3f normal = (dot(Ng, rayDir) > 0.f) ? -Ng : Ng;
 
   prd.event = SCATTER_DIFFUSE;
   prd.scattered.origin = hitPoint;
@@ -162,7 +164,9 @@ inline __device__ void scatterSpecular(PhotonMapperPRD &prd, const TrianglesGeom
   const auto [u, v] = optixGetTriangleBarycentrics();
   const int primID = optixGetPrimitiveIndex();
 
-  const vec3f normal = get_normal_at_hp(self, u, v, primID);
+  // Face the incoming photon (the fuzzed lobe below is tested against this side).
+  const vec3f Ng = get_normal_at_hp(self, u, v, primID);
+  const vec3f normal = (dot(Ng, rayDir) > 0.f) ? -Ng : Ng;
 
   prd.event = SCATTER_SPECULAR;
   prd.scattered.origin = hitPoint;

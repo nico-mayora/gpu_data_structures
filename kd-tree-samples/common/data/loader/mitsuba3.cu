@@ -226,13 +226,22 @@ Material *Mitsuba3Loader::resolveSubmeshMaterial(
 void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
     const std::string type = shape->Attribute("type");
     const auto tf = load_transform(shape->FirstChildElement("transform"));
+    const std::string shape_id = shape->Attribute("id") ? shape->Attribute("id") : "<unnamed>";
+
+    // Material: an inline <bsdf> takes precedence over a <ref>.
+    Material *shape_material = nullptr;
+    if (const auto inline_bsdf = shape->FirstChildElement("bsdf")) {
+        shape_material = parseMaterial(inline_bsdf, shape_id);
+    } else if (const auto ref = shape->FirstChildElement("ref")) {
+        if (const char *id = ref->Attribute("id")) {
+            if (const auto it = materials.find(id); it != materials.end()) shape_material = it->second;
+        }
+    }
 
     if (const auto emitter = shape->FirstChildElement("emitter")) {
         const std::string emitter_type = emitter->Attribute("type") ? emitter->Attribute("type") : "";
         if (emitter_type == "area") {
-            std::cerr << "WARNING: area emitter on shape '"
-                      << (shape->Attribute("id") ? shape->Attribute("id") : "<unnamed>")
-                      << "' skipped" << std::endl;
+            std::cerr << "WARNING: area emitter on shape '" << shape_id << "' skipped" << std::endl;
         } else {
             std::cerr << "WARNING: unsupported emitter type '" << emitter_type
                       << "' inside shape; skipping" << std::endl;
@@ -242,15 +251,12 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
     if (type == "rectangle" || type == "cube") {
         Mesh *mesh = (type == "rectangle") ? Mesh::makeBaseRectangle() : Mesh::makeBaseCube();
         mesh->applyTransform(tf);
-        const auto ref = shape->FirstChildElement("ref");
-        if (!ref) {
-            std::cerr << "ERROR: shape '" << (shape->Attribute("id") ? shape->Attribute("id") : "<unnamed>")
-                      << "' of type '" << type << "' has no material <ref>" << std::endl;
+        if (!shape_material) {
+            std::cerr << "ERROR: shape '" << shape_id << "' of type '" << type
+                      << "' has no material" << std::endl;
             std::abort();
         }
-        const std::string mat_id = ref->Attribute("id");
-        Material *material = materials.at(mat_id);
-        auto *model = new Model{ mesh, material, xmlTexturePath(material) };
+        auto *model = new Model{ mesh, shape_material, xmlTexturePath(shape_material) };
         world->models.emplace_back(model);
         return;
     }
@@ -279,9 +285,10 @@ void Mitsuba3Loader::loadShape(const tinyxml2::XMLElement *shape) {
     }
 
     auto submeshes = load_obj_submeshes(obj_file_path, faceted, load_material_files);
+    const bool shape_overrides = shape->FirstChildElement("bsdf") != nullptr;
     for (auto &sub : submeshes) {
         sub.mesh->applyTransform(tf);
-        Material *material = resolveSubmeshMaterial(sub, shape);
+        Material *material = shape_overrides ? shape_material : resolveSubmeshMaterial(sub, shape);
         const std::string &tex = sub.albedo_texture_path.empty()
             ? xmlTexturePath(material) : sub.albedo_texture_path;
         world->models.emplace_back(new Model{ sub.mesh, material, tex });
@@ -407,11 +414,14 @@ void Mitsuba3Loader::loadMaterial(const tinyxml2::XMLElement *bsdf) {
                   << "\"> without id; it cannot be referenced" << std::endl;
         return;
     }
+    const std::string name = bsdf->Attribute("id");
+    materials.emplace(name, parseMaterial(bsdf, name));
+}
 
+Material *Mitsuba3Loader::parseMaterial(const tinyxml2::XMLElement *bsdf, const std::string &name) {
     const auto inner = unwrap_twosided(bsdf);
     auto material = new Material;
 
-    std::string name = bsdf->Attribute("id");
     const std::string type = inner->Attribute("type");
 
     if (type == "diffuse") {
@@ -459,7 +469,7 @@ void Mitsuba3Loader::loadMaterial(const tinyxml2::XMLElement *bsdf) {
         material->ior = 0.f;
     }
 
-    materials.emplace(name, material);
+    return material;
 }
 
 

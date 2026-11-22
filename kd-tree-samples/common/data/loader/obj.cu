@@ -9,6 +9,20 @@
 
 namespace {
 
+// A unique OBJ corner: (position, texcoord, normal) indices.
+struct CornerKey {
+    int v, vt, vn;
+    bool operator==(const CornerKey &o) const { return v == o.v && vt == o.vt && vn == o.vn; }
+};
+struct CornerKeyHash {
+    size_t operator()(const CornerKey &k) const {
+        size_t h = std::hash<int>()(k.v);
+        h ^= std::hash<int>()(k.vt) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        h ^= std::hash<int>()(k.vn) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        return h;
+    }
+};
+
 struct FaceRef {
     const tinyobj::shape_t *shape;
     size_t face_index;     // index into shape->mesh.num_face_vertices
@@ -24,9 +38,12 @@ Mesh *build_submesh(const tinyobj::attrib_t &attrib,
     auto *mesh = new Mesh();
     mesh->faceted = faceted;
     const bool has_uvs = !attrib.texcoords.empty();
+    // Use the file's shading normals when smooth shading is requested and every corner has one.
+    bool use_file_normals = !faceted && !attrib.normals.empty();
+    std::vector<owl::vec3f> file_normals;
 
-    // Remap original vertex_index → submesh-local index.
-    std::unordered_map<int, int> remap;
+    // Remap original (v, vt, vn) corner → submesh-local index.
+    std::unordered_map<CornerKey, int, CornerKeyHash> remap;
     bool uv_seam_warned = false;
 
     for (const auto &fr : faces) {
@@ -46,17 +63,28 @@ Mesh *build_submesh(const tinyobj::attrib_t &attrib,
         int tri_local[3];
         for (int c = 0; c < 3; c++) {
             const int orig = corners[c].vertex_index;
-            auto it = remap.find(orig);
+            const CornerKey key{ orig, corners[c].texcoord_index, corners[c].normal_index };
+            auto it = remap.find(key);
             int local;
             if (it == remap.end()) {
                 local = static_cast<int>(mesh->vertices.size());
-                remap.emplace(orig, local);
+                remap.emplace(key, local);
                 mesh->vertices.emplace_back(
                     attrib.vertices[3 * orig + 0],
                     attrib.vertices[3 * orig + 1],
                     attrib.vertices[3 * orig + 2]
                 );
                 if (has_uvs) mesh->uvs.emplace_back(0.f, 0.f);
+                if (use_file_normals) {
+                    const int ni = corners[c].normal_index;
+                    if (ni < 0) {
+                        use_file_normals = false;
+                    } else {
+                        file_normals.emplace_back(attrib.normals[3 * ni + 0],
+                                                  attrib.normals[3 * ni + 1],
+                                                  attrib.normals[3 * ni + 2]);
+                    }
+                }
             } else {
                 local = it->second;
             }
@@ -87,7 +115,13 @@ Mesh *build_submesh(const tinyobj::attrib_t &attrib,
         }
     }
 
-    if (!faceted) {
+    if (!faceted && use_file_normals && file_normals.size() == mesh->vertices.size()) {
+        mesh->normals = std::move(file_normals);
+        for (auto &n : mesh->normals) {
+            const float len = length(n);
+            n = len > 0.f ? n / len : owl::vec3f(0.f, 0.f, 1.f);
+        }
+    } else if (!faceted) {
         mesh->normals.assign(mesh->vertices.size(), owl::vec3f(0.f));
         for (const auto &tri : mesh->indices) {
             const owl::vec3f v0 = mesh->vertices[tri.x];

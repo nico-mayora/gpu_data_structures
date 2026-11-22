@@ -58,6 +58,7 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
           { "texCoord", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,texCoord)},
           { "albedoTexture", OWL_TEXTURE, OWL_OFFSETOF(TrianglesGeomData,albedoTexture)},
           { "material", OWL_BUFPTR, OWL_OFFSETOF(TrianglesGeomData,material)},
+          { "faceted", OWL_BOOL, OWL_OFFSETOF(TrianglesGeomData,faceted)},
           { /* Sentinel to mark end-of-list */ }
   };
 
@@ -96,6 +97,7 @@ GeometryData loadGeometry(OWLContext &owlContext, World* world){
     owlGeomSetBuffer(trianglesGeom,"index",indexBuffer);
     owlGeomSetBuffer(trianglesGeom,"normal", normal_buffer);
     owlGeomSetBuffer(trianglesGeom,"material", materialBuffer);
+    owlGeomSet1b(trianglesGeom,"faceted", mesh->faceted);
 
     if (!mesh->uvs.empty()) {
       OWLBuffer uv_buffer

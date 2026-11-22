@@ -110,48 +110,16 @@ owl::vec3f reflect(const owl::vec3f &incoming, const owl::vec3f &normal) {
     return incoming - 2.f * dot(incoming, normal) * normal;
 }
 
+// Unpolarised Fresnel reflectance for a dielectric interface. eta = n_incident / n_transmitted.
+// Returns 1 on total internal reflection; cos_t receives the transmitted cosine otherwise.
 inline __device__
-float calculate_fresnel(float ior, float cos_theta) {
-    cos_theta = fabsf(cos_theta);
-
-    // Schlick
-    float r0 = (1.0f - ior) / (1.0f + ior);
-    r0 = r0 * r0;
-    float one_minus_cos = 1.0f - cos_theta;
-    float one_minus_cos5 = one_minus_cos * one_minus_cos * one_minus_cos * one_minus_cos * one_minus_cos;
-
-    return r0 + (1.0f - r0) * one_minus_cos5;
-}
-
-inline __device__
-owl::vec3f calculate_refracted(const Material& material,
-                               const owl::vec3f& ray_dir,
-                               const owl::vec3f& normal,
-                               Random& rand) {
-    float cos_i = dot(-ray_dir, normal);
-    float etai_over_etat;
-    owl::vec3f outward_normal;
-
-    if (cos_i > 0.0f) {
-        etai_over_etat = 1.0f / material.ior;
-        outward_normal = normal;
-    } else {
-        etai_over_etat = material.ior;
-        outward_normal = -normal;
-    }
-
-    float cos_theta = fminf(dot(-ray_dir, outward_normal), 1.0f);
-    float sin_theta = sqrtf(1.0f - cos_theta * cos_theta);
-
-    if (etai_over_etat * sin_theta > 1.0f) {
-        // Total internal reflection - reflect using correct normal
-        return reflect(ray_dir, outward_normal);
-    }
-
-    owl::vec3f r_out_perp = etai_over_etat * (ray_dir + cos_theta * outward_normal);
-    owl::vec3f r_out_parallel = -sqrtf(fabsf(1.0f - dot(r_out_perp, r_out_perp)))
-                                * outward_normal;
-    return r_out_perp + r_out_parallel;
+float fresnel_dielectric(const float cos_i, const float eta, float &cos_t) {
+    const float sin2_t = eta * eta * fmaxf(0.f, 1.f - cos_i * cos_i);
+    if (sin2_t >= 1.f) { cos_t = 0.f; return 1.f; }
+    cos_t = sqrtf(1.f - sin2_t);
+    const float rs = (eta * cos_i - cos_t) / (eta * cos_i + cos_t);
+    const float rp = (cos_i - eta * cos_t) / (cos_i + eta * cos_t);
+    return 0.5f * (rs * rs + rp * rp);
 }
 
 inline __device__
@@ -164,7 +132,8 @@ owl::vec3f random_unit_vector(Random &rand) {
 inline __device__
 owl::vec3f reflect_or_refract_ray(const Material& material,
                                   const owl::vec3f& ray_dir,
-                                  const owl::vec3f& normal,
+                                  const owl::vec3f& normal,   // faces the incoming ray
+                                  const bool front_face,      // ray hit the side the stored normal points to
                                   Random& rand)
 {
     if (material.matType == CONDUCTOR) {
@@ -179,15 +148,18 @@ owl::vec3f reflect_or_refract_ray(const Material& material,
     }
 
     if (material.matType == DIELECTRIC) {
-        float cos_theta = dot(-ray_dir, normal);
-        float fresnel = calculate_fresnel(material.ior, cos_theta);
+        // `normal` always faces the ray, so it can't tell entering from exiting:
+        // the IOR ratio comes from which side was hit.
+        const float cos_i = fminf(fmaxf(-dot(ray_dir, normal), 0.f), 1.f);
+        const float ior = material.ior > 0.f ? material.ior : 1.5f;
+        const float eta = front_face ? 1.f / ior : ior;
+        float cos_t;
+        const float fresnel = fresnel_dielectric(cos_i, eta, cos_t);
 
-        if (rand() < fresnel) {
-            owl::vec3f outward_normal = (cos_theta > 0.0f) ? normal : -normal;
-            return reflect(ray_dir, outward_normal);
-        }
+        if (rand() < fresnel)
+            return reflect(ray_dir, normal);
 
-        return calculate_refracted(material, ray_dir, normal, rand);
+        return normalize(eta * ray_dir + (eta * cos_i - cos_t) * normal);
     }
     return 0.;
 }

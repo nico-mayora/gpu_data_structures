@@ -192,7 +192,7 @@ Viewer::Viewer(const World *world, std::string scene_name, bool benchmark, bool 
 
 Viewer::~Viewer()
 {
-    if (!benchmarkMode)
+    if (!benchmarkMode && ImGui::GetCurrentContext())
         ImGui::DestroyContext();
 }
 
@@ -204,9 +204,15 @@ void Viewer::render()
         if (benchmarkMode) {
             accumID = 0;
         } else if (!visible && !screenShotTakenHeadless) {
-            std::cout << "Converged. Taking screenshot...\n";
+            const float secs = std::chrono::duration<float>(std::chrono::steady_clock::now() - renderStart).count();
+            std::cout << "Converged after " << accumID << " spp in " << secs << " s. Taking screenshot...\n";
             takeScreenshot();
             screenShotTakenHeadless = true;
+            headlessDone = true;
+
+            ImGui_ImplOpenGL3_Shutdown();
+            ImGui_ImplGlfw_Shutdown();
+            ImGui::DestroyContext();
             return;
         } else {
             return;
@@ -214,6 +220,7 @@ void Viewer::render()
     }
 
     screenShotTakenHeadless = false;
+    if (accumID == 0) renderStart = std::chrono::steady_clock::now();
 
     // accumID is a per-launch uniform, so the SBT must be rebuilt before each launch.
     owlRayGenSet1i(rayGen, "accumID", accumID);
@@ -238,7 +245,7 @@ void Viewer::draw()
 {
     OWLViewer::draw();
 
-    if (!hudVisible || benchmarkMode) return;
+    if (!hudVisible || benchmarkMode || headlessDone) return;
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -293,10 +300,11 @@ void Viewer::cameraChanged()
     owl::vec3f camera_d00
       = normalize(lookAt-lookFrom);
     float aspect = fbSize.x / float(fbSize.y);
+
     owl::vec3f camera_ddu
-      = tanHalfFovy * aspect * normalize(cross(camera_d00,lookUp));
+      = 2.f * tanHalfFovy * aspect * normalize(cross(camera_d00,lookUp));
     owl::vec3f camera_ddv
-      = tanHalfFovy * normalize(cross(camera_ddu,camera_d00));
+      = 2.f * tanHalfFovy * normalize(cross(camera_ddu,camera_d00));
     camera_d00 -= 0.5f * camera_ddu;
     camera_d00 -= 0.5f * camera_ddv;
 

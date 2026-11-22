@@ -25,6 +25,7 @@ class Mitsuba3Loader {
     void loadLight(const tinyxml2::XMLElement *light);
     void loadSensor(const tinyxml2::XMLElement *sensor);
     void loadMaterial(const tinyxml2::XMLElement *bsdf);
+    Material *parseMaterial(const tinyxml2::XMLElement *bsdf, const std::string &name);
     void loadReflectance(Material *material, const std::string &name,
                          const tinyxml2::XMLElement *inner, const char *prop);
     owl::vec3f conductorAlbedo(const tinyxml2::XMLElement *inner);
