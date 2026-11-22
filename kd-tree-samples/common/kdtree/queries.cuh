@@ -156,10 +156,15 @@ __device__ void get_closest_k_points_in_range(const float *query_pos, const P *t
         const bool far_in_range = signed_dist * signed_dist <= max_search_radius;
 
         int next = parent;
-        if (from_parent)
-            next = close_child;
-        else if (prev == close_child)
-            next = far_in_range ? far_child : parent;
+        if (from_parent) {
+            if (close_child < N)
+                next = close_child;
+            else if (far_in_range && far_child < N)
+                next = far_child;
+        } else if (prev == close_child) {
+            if (far_in_range && far_child < N)
+                next = far_child;
+        }
 
         if (next == -1) // We're done
             return;
