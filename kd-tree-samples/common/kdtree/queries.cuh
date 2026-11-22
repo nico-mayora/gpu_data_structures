@@ -28,6 +28,24 @@ struct BaseQueryResult {
     static __inline__ __device__ uint64_t packData(const uint32_t idx, const float dist) {
         return (static_cast<uint64_t>(__float_as_uint(dist)) << 32) | idx;
     }
+
+    // Calls f(index, dist2) for every filled slot, in slot order (not sorted by distance).
+    // All K slots are read before the first call, so loads inside f don't each wait on a slot read.
+    template<typename F>
+    __device__ void forEach(F &&f) const {
+        uint64_t preloaded[K];
+#pragma unroll
+        for (int p = 0; p < K; ++p) {
+            preloaded[p] = photonData[p];
+        }
+#pragma unroll
+        for (int p = 0; p < K; ++p) {
+            if (const uint32_t idx = static_cast<uint32_t>(preloaded[p]);
+                idx != 0xFFFFFFFFu) { // valid photon, process
+                f(idx, __uint_as_float(static_cast<uint32_t>(preloaded[p] >> 32)));
+            }
+        }
+    }
 };
 
 // Implementation with a max heap. Furthest point is easily accessible; if we attempt to add a point
