@@ -29,18 +29,20 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
     HeapQueryResult<K> result(heap);
     get_closest_k_points_in_range<K, PhotonCoord, HeapQueryResult<K>>(query, coord_map, num_photons, max_radius, &result);
 
-    // With a bounded search that found fewer than K photons, the farthest photon's distance
-    // can be arbitrarily small (1-2 photons right next to the query) and blow the density
-    // up into fireflies; normalise by the search radius instead (fixed-radius estimate).
-    const float radiusSqr = (max_radius < INFTY && !result.isFull())
-                          ? max_radius * max_radius
-                          : result.getQueryRadiusSqr();
+    // Density-estimate radius. Only photons inside max_radius are ever admitted, so once the heap
+    // is full getQueryRadiusSqr() <= max_radius^2; while it isn't, the root is still an empty slot
+    // at INFTY. The min is therefore the farthest photon when K were found, and the search radius
+    // when fewer were (fixed-radius estimate: 1-2 photons right next to the query would otherwise
+    // blow the density up into fireflies). Unbounded queries (INFTY * INFTY = INFTY) use the
+    // farthest photon.
+    const float radiusSqr = fminf(max_radius * max_radius, result.getQueryRadiusSqr());
     const float inv_radius = 1.f / sqrtf(radiusSqr);
     const float inv_normalization = 1.0f / (M_PI * radiusSqr * kernel_factor);
 
     owl::vec3f illumination = 0.f;
     for (int p = 0; p < K; p++) {
-        if (result.getDistance(p) == INFTY) break;
+        // Empty slots (index 0xFFFFFFFF) end up scattered through the heap: skip, don't stop.
+        if (result.getIndex(p) == 0xFFFFFFFFu) continue;
         const Photon &photon = photon_map[result.getIndex(p)];
         illumination += calculate_photon_contrib(photon, prd, inv_radius, inv_k, inv_normalization);
     }
