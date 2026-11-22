@@ -40,12 +40,19 @@ owl::vec3f gather_photons(const owl::vec3f &query_pos,
     const float inv_normalization = 1.0f / (M_PI * radiusSqr * kernel_factor);
 
     owl::vec3f illumination = 0.f;
+#ifdef KD_GATHER_FOREACH
+    // Visit the candidate list with forEach: it reads every slot before the first photon fetch.
+    result.forEach([&](const uint32_t idx, float) {
+        illumination += calculate_photon_contrib(photon_map[idx], prd, inv_radius, inv_k, inv_normalization);
+    });
+#else
     for (int p = 0; p < K; p++) {
         // Empty slots (index 0xFFFFFFFF) end up scattered through the heap: skip, don't stop.
         if (result.getIndex(p) == 0xFFFFFFFFu) continue;
         const Photon &photon = photon_map[result.getIndex(p)];
         illumination += calculate_photon_contrib(photon, prd, inv_radius, inv_k, inv_normalization);
     }
+#endif
     return illumination;
 }
 
